@@ -3,7 +3,8 @@ import {
   Settings, Home, CheckSquare, Calendar as CalendarIcon, 
   ChefHat, Gift, X, Plus, Sparkles, Bell, 
   ChevronRight, Clock, MapPin, Send, User, Check,
-  Utensils, Star, Flame, MoreVertical, Users, BellRing, CreditCard, LogOut
+  Utensils, Star, Flame, MoreVertical, Users, BellRing, CreditCard, LogOut,
+  ShoppingCart, Loader2
 } from 'lucide-react';
 
 // --- CUSTOM STYLES & KEYFRAMES ---
@@ -159,6 +160,7 @@ export default function App() {
   const [tasks, setTasks] = useState(mockTasks);
   const [events, setEvents] = useState(mockEvents);
   const [meals, setMeals] = useState(mockMeals);
+  const [groceries, setGroceries] = useState([]);
   const [userPoints, setUserPoints] = useState({ 'Tommy': 45, 'Lily': 30 }); // Individual point banks
   
   const [showConfetti, setShowConfetti] = useState(false);
@@ -219,7 +221,7 @@ export default function App() {
       case 'calendar':
         return <CalendarView events={events} onAdd={handleAddEvent} isParent={isParent} />;
       case 'meals':
-        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} isParent={isParent} />;
+        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
       case 'rewards':
         return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
       case 'settings':
@@ -651,11 +653,14 @@ const AICopilotModal = ({ isOpen, onClose }) => {
   );
 };
 
-const MealsView = ({ meals, onAdd, onUpdate, isParent }) => {
+const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
+  
+  const [isGroceryModalOpen, setIsGroceryModalOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   
   const [meal, setMeal] = useState('');
   const [day, setDay] = useState('Today');
@@ -687,6 +692,33 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent }) => {
     setIsEditing(false);
   };
 
+  const generateGroceries = () => {
+    setIsGenerating(true);
+    setTimeout(() => {
+      const allIngredients = meals.reduce((acc, meal) => {
+        if (meal.ingredients) {
+          const items = meal.ingredients.split('\n').filter(i => i.trim());
+          return [...acc, ...items];
+        }
+        return acc;
+      }, []);
+      const uniqueItems = [...new Set(allIngredients)].map((item, i) => ({ id: i, name: item, checked: false }));
+      setGroceries(uniqueItems);
+      setIsGenerating(false);
+    }, 800); // Fake AI thinking time for effect
+  };
+
+  const toggleGrocery = (id) => {
+    setGroceries(groceries.map(g => g.id === id ? { ...g, checked: !g.checked } : g));
+  };
+
+  const openGroceryList = () => {
+    if (groceries.length === 0) {
+      generateGroceries();
+    }
+    setIsGroceryModalOpen(true);
+  };
+
   return (
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
@@ -694,7 +726,12 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent }) => {
           <h2 className="text-2xl font-extrabold text-slate-900">Meal Plan</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">What's cooking this week?</p>
         </div>
-        {isParent && <Button onClick={() => setIsModalOpen(true)} variant="premium" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Recipe</Button>}
+        <div className="flex gap-2">
+          <Button onClick={openGroceryList} variant="secondary" className="!w-auto !py-2 !px-3 text-sm">
+            <ShoppingCart className="w-4 h-4"/> <span className="hidden sm:inline">List</span>
+          </Button>
+          {isParent && <Button onClick={() => setIsModalOpen(true)} variant="premium" className="!w-auto !py-2 !px-3 text-sm"><Plus className="w-4 h-4"/> <span className="hidden sm:inline">Recipe</span></Button>}
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -827,6 +864,45 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent }) => {
             </div>
           </form>
         )}
+      </Modal>
+
+      {/* Grocery List Modal */}
+      <Modal isOpen={isGroceryModalOpen} onClose={() => setIsGroceryModalOpen(false)} title="🛒 Grocery List" fullHeight>
+        <div className="flex flex-col h-full h-[60vh]">
+          <div className="flex items-center justify-between bg-indigo-50 text-indigo-700 p-3 rounded-xl border border-indigo-100 mb-4 shrink-0">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              <span className="text-sm font-bold">AI Generated from Meals</span>
+            </div>
+            <button onClick={generateGroceries} className="text-xs font-bold bg-white px-2 py-1 rounded-lg shadow-sm hover:scale-105 transition-transform active:scale-95">
+              Regenerate
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto no-scrollbar pb-4 relative">
+            {isGenerating ? (
+              <div className="flex flex-col items-center justify-center h-full space-y-3">
+                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                <p className="text-sm font-medium text-slate-500">Compiling ingredients...</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {groceries.map(item => (
+                  <div key={item.id} onClick={() => toggleGrocery(item.id)} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${item.checked ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-100 hover:border-indigo-200 shadow-sm'}`}>
+                    <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${item.checked ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300'}`}>
+                      {item.checked && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className={`font-medium ${item.checked ? 'line-through text-slate-400' : 'text-slate-700'}`}>{item.name}</span>
+                  </div>
+                ))}
+                {groceries.length === 0 && !isGenerating && (
+                  <div className="text-center py-6 text-slate-400 text-sm">No ingredients found in your meal plan.</div>
+                )}
+              </div>
+            )}
+          </div>
+          <Button onClick={() => setIsGroceryModalOpen(false)} className="mt-auto shrink-0 pt-2">Close List</Button>
+        </div>
       </Modal>
     </div>
   );
