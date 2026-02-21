@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Settings, Home, CheckSquare, Calendar as CalendarIcon, 
-  ChefHat, Gift, X, Plus, Sparkles, Bell, 
-  ChevronRight, Clock, MapPin, Send, User, Check,
-  Utensils, Star, Flame, MoreVertical, Users, BellRing, CreditCard, LogOut,
-  ShoppingCart, Loader2, Hourglass, ArrowRight
+  ChefHat, Gift, X, Plus, Bell, ChevronRight, Clock, 
+  MapPin, Send, User, Check, Utensils, Star, Flame, 
+  MoreVertical, Users, BellRing, CreditCard, LogOut,
+  ShoppingCart, Loader2, Hourglass, ArrowRight,
+  Layers, Wand2, Smartphone, Film, Ticket
 } from 'lucide-react';
 
 // --- CUSTOM STYLES & KEYFRAMES ---
@@ -15,7 +16,7 @@ const CustomStyles = () => (
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       
       @keyframes popIn {
-        0% { transform: scale(0.8); opacity: 0; }
+        0% { transform: scale(0.95); opacity: 0; }
         100% { transform: scale(1); opacity: 1; }
       }
       
@@ -26,11 +27,11 @@ const CustomStyles = () => (
 
       @keyframes pulse-slow {
         0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.05); opacity: 0.8; }
+        50% { transform: scale(1.05); opacity: 0.9; }
       }
 
-      .animate-pop-in { animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
+      .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .animate-pulse-slow { animation: pulse-slow 4s ease-in-out infinite; }
       
       .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
     `}
@@ -41,24 +42,24 @@ const CustomStyles = () => (
 const Card = ({ children, className = '', onClick }) => (
   <div 
     onClick={onClick} 
-    className={`bg-white/90 backdrop-blur-xl rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-slate-900/5 p-5 transition-all duration-300 ${onClick ? 'cursor-pointer hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 active:scale-[0.98]' : ''} ${className}`}
+    className={`bg-white/80 backdrop-blur-2xl rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-slate-900/5 p-5 transition-all duration-300 ${onClick ? 'cursor-pointer hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 active:scale-[0.98]' : ''} ${className}`}
   >
     {children}
   </div>
 );
 
 const Button = ({ children, variant = 'primary', className = '', ...props }) => {
-  const baseStyle = "w-full font-bold rounded-2xl py-3.5 px-4 transition-all duration-300 active:scale-[0.97] flex items-center justify-center gap-2 relative overflow-hidden group disabled:opacity-50 disabled:pointer-events-none";
+  const baseStyle = "w-full font-semibold rounded-[1.25rem] py-3.5 px-4 transition-all duration-300 active:scale-[0.97] flex items-center justify-center gap-2 relative overflow-hidden group disabled:opacity-50 disabled:pointer-events-none";
   const variants = {
-    primary: "bg-indigo-600 text-white shadow-[0_4px_20px_-4px_rgba(79,70,229,0.4)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] hover:bg-indigo-500 hover:shadow-[0_8px_25px_-5px_rgba(79,70,229,0.5)]",
-    secondary: "bg-slate-100/80 backdrop-blur-sm text-slate-700 hover:bg-slate-200/80 ring-1 ring-slate-900/5",
-    premium: "bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-[0_4px_20px_-4px_rgba(139,92,246,0.4)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_8px_25px_-5px_rgba(139,92,246,0.5)] hover:scale-[1.02]",
-    outline: "border-2 border-slate-200/50 text-slate-700 hover:border-slate-300 hover:bg-slate-50 shadow-sm"
+    primary: "bg-slate-900 text-white shadow-md shadow-slate-900/20 hover:bg-slate-800",
+    secondary: "bg-white/80 backdrop-blur-md text-slate-800 hover:bg-white ring-1 ring-slate-900/10 shadow-sm",
+    premium: "bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02]",
+    outline: "border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
   };
   return (
     <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
-      <div className="relative z-10 flex items-center justify-center gap-2">{children}</div>
-      <div className="absolute inset-0 bg-white/20 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300 ease-in-out pointer-events-none rounded-2xl" style={{ mixBlendMode: 'overlay' }}></div>
+      <div className="relative z-10 flex items-center justify-center gap-2 tracking-wide">{children}</div>
+      <div className="absolute inset-0 bg-white/20 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300 ease-in-out pointer-events-none rounded-[1.25rem]" style={{ mixBlendMode: 'overlay' }}></div>
     </button>
   );
 };
@@ -68,7 +69,7 @@ const Badge = ({ children, variant = 'default', className = '' }) => {
     default: "bg-slate-100/80 text-slate-700 ring-1 ring-slate-900/5",
     success: "bg-emerald-100/80 text-emerald-700 ring-1 ring-emerald-900/5",
     warning: "bg-amber-100/80 text-amber-700 ring-1 ring-amber-900/5",
-    premium: "bg-violet-100/80 text-violet-700 ring-1 ring-violet-900/5",
+    premium: "bg-purple-100/80 text-purple-700 ring-1 ring-purple-900/5",
   };
   return (
     <span className={`text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider backdrop-blur-sm ${variants[variant]} ${className}`}>
@@ -77,21 +78,37 @@ const Badge = ({ children, variant = 'default', className = '' }) => {
   );
 };
 
+// --- SLEEK APPLE-STYLE AVATAR COMPONENT ---
+const Avatar = ({ user, size = 'md', className = '' }) => {
+  const sizes = {
+    sm: 'w-8 h-8 text-sm',
+    md: 'w-12 h-12 text-xl',
+    lg: 'w-16 h-16 text-3xl',
+    xl: 'w-24 h-24 text-5xl',
+    xxl: 'w-28 h-28 text-5xl'
+  };
+  return (
+    <div className={`flex items-center justify-center rounded-full bg-gradient-to-br ${user.color} text-white font-medium shadow-inner ring-1 ring-white/30 ${sizes[size]} ${className}`}>
+      {user.initials}
+    </div>
+  );
+};
+
 const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
   if (!isOpen) return null;
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/30 backdrop-blur-sm transition-opacity"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-opacity"
       onClick={onClose}
     >
       <div 
-        className={`bg-white/95 backdrop-blur-2xl w-full sm:w-[90%] max-w-md ${fullHeight ? 'h-[90%]' : 'max-h-[90%]'} sm:h-auto rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 shadow-2xl flex flex-col ring-1 ring-slate-900/5 relative animate-pop-in cursor-default`}
+        className={`bg-white/95 backdrop-blur-3xl w-full sm:w-[90%] max-w-md ${fullHeight ? 'h-[90%]' : 'max-h-[90%]'} sm:h-auto rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 shadow-2xl flex flex-col ring-1 ring-slate-900/5 relative animate-pop-in cursor-default`}
         onClick={e => e.stopPropagation()}
       >
-        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-5 sm:hidden opacity-60"></div>
+        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-6 sm:hidden opacity-60"></div>
         <div className="flex justify-between items-center mb-6 shrink-0">
-          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{title}</h2>
-          <button onClick={onClose} className="p-2 bg-slate-100/80 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-all hover:rotate-90 duration-300">
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">{title}</h2>
+          <button onClick={onClose} className="p-2 bg-slate-100/80 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-all hover:rotate-90 duration-300">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -106,7 +123,7 @@ const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
 // --- CONFETTI ANIMATION ---
 const Confetti = ({ active }) => {
   if (!active) return null;
-  const colors = ['bg-indigo-500', 'bg-violet-500', 'bg-emerald-400', 'bg-amber-400', 'bg-rose-400'];
+  const colors = ['bg-indigo-500', 'bg-purple-500', 'bg-emerald-400', 'bg-amber-400', 'bg-pink-400'];
   return (
     <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden flex justify-center items-center">
       {[...Array(30)].map((_, i) => (
@@ -129,10 +146,10 @@ const Confetti = ({ active }) => {
 
 // --- MOCK DATA ---
 const MOCK_USERS = [
-  { id: 'p1', name: "Sarah", role: "Parent", avatar: "👩‍🦰" },
-  { id: 'p2', name: "Dad", role: "Parent", avatar: "👨" },
-  { id: 'c1', name: "Tommy", role: "Child", avatar: "👦" },
-  { id: 'c2', name: "Lily", role: "Child", avatar: "👧" }
+  { id: 'p1', name: "Sarah", role: "Parent", initials: "S", color: "from-pink-500 to-rose-500" },
+  { id: 'p2', name: "Dad", role: "Parent", initials: "D", color: "from-blue-500 to-cyan-500" },
+  { id: 'c1', name: "Tommy", role: "Child", initials: "T", color: "from-emerald-400 to-teal-500" },
+  { id: 'c2', name: "Lily", role: "Child", initials: "L", color: "from-purple-500 to-indigo-500" }
 ];
 const mockTasks = [
   { id: 1, title: "Empty Dishwasher", assignee: "Tommy", points: 10, status: 'open' },
@@ -150,9 +167,9 @@ const mockMeals = [
   { id: 3, day: "Wednesday", meal: "Grilled Chicken & Veggies", prepTime: "45m prep", tags: ["Healthy"], ingredients: "2 Chicken Breasts\n1 bunch Asparagus\n2 tbsp Olive Oil\nSalt, Pepper, Garlic Powder", instructions: "1. Preheat grill or pan.\n2. Season chicken and vegetables.\n3. Grill chicken until cooked through.\n4. Roast or grill asparagus until tender." },
 ];
 const mockRewards = [
-  { id: 1, title: "30 Min Extra Screen Time", cost: 20, icon: "📱", color: "bg-blue-100 text-blue-600" },
-  { id: 2, title: "Choose Movie Night Film", cost: 50, icon: "🍿", color: "bg-purple-100 text-purple-600" },
-  { id: 3, title: "Ice Cream Trip", cost: 100, icon: "🍦", color: "bg-pink-100 text-pink-600" },
+  { id: 1, title: "30 Min Screen Time", cost: 20, icon: <Smartphone className="w-6 h-6"/>, color: "bg-blue-100 text-blue-600" },
+  { id: 2, title: "Choose Movie Night", cost: 50, icon: <Film className="w-6 h-6"/>, color: "bg-purple-100 text-purple-600" },
+  { id: 3, title: "Special Activity", cost: 100, icon: <Ticket className="w-6 h-6"/>, color: "bg-pink-100 text-pink-600" },
 ];
 
 // --- MAIN APP COMPONENT ---
@@ -293,53 +310,54 @@ export default function App() {
       <Confetti active={showConfetti} />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto w-full max-w-2xl mx-auto pb-32 pt-8 px-4 sm:px-6 relative">
-        {/* Header section */}
-        {activeTab === 'home' && (
-          <header className="flex justify-between items-start mb-8 animate-pop-in">
-            <div>
-              <p className="text-[13px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <CalendarIcon className="w-4 h-4"/> Today
-              </p>
-              <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                Good afternoon,<br/>{activeUser.name}
-              </h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="relative cursor-pointer group" onClick={() => setIsUserSwitcherOpen(true)}>
-                <div className="absolute -inset-1.5 bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full blur opacity-20 group-hover:opacity-60 transition duration-500"></div>
-                <div className="relative w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl shadow-sm border-2 border-white ring-1 ring-slate-100/50">
-                  {activeUser.avatar}
-                </div>
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 border-[2px] border-white rounded-full shadow-sm flex items-center justify-center text-[9px] text-white font-bold z-10">
-                  {isParent ? 'P' : 'C'}
-                </span>
-                {isParent && pendingApprovalTasks.length > 0 && (
-                  <span className="absolute top-0 right-0 w-3 h-3 bg-rose-500 border-2 border-white rounded-full shadow-sm animate-pulse -translate-y-1/2 translate-x-1/2 z-20"></span>
-                )}
+      <main className="flex-1 overflow-y-auto w-full max-w-2xl mx-auto pb-32 pt-6 px-4 sm:px-6 relative">
+        
+        {/* Global Header (Always visible on all tabs) */}
+        <header className="flex justify-between items-start mb-6 min-h-[64px] shrink-0">
+          <div className="flex-1">
+            {activeTab === 'home' && (
+              <div className="animate-pop-in">
+                <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5"/> Today
+                </p>
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight leading-tight">
+                  Good afternoon,<br/>{activeUser.name}
+                </h1>
               </div>
-              {isParent && (
-                <button 
-                  onClick={() => setActiveTab('settings')}
-                  className="p-3 bg-white/80 backdrop-blur-sm rounded-full shadow-sm ring-1 ring-slate-900/5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 active:scale-95 transition-all"
-                >
-                  <MoreVertical className="w-5 h-5" />
-                </button>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-3 z-20 shrink-0 ml-4 pt-1">
+            <div className="relative cursor-pointer group" onClick={() => setIsUserSwitcherOpen(true)}>
+              <Avatar user={activeUser} size="md" className="group-hover:scale-105 transition-transform duration-300 shadow-sm" />
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 border-[2px] border-slate-50 rounded-full shadow-sm flex items-center justify-center text-[9px] text-white font-bold z-10">
+                {isParent ? 'P' : 'C'}
+              </span>
+              {isParent && pendingApprovalTasks.length > 0 && (
+                <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-rose-500 border-2 border-slate-50 rounded-full shadow-sm animate-pulse z-20 -translate-y-1/3 translate-x-1/3"></span>
               )}
             </div>
-          </header>
-        )}
+            {isParent && (
+              <button 
+                onClick={() => setActiveTab('settings')}
+                className={`w-11 h-11 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-full shadow-sm ring-1 ring-slate-900/5 hover:text-slate-800 hover:bg-slate-100 active:scale-95 transition-all ${activeTab === 'settings' ? 'text-indigo-600 bg-indigo-50 ring-indigo-200' : 'text-slate-500'}`}
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </header>
 
         {renderContent()}
       </main>
 
-      {/* Floating Action Button for AI Copilot */}
+      {/* Sleek Minimalist AI Copilot FAB */}
       {isParent && (
         <button 
           onClick={() => setIsCopilotOpen(true)}
-          className="fixed bottom-28 right-4 sm:right-8 z-40 bg-gradient-to-r from-violet-600 to-indigo-600 text-white p-4 rounded-full shadow-[0_8px_30px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all group"
+          className="fixed bottom-24 right-4 sm:right-8 z-40 bg-white/95 backdrop-blur-xl text-indigo-600 p-3.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] ring-1 ring-slate-900/5 hover:scale-105 active:scale-95 transition-all group flex items-center justify-center"
         >
-          <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+          <Wand2 className="w-5 h-5 group-hover:rotate-12 transition-transform" />
         </button>
       )}
 
@@ -353,9 +371,9 @@ export default function App() {
             <div 
               key={user.id} 
               onClick={() => { setActiveUser(user); setIsUserSwitcherOpen(false); }}
-              className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser.id === user.id ? 'bg-indigo-50 ring-2 ring-indigo-500' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}
+              className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser.id === user.id ? 'bg-indigo-50 ring-1 ring-indigo-200' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}
             >
-              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-2xl shadow-sm">{user.avatar}</div>
+              <Avatar user={user} size="md" />
               <div>
                 <h4 className="font-bold text-slate-800">{user.name}</h4>
                 <p className="text-xs font-medium text-slate-500">{user.role}</p>
@@ -368,7 +386,7 @@ export default function App() {
 
       {/* Premium Floating iOS-Style Dock */}
       <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-4 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent z-40 pointer-events-none flex justify-center">
-        <nav className="bg-white/80 backdrop-blur-2xl px-2 py-2 flex justify-between items-center shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] rounded-[2rem] ring-1 ring-slate-900/5 overflow-x-auto no-scrollbar w-full max-w-md pointer-events-auto">
+        <nav className="bg-white/90 backdrop-blur-2xl px-2 py-2 flex justify-between items-center shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] rounded-full ring-1 ring-slate-900/5 overflow-x-auto no-scrollbar w-full max-w-md pointer-events-auto">
           {[
             { id: 'home', icon: Home, label: 'Today' },
             { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
@@ -382,13 +400,13 @@ export default function App() {
               <button 
                 key={item.id} 
                 onClick={() => setActiveTab(item.id)}
-                className={`relative flex flex-col items-center justify-center gap-1 transition-all duration-300 flex-1 min-w-[50px] py-2 ${isActive ? 'text-indigo-600 scale-110' : 'text-slate-400 hover:text-slate-600 hover:scale-105 active:scale-95'}`}
+                className={`relative flex flex-col items-center justify-center gap-1 transition-all duration-300 flex-1 min-w-[50px] py-2 ${isActive ? 'text-indigo-600 scale-105' : 'text-slate-400 hover:text-slate-600 hover:scale-105 active:scale-95'}`}
               >
                 {isActive && (
-                  <div className="absolute inset-0 bg-indigo-50/80 rounded-[1.5rem] -z-10"></div>
+                  <div className="absolute inset-0 bg-indigo-50/80 rounded-full -z-10"></div>
                 )}
                 <Icon className={`w-5 h-5 transition-all duration-300 ${isActive ? 'fill-indigo-100/50' : ''}`} />
-                <span className={`text-[9px] tracking-wide transition-all mt-0.5 ${isActive ? 'font-extrabold' : 'font-semibold'}`}>{item.label}</span>
+                <span className={`text-[9px] tracking-wide transition-all mt-0.5 ${isActive ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
               </button>
             )
           })}
@@ -401,14 +419,14 @@ export default function App() {
 // --- SUB-VIEWS ---
 
 const SplashScreen = () => (
-  <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 flex flex-col items-center justify-center text-white relative overflow-hidden transition-opacity duration-500">
-    <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
-    <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+  <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white relative overflow-hidden transition-opacity duration-500">
+    <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[100px]"></div>
+    <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[100px]"></div>
     
-    <div className="w-28 h-28 bg-white/20 backdrop-blur-xl rounded-[2.5rem] flex items-center justify-center mb-6 shadow-2xl border border-white/30 animate-pulse-slow">
-      <Sparkles className="w-14 h-14 text-white" />
+    <div className="flex flex-col items-center animate-pulse-slow z-10">
+      <Layers className="w-16 h-16 text-white mb-6 drop-shadow-2xl" strokeWidth={1.5} />
+      <h1 className="text-3xl font-semibold tracking-wide drop-shadow-lg">FamilyOS</h1>
     </div>
-    <h1 className="text-5xl font-extrabold tracking-tight drop-shadow-lg animate-pop-in">FamilyOS</h1>
   </div>
 );
 
@@ -417,17 +435,17 @@ const OnboardingFlow = ({ onComplete }) => {
   
   const content = [
     {
-      icon: <Users className="w-12 h-12 text-indigo-500" />,
+      icon: <Users className="w-10 h-10 text-indigo-500" strokeWidth={1.5} />,
       title: "Welcome to FamilyOS",
       desc: "The smart operating system designed to keep your modern family organized, together."
     },
     {
-      icon: <Sparkles className="w-12 h-12 text-violet-500" />,
+      icon: <Wand2 className="w-10 h-10 text-purple-500" strokeWidth={1.5} />,
       title: "Meet Your Copilot",
       desc: "Instantly generate meal plans, auto-create grocery lists, and resolve scheduling conflicts using AI."
     },
     {
-      icon: <Gift className="w-12 h-12 text-emerald-500" />,
+      icon: <Gift className="w-10 h-10 text-emerald-500" strokeWidth={1.5} />,
       title: "Gamify the Household",
       desc: "Kids earn points by completing assigned chores and can redeem them for real-life rewards."
     }
@@ -437,25 +455,25 @@ const OnboardingFlow = ({ onComplete }) => {
     <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-pop-in max-w-md mx-auto w-full">
         
-        <div className="w-24 h-24 bg-white rounded-full shadow-xl shadow-indigo-500/10 flex items-center justify-center mb-8 ring-1 ring-slate-900/5 transition-all">
+        <div className="w-20 h-20 bg-white rounded-[1.5rem] shadow-xl shadow-slate-200/50 flex items-center justify-center mb-8 ring-1 ring-slate-900/5 transition-all">
           {content[step].icon}
         </div>
         
-        <h2 className="text-3xl font-extrabold text-slate-900 mb-4 tracking-tight leading-tight">
+        <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">
           {content[step].title}
         </h2>
         
-        <p className="text-slate-500 text-lg leading-relaxed font-medium">
+        <p className="text-slate-500 text-base leading-relaxed font-medium">
           {content[step].desc}
         </p>
 
       </div>
 
-      <div className="bg-white px-6 pb-12 pt-6 rounded-t-[3rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.05)] flex flex-col items-center max-w-md mx-auto w-full">
+      <div className="bg-white px-6 pb-12 pt-8 rounded-t-[2.5rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.03)] flex flex-col items-center max-w-md mx-auto w-full">
         {/* Dots */}
         <div className="flex gap-2 mb-8">
           {[0, 1, 2].map(idx => (
-            <div key={idx} className={`h-2 rounded-full transition-all duration-300 ${step === idx ? 'w-8 bg-indigo-600' : 'w-2 bg-slate-200'}`} />
+            <div key={idx} className={`h-1.5 rounded-full transition-all duration-300 ${step === idx ? 'w-6 bg-slate-800' : 'w-1.5 bg-slate-200'}`} />
           ))}
         </div>
 
@@ -464,10 +482,9 @@ const OnboardingFlow = ({ onComplete }) => {
             if (step < 2) setStep(step + 1);
             else onComplete();
           }} 
-          className="w-full !py-4 text-lg"
+          className="w-full text-base"
         >
           {step < 2 ? 'Continue' : 'Get Started'}
-          {step < 2 && <ArrowRight className="w-5 h-5 ml-1" />}
         </Button>
       </div>
     </div>
@@ -475,26 +492,22 @@ const OnboardingFlow = ({ onComplete }) => {
 };
 
 const LoginScreen = ({ onLogin, users }) => (
-  <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
-    {/* Background decorative blobs */}
-    <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
-    <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+  <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
+    {/* Soft OS background glows */}
+    <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]"></div>
+    <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-500/20 rounded-full blur-[100px]"></div>
     
-    <div className="mb-16 text-center animate-pop-in relative z-10">
-      <div className="w-24 h-24 bg-white/20 backdrop-blur-xl rounded-[2rem] mx-auto flex items-center justify-center mb-6 shadow-2xl border border-white/30">
-        <Sparkles className="w-12 h-12 text-white" />
-      </div>
-      <h1 className="text-5xl font-extrabold tracking-tight mb-3 drop-shadow-lg">FamilyOS</h1>
-      <p className="text-indigo-50 text-lg font-medium tracking-wide">Who's using the app today?</p>
+    <div className="mb-16 text-center animate-pop-in relative z-10 flex flex-col items-center">
+      <Layers className="w-12 h-12 text-white/90 mb-6 drop-shadow-lg" strokeWidth={1.5} />
+      <h1 className="text-3xl font-semibold tracking-wide mb-2 text-white/90">FamilyOS</h1>
+      <p className="text-white/50 text-sm font-medium tracking-wide">Select your profile</p>
     </div>
     
-    <div className="grid grid-cols-2 gap-x-8 gap-y-10 w-full max-w-sm animate-pop-in relative z-10" style={{animationDelay: '0.1s'}}>
+    <div className="grid grid-cols-2 gap-x-10 gap-y-12 w-full max-w-sm animate-pop-in relative z-10" style={{animationDelay: '0.1s'}}>
       {users.map(u => (
         <div key={u.id} onClick={() => onLogin(u)} className="flex flex-col items-center gap-4 cursor-pointer group">
-          <div className="w-28 h-28 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-5xl shadow-xl border-2 border-white/40 group-hover:scale-110 group-hover:bg-white/30 transition-all duration-300">
-            {u.avatar}
-          </div>
-          <span className="font-bold text-lg tracking-wide text-white/90 group-hover:text-white">{u.name}</span>
+          <Avatar user={u} size="xxl" className="group-hover:scale-105 transition-transform duration-300 shadow-2xl border-white/20" />
+          <span className="font-medium text-base tracking-wide text-white/70 group-hover:text-white transition-colors">{u.name}</span>
         </div>
       ))}
     </div>
@@ -511,11 +524,11 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
       
       {/* Approvals Banner for Parents */}
       {isParent && pendingApproval > 0 && (
-        <Card onClick={() => onNavigate('tasks')} className="!bg-gradient-to-br from-amber-400 to-orange-500 text-white !border-0 flex items-center justify-between group shadow-lg shadow-orange-500/20">
+        <Card onClick={() => onNavigate('tasks')} className="!bg-amber-500 text-white !border-0 flex items-center justify-between group shadow-lg shadow-amber-500/20">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-xl"><Bell className="w-5 h-5 text-white" /></div>
             <div>
-              <h4 className="font-bold text-lg leading-tight">Approvals Needed</h4>
+              <h4 className="font-bold text-base leading-tight">Approvals Needed</h4>
               <p className="text-sm text-white/90 font-medium">{pendingApproval} task{pendingApproval > 1 ? 's' : ''} waiting for your review</p>
             </div>
           </div>
@@ -525,20 +538,20 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-2 gap-4">
-        <Card onClick={() => onNavigate('tasks')} className="flex flex-col items-start gap-2 bg-gradient-to-br from-indigo-500 to-violet-600 text-white border-0 shadow-indigo-500/20">
-          <CheckSquare className="w-8 h-8 opacity-80" />
+        <Card onClick={() => onNavigate('tasks')} className="flex flex-col items-start gap-2 border-0 bg-slate-900 text-white shadow-lg shadow-slate-900/10">
+          <CheckSquare className="w-6 h-6 opacity-70" strokeWidth={2} />
           <div>
-            <p className="text-3xl font-extrabold">{openTasks}</p>
-            <p className="text-sm font-medium opacity-80">Tasks Left</p>
+            <p className="text-3xl font-bold tracking-tight">{openTasks}</p>
+            <p className="text-xs font-medium text-slate-400">Tasks Left</p>
           </div>
         </Card>
         <Card onClick={() => onNavigate('rewards')} className="flex flex-col items-start gap-2">
-          <div className="p-2 bg-amber-100 text-amber-600 rounded-xl">
-            <Gift className="w-6 h-6" />
+          <div className="p-1.5 bg-slate-100 text-slate-600 rounded-lg">
+            <Gift className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-3xl font-extrabold text-slate-800">{points}</p>
-            <p className="text-sm font-medium text-slate-500">{isParent ? 'Total Family Pts' : 'My Points'}</p>
+            <p className="text-3xl font-bold tracking-tight text-slate-800">{points}</p>
+            <p className="text-xs font-medium text-slate-500">{isParent ? 'Total Family Pts' : 'My Points'}</p>
           </div>
         </Card>
       </div>
@@ -547,17 +560,17 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
       <div>
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold text-slate-800">Up Next</h3>
-          <button onClick={() => onNavigate('calendar')} className="text-sm font-bold text-indigo-600 flex items-center hover:opacity-80 transition-opacity">
+          <button onClick={() => onNavigate('calendar')} className="text-sm font-semibold text-slate-500 flex items-center hover:text-slate-800 transition-colors">
             View Schedule <ChevronRight className="w-4 h-4" />
           </button>
         </div>
         <Card className="!p-0 overflow-hidden">
           {events.slice(0, 2).map((event, i) => (
             <div key={event.id} className={`p-4 flex gap-4 items-center ${i !== 0 ? 'border-t border-slate-100' : ''}`}>
-              <div className={`w-2 h-12 rounded-full ${event.color}`}></div>
+              <div className={`w-1.5 h-10 rounded-full ${event.color}`}></div>
               <div>
-                <p className="font-bold text-slate-800">{event.title}</p>
-                <div className="flex gap-3 mt-1 text-xs font-medium text-slate-500">
+                <p className="font-bold text-slate-800 text-sm">{event.title}</p>
+                <div className="flex gap-3 mt-1 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
                   <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {event.time}</span>
                   <span className="flex items-center gap-1"><MapPin className="w-3 h-3"/> {event.location}</span>
                 </div>
@@ -590,10 +603,10 @@ const TasksView = ({ tasks, onComplete, onAdd, activeUser, isParent }) => {
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">{isParent ? 'Family Tasks' : 'My Tasks'}</h2>
+          <h2 className="text-2xl font-bold text-slate-900">{isParent ? 'Family Tasks' : 'My Tasks'}</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">Check off to earn points!</p>
         </div>
-        {isParent && <Button onClick={() => setIsModalOpen(true)} variant="premium" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> New</Button>}
+        {isParent && <Button onClick={() => setIsModalOpen(true)} variant="secondary" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> New</Button>}
       </div>
 
       <div className="space-y-3">
@@ -613,19 +626,19 @@ const TasksView = ({ tasks, onComplete, onAdd, activeUser, isParent }) => {
               }
             >
               <div className="flex items-center gap-4">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-300 
-                  ${isApproved ? 'bg-indigo-500 border-indigo-500' : isPending ? 'bg-amber-400 border-amber-400' : 'border-slate-300 group-hover:border-indigo-400'}`
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center border transition-all duration-300 
+                  ${isApproved ? 'bg-indigo-500 border-indigo-500' : isPending ? 'bg-amber-400 border-amber-400' : 'border-slate-300 group-hover:border-slate-400'}`
                 }>
                   {isApproved && <Check className="w-4 h-4 text-white" />}
                   {isPending && <Hourglass className="w-3.5 h-3.5 text-white" />}
                 </div>
                 <div>
-                  <p className={`font-bold transition-all ${isApproved ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                  <p className={`font-semibold text-sm transition-all ${isApproved ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                       <User className="w-3 h-3"/> {task.assignee}
                     </p>
-                    {isPending && !isParent && <span className="text-[10px] font-bold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md">Waiting for Parent</span>}
+                    {isPending && !isParent && <span className="text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Awaiting Parent</span>}
                   </div>
                 </div>
               </div>
@@ -698,36 +711,36 @@ const CalendarView = ({ events, onAdd, isParent }) => {
   return (
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
-        <h2 className="text-2xl font-extrabold text-slate-900">This Week</h2>
+        <h2 className="text-2xl font-bold text-slate-900">This Week</h2>
         {isParent && <Button onClick={() => setIsModalOpen(true)} variant="secondary" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Event</Button>}
       </div>
 
       {/* Horizontal Date Picker */}
-      <div className="flex justify-between items-center bg-white/60 p-2 rounded-3xl ring-1 ring-slate-900/5">
+      <div className="flex justify-between items-center bg-white/60 p-2 rounded-[1.5rem] ring-1 ring-slate-900/5">
         {days.map((day, idx) => {
           const isToday = idx === 2; // Mocking Wednesday as today
           return (
-            <div key={day} className={`flex flex-col items-center justify-center w-12 h-16 rounded-2xl transition-all ${isToday ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : 'text-slate-500 hover:bg-white'}`}>
+            <div key={day} className={`flex flex-col items-center justify-center w-12 h-16 rounded-2xl transition-all ${isToday ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-white'}`}>
               <span className="text-[10px] font-bold uppercase tracking-wider">{day}</span>
-              <span className={`text-lg font-extrabold mt-0.5 ${isToday ? 'text-white' : 'text-slate-800'}`}>{dates[idx]}</span>
+              <span className={`text-lg font-bold mt-0.5 ${isToday ? 'text-white' : 'text-slate-800'}`}>{dates[idx]}</span>
             </div>
           );
         })}
       </div>
 
       {/* Timeline Events */}
-      <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+      <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-px before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
         {events.map((event, idx) => (
           <div key={event.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-            <div className={`flex items-center justify-center w-10 h-10 rounded-full border-4 border-slate-50 bg-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 ${event.color.replace('bg-', 'text-')}`}>
+            <div className={`flex items-center justify-center w-10 h-10 rounded-full border-[3px] border-slate-50 bg-white shadow-sm shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 ${event.color.replace('bg-', 'text-')}`}>
               <Clock className="w-4 h-4 currentColor" />
             </div>
-            <Card className="w-[calc(100%-3rem)] md:w-[calc(50%-2.5rem)] !p-4 !rounded-2xl">
+            <Card className="w-[calc(100%-3rem)] md:w-[calc(50%-2.5rem)] !p-4 !rounded-[1.5rem]">
               <div className="flex items-center gap-2 mb-1">
                 <Badge variant="default" className="!bg-slate-50">{event.time}</Badge>
               </div>
-              <p className="font-bold text-slate-800 text-lg">{event.title}</p>
-              <p className="text-sm font-medium text-slate-500 flex items-center gap-1 mt-2">
+              <p className="font-semibold text-slate-800 text-base">{event.title}</p>
+              <p className="text-xs font-medium text-slate-500 flex items-center gap-1 mt-2">
                 <MapPin className="w-3.5 h-3.5"/> {event.location}
               </p>
             </Card>
@@ -791,15 +804,15 @@ const AICopilotModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="✨ AI Copilot" fullHeight>
+    <Modal isOpen={isOpen} onClose={onClose} title={<div className="flex items-center gap-2"><Wand2 className="w-5 h-5 text-indigo-500"/> Copilot</div>} fullHeight>
       <div className="flex flex-col h-full h-[60vh]">
         {/* Chat Area */}
         <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-4">
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] p-4 rounded-3xl text-sm font-medium leading-relaxed ${
+              <div className={`max-w-[85%] p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed ${
                 msg.role === 'user' 
-                  ? 'bg-indigo-600 text-white rounded-br-sm' 
+                  ? 'bg-slate-900 text-white rounded-br-sm' 
                   : 'bg-slate-100 text-slate-800 rounded-bl-sm ring-1 ring-slate-900/5'
               }`}>
                 {msg.text}
@@ -809,14 +822,14 @@ const AICopilotModal = ({ isOpen, onClose }) => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Quick Actions (Only show if few messages) */}
+        {/* Quick Actions */}
         {messages.length < 3 && (
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-4 pt-2 shrink-0">
             {["Plan Dinners", "Assign Weekend Chores", "Find Free Time"].map(action => (
               <button 
                 key={action}
                 onClick={() => handleSend(action)}
-                className="whitespace-nowrap bg-white border border-indigo-100 text-indigo-600 px-4 py-2 rounded-full text-xs font-bold hover:bg-indigo-50 transition-colors shadow-sm"
+                className="whitespace-nowrap bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-full text-xs font-semibold hover:bg-slate-50 transition-colors shadow-sm"
               >
                 {action}
               </button>
@@ -832,11 +845,11 @@ const AICopilotModal = ({ isOpen, onClose }) => {
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Ask Copilot anything..."
-            className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-full pl-5 pr-12 py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-white transition-all font-medium"
+            className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-full pl-5 pr-12 py-4 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:bg-white transition-all font-medium"
           />
           <button 
             onClick={() => handleSend()}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-500 transition-colors shadow-sm disabled:opacity-50"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
             disabled={!input.trim()}
           >
             <Send className="w-4 h-4" />
@@ -899,7 +912,7 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }
       const uniqueItems = [...new Set(allIngredients)].map((item, i) => ({ id: i, name: item, checked: false }));
       setGroceries(uniqueItems);
       setIsGenerating(false);
-    }, 800); // Fake AI thinking time for effect
+    }, 800);
   };
 
   const toggleGrocery = (id) => {
@@ -917,20 +930,20 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">Meal Plan</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Meal Plan</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">What's cooking this week?</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={openGroceryList} variant="secondary" className="!w-auto !py-2 !px-3 text-sm">
             <ShoppingCart className="w-4 h-4"/> <span className="hidden sm:inline">List</span>
           </Button>
-          {isParent && <Button onClick={() => setIsModalOpen(true)} variant="premium" className="!w-auto !py-2 !px-3 text-sm"><Plus className="w-4 h-4"/> <span className="hidden sm:inline">Recipe</span></Button>}
+          {isParent && <Button onClick={() => setIsModalOpen(true)} variant="secondary" className="!w-auto !py-2 !px-3 text-sm"><Plus className="w-4 h-4"/> <span className="hidden sm:inline">Recipe</span></Button>}
         </div>
       </div>
 
       <div className="space-y-4">
         {meals.map((meal) => (
-          <Card key={meal.id} onClick={() => setSelectedMeal(meal)} className="!p-5 flex flex-col gap-3 group cursor-pointer">
+          <Card key={meal.id} onClick={() => setSelectedMeal(meal)} className="!p-4 flex flex-col gap-3 group cursor-pointer">
             <div className="flex justify-between items-start">
               <Badge variant={meal.day === 'Today' ? 'premium' : 'default'} className="!text-[10px]">
                 {meal.day}
@@ -939,14 +952,14 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }
             </div>
             
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <Utensils className="w-6 h-6 text-indigo-500" />
+              <div className="w-12 h-12 rounded-[1rem] bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Utensils className="w-5 h-5 text-slate-600" />
               </div>
               <div>
-                <h4 className="text-lg font-bold text-slate-800 leading-tight">{meal.meal}</h4>
+                <h4 className="text-base font-semibold text-slate-800 leading-tight">{meal.meal}</h4>
                 <div className="flex gap-2 mt-2">
                   {meal.tags.map(tag => (
-                    <span key={tag} className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 uppercase tracking-wider">
+                    <span key={tag} className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 uppercase tracking-wider">
                       {tag}
                     </span>
                   ))}
@@ -1063,12 +1076,12 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }
       {/* Grocery List Modal */}
       <Modal isOpen={isGroceryModalOpen} onClose={() => setIsGroceryModalOpen(false)} title="🛒 Grocery List" fullHeight>
         <div className="flex flex-col h-full h-[60vh]">
-          <div className="flex items-center justify-between bg-indigo-50 text-indigo-700 p-3 rounded-xl border border-indigo-100 mb-4 shrink-0">
+          <div className="flex items-center justify-between bg-slate-50 text-slate-700 p-3 rounded-xl border border-slate-200 mb-4 shrink-0">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-sm font-bold">AI Generated from Meals</span>
+              <Wand2 className="w-4 h-4 text-purple-500" />
+              <span className="text-sm font-bold">Generated from Meals</span>
             </div>
-            <button onClick={generateGroceries} className="text-xs font-bold bg-white px-2 py-1 rounded-lg shadow-sm hover:scale-105 transition-transform active:scale-95">
+            <button onClick={generateGroceries} className="text-xs font-bold bg-white px-2 py-1 rounded-lg shadow-sm hover:scale-105 transition-transform active:scale-95 border border-slate-200">
               Regenerate
             </button>
           </div>
@@ -1076,14 +1089,14 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }
           <div className="flex-1 overflow-y-auto no-scrollbar pb-4 relative">
             {isGenerating ? (
               <div className="flex flex-col items-center justify-center h-full space-y-3">
-                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
                 <p className="text-sm font-medium text-slate-500">Compiling ingredients...</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {groceries.map(item => (
-                  <div key={item.id} onClick={() => toggleGrocery(item.id)} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${item.checked ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-100 hover:border-indigo-200 shadow-sm'}`}>
-                    <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${item.checked ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300'}`}>
+                  <div key={item.id} onClick={() => toggleGrocery(item.id)} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${item.checked ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm'}`}>
+                    <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${item.checked ? 'bg-slate-800 border-slate-800' : 'border-slate-300'}`}>
                       {item.checked && <Check className="w-3 h-3 text-white" />}
                     </div>
                     <span className={`font-medium ${item.checked ? 'line-through text-slate-400' : 'text-slate-700'}`}>{item.name}</span>
@@ -1107,12 +1120,12 @@ const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">Rewards</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Rewards</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">Cash in your hard work!</p>
         </div>
-        <div className="bg-gradient-to-br from-amber-400 to-orange-500 text-white px-4 py-2 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center gap-2 transition-all">
-          <Star className="w-5 h-5 fill-white/50" />
-          <span className="font-extrabold text-lg">{points} {isParent ? 'Total pts' : 'pts'}</span>
+        <div className="bg-slate-900 text-white px-4 py-2 rounded-2xl shadow-lg flex items-center gap-2 transition-all">
+          <Star className="w-4 h-4 fill-white/50" />
+          <span className="font-bold text-lg">{points} {isParent ? 'Total pts' : 'pts'}</span>
         </div>
       </div>
 
@@ -1120,7 +1133,7 @@ const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
         {rewards.map((reward) => (
           <Card key={reward.id} className="!p-5 flex flex-col justify-between gap-4 group">
             <div className="flex items-start justify-between">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner ${reward.color} group-hover:scale-110 transition-transform duration-300`}>
+              <div className={`w-12 h-12 rounded-[1.25rem] flex items-center justify-center shadow-sm ${reward.color} group-hover:scale-110 transition-transform duration-300`}>
                 {reward.icon}
               </div>
               <Badge variant="warning" className="!bg-amber-100 !text-amber-700 !border-0 shadow-sm flex items-center gap-1">
@@ -1129,12 +1142,12 @@ const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
             </div>
             
             <div>
-              <h4 className="font-bold text-slate-800">{reward.title}</h4>
+              <h4 className="font-bold text-slate-800 text-base">{reward.title}</h4>
             </div>
 
             <Button 
               variant={points >= reward.cost ? 'primary' : 'secondary'} 
-              className="!py-2.5 mt-2"
+              className="!py-2.5 mt-2 text-sm"
               disabled={points < reward.cost || isParent}
               onClick={() => onRedeem(reward.cost)}
             >
@@ -1156,7 +1169,7 @@ const SettingsView = ({ user, isParent, onLogout }) => {
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">Settings</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">Manage family preferences</p>
         </div>
       </div>
@@ -1164,11 +1177,7 @@ const SettingsView = ({ user, isParent, onLogout }) => {
       <div className="space-y-4">
         <Card className="!p-0 overflow-hidden">
           <div className="p-5 flex items-center gap-4 border-b border-slate-100">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center text-3xl ring-2 ring-white shadow-sm">
-                {user.avatar}
-              </div>
-            </div>
+            <Avatar user={user} size="lg" className="ring-4 ring-white shadow-sm" />
             <div>
               <h3 className="text-lg font-bold text-slate-800 leading-tight">{user.name}</h3>
               <p className="text-sm font-medium text-slate-500">{user.role}</p>
@@ -1184,7 +1193,7 @@ const SettingsView = ({ user, isParent, onLogout }) => {
 
         {isParent && (
           <>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider pl-2 mt-6 mb-2">App Settings</h3>
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest pl-2 mt-6 mb-2">App Settings</h3>
             <Card className="!p-2">
               <SettingRow onClick={() => setActiveModal('general')} icon={Settings} label="General Preferences" />
               <SettingRow onClick={() => setActiveModal('logout')} icon={LogOut} label="Log Out" className="text-rose-600" iconClass="text-rose-500 bg-rose-50" hideArrow />
@@ -1204,7 +1213,7 @@ const SettingsView = ({ user, isParent, onLogout }) => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1">Name</label>
-            <input type="text" defaultValue={user.name} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
+            <input type="text" defaultValue={user.name} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-slate-300" />
           </div>
           <Button onClick={handleModalClose} className="mt-2">Save Changes</Button>
         </div>
@@ -1213,9 +1222,12 @@ const SettingsView = ({ user, isParent, onLogout }) => {
       <Modal isOpen={activeModal === 'family'} onClose={handleModalClose} title="Family Members">
         <div className="space-y-3">
           {MOCK_USERS.map((member, i) => (
-            <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <span className="font-medium text-slate-700">{member.name} ({member.role})</span>
-              <Button variant="secondary" className="!w-auto !py-1 !px-3 text-xs">Edit</Button>
+            <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-[1.25rem] border border-slate-100">
+              <div className="flex items-center gap-3">
+                <Avatar user={member} size="sm" />
+                <span className="font-semibold text-slate-700 text-sm">{member.name} <span className="text-slate-400 font-normal">({member.role})</span></span>
+              </div>
+              <Button variant="secondary" className="!w-auto !py-1.5 !px-3 text-xs">Edit</Button>
             </div>
           ))}
           <Button variant="outline" className="mt-2 w-full border-dashed"><Plus className="w-4 h-4"/> Add Member</Button>
@@ -1226,7 +1238,7 @@ const SettingsView = ({ user, isParent, onLogout }) => {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <span className="font-medium text-slate-700">Push Notifications</span>
-            <div className="w-12 h-6 bg-indigo-500 rounded-full relative cursor-pointer"><div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 shadow-sm"></div></div>
+            <div className="w-12 h-6 bg-slate-800 rounded-full relative cursor-pointer"><div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 shadow-sm"></div></div>
           </div>
           <div className="flex justify-between items-center">
             <span className="font-medium text-slate-700">Daily Digest Email</span>
@@ -1238,8 +1250,8 @@ const SettingsView = ({ user, isParent, onLogout }) => {
 
       <Modal isOpen={activeModal === 'subscription'} onClose={handleModalClose} title="Subscription">
         <div className="space-y-4 text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-2xl mx-auto flex items-center justify-center text-white mb-4 shadow-lg shadow-indigo-500/30">
-            <Sparkles className="w-8 h-8" />
+          <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-[1.5rem] mx-auto flex items-center justify-center text-white mb-4 shadow-lg shadow-purple-500/30">
+            <Layers className="w-8 h-8" />
           </div>
           <h3 className="text-xl font-bold text-slate-900">Premium Plan</h3>
           <p className="text-sm text-slate-500 pb-4">You have access to all features, including AI Copilot and advanced scheduling.</p>
@@ -1251,7 +1263,7 @@ const SettingsView = ({ user, isParent, onLogout }) => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1">Language</label>
-            <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+            <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-slate-300">
               <option>English</option>
               <option>Spanish</option>
               <option>French</option>
@@ -1263,10 +1275,10 @@ const SettingsView = ({ user, isParent, onLogout }) => {
 
       <Modal isOpen={activeModal === 'logout'} onClose={handleModalClose} title="Log Out">
         <div className="space-y-4">
-          <p className="text-slate-600">Are you sure you want to log out of FamilyOS?</p>
+          <p className="text-slate-600 font-medium">Are you sure you want to log out of FamilyOS?</p>
           <div className="flex gap-3 mt-4">
             <Button variant="secondary" onClick={handleModalClose} className="flex-1">Cancel</Button>
-            <Button variant="primary" onClick={() => { handleModalClose(); onLogout(); }} className="flex-1 !bg-rose-600 hover:!bg-rose-700 !shadow-none">Log Out</Button>
+            <Button variant="primary" onClick={() => { handleModalClose(); onLogout(); }} className="flex-1 !bg-rose-500 hover:!bg-rose-600 !shadow-none">Log Out</Button>
           </div>
         </div>
       </Modal>
@@ -1277,10 +1289,10 @@ const SettingsView = ({ user, isParent, onLogout }) => {
 const SettingRow = ({ icon: Icon, label, value, className = '', iconClass = '', hideArrow = false, onClick }) => (
   <div onClick={onClick} className={`flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors ${className}`}>
     <div className="flex items-center gap-3">
-      <div className={`p-2 rounded-lg bg-slate-100 text-slate-600 ${iconClass}`}>
-        <Icon className="w-5 h-5" />
+      <div className={`p-2.5 rounded-xl bg-slate-100 text-slate-600 ${iconClass}`}>
+        <Icon className="w-4 h-4" />
       </div>
-      <span className="font-bold text-slate-700">{label}</span>
+      <span className="font-semibold text-sm text-slate-700">{label}</span>
     </div>
     <div className="flex items-center gap-2">
       {value && <span className="text-sm font-medium text-slate-500">{value}</span>}
