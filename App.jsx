@@ -133,9 +133,9 @@ const mockEvents = [
   { id: 3, title: "Dentist Appointment", time: "Tomorrow, 9:00 AM", location: "Dr. Smith's Clinic", color: "bg-rose-500" },
 ];
 const mockMeals = [
-  { id: 1, day: "Today", meal: "Spaghetti Bolognese", prepTime: "30m prep", tags: ["Pasta", "Kid-Friendly"] },
-  { id: 2, day: "Tomorrow", meal: "Taco Tuesday", prepTime: "20m prep", tags: ["Mexican", "Quick"] },
-  { id: 3, day: "Wednesday", meal: "Grilled Chicken & Veggies", prepTime: "45m prep", tags: ["Healthy"] },
+  { id: 1, day: "Today", meal: "Spaghetti Bolognese", prepTime: "30m prep", tags: ["Pasta", "Kid-Friendly"], ingredients: "1 lb Ground Beef\n1 box Spaghetti\n1 jar Marinara Sauce", instructions: "1. Boil water and cook pasta.\n2. Brown ground beef in a skillet.\n3. Add marinara sauce and simmer.\n4. Serve sauce over pasta." },
+  { id: 2, day: "Tomorrow", meal: "Taco Tuesday", prepTime: "20m prep", tags: ["Mexican", "Quick"], ingredients: "1 lb Ground Turkey\n1 packet Taco Seasoning\n8 Taco Shells\nCheese, Lettuce, Salsa", instructions: "1. Brown turkey in a pan.\n2. Add seasoning and water, simmer.\n3. Warm taco shells.\n4. Assemble tacos with toppings." },
+  { id: 3, day: "Wednesday", meal: "Grilled Chicken & Veggies", prepTime: "45m prep", tags: ["Healthy"], ingredients: "2 Chicken Breasts\n1 bunch Asparagus\n2 tbsp Olive Oil\nSalt, Pepper, Garlic Powder", instructions: "1. Preheat grill or pan.\n2. Season chicken and vegetables.\n3. Grill chicken until cooked through.\n4. Roast or grill asparagus until tender." },
 ];
 const mockRewards = [
   { id: 1, title: "30 Min Extra Screen Time", cost: 20, icon: "📱", color: "bg-blue-100 text-blue-600" },
@@ -185,7 +185,8 @@ export default function App() {
 
   const handleAddTask = (newTask) => setTasks([...tasks, { ...newTask, id: Date.now(), completed: false }]);
   const handleAddEvent = (newEvent) => setEvents([...events, { ...newEvent, id: Date.now(), color: 'bg-indigo-500' }]);
-  const handleAddMeal = (newMeal) => setMeals([...meals, { ...newMeal, id: Date.now(), tags: ['New Recipe'] }]);
+  const handleAddMeal = (newMeal) => setMeals([...meals, { ...newMeal, id: Date.now(), tags: ['New Recipe'], ingredients: "1 lb Main Protein/Base\n2 cups Fresh Vegetables\n1 tbsp Olive Oil\nAssorted Seasonings", instructions: "1. Preheat oven or heat pan to medium-high.\n2. Chop and prepare all ingredients.\n3. Cook the main base until fully done.\n4. Mix in vegetables and seasonings. Serve hot." }]);
+  const handleUpdateMeal = (updatedMeal) => setMeals(meals.map(m => m.id === updatedMeal.id ? updatedMeal : m));
 
   const renderContent = () => {
     switch(activeTab) {
@@ -196,7 +197,7 @@ export default function App() {
       case 'calendar':
         return <CalendarView events={events} onAdd={handleAddEvent} />;
       case 'meals':
-        return <MealsView meals={meals} onAdd={handleAddMeal} />;
+        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} />;
       case 'rewards':
         return <RewardsView rewards={mockRewards} points={points} onRedeem={handleRedeemReward} />;
       case 'settings':
@@ -596,18 +597,40 @@ const AICopilotModal = ({ isOpen, onClose }) => {
   );
 };
 
-const MealsView = ({ meals, onAdd }) => {
+const MealsView = ({ meals, onAdd, onUpdate }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedMeal, setSelectedMeal] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+  
   const [meal, setMeal] = useState('');
   const [day, setDay] = useState('Today');
   const [prepTime, setPrepTime] = useState('30m');
 
-  const handleSubmit = (e) => {
+  const handleAddSubmit = (e) => {
     e.preventDefault();
     if (!meal.trim()) return;
     onAdd({ meal, day, prepTime: prepTime + ' prep' });
     setMeal('');
     setIsModalOpen(false);
+  };
+
+  const handleEditClick = () => {
+    setEditForm({ ...selectedMeal });
+    setIsEditing(true);
+  };
+
+  const handleEditSubmit = (e) => {
+    e.preventDefault();
+    if (!editForm.meal.trim()) return;
+    onUpdate(editForm);
+    setSelectedMeal(editForm);
+    setIsEditing(false);
+  };
+
+  const closeMealModal = () => {
+    setSelectedMeal(null);
+    setIsEditing(false);
   };
 
   return (
@@ -622,7 +645,7 @@ const MealsView = ({ meals, onAdd }) => {
 
       <div className="space-y-4">
         {meals.map((meal) => (
-          <Card key={meal.id} className="!p-5 flex flex-col gap-3 group">
+          <Card key={meal.id} onClick={() => setSelectedMeal(meal)} className="!p-5 flex flex-col gap-3 group cursor-pointer">
             <div className="flex justify-between items-start">
               <Badge variant={meal.day === 'Today' ? 'premium' : 'default'} className="!text-[10px]">
                 {meal.day}
@@ -650,7 +673,7 @@ const MealsView = ({ meals, onAdd }) => {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Recipe">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleAddSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1">Recipe Name</label>
             <input type="text" value={meal} onChange={e => setMeal(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" placeholder="e.g., Chicken Parmesan" autoFocus />
@@ -664,6 +687,8 @@ const MealsView = ({ meals, onAdd }) => {
                 <option>Wednesday</option>
                 <option>Thursday</option>
                 <option>Friday</option>
+                <option>Saturday</option>
+                <option>Sunday</option>
               </select>
             </div>
             <div>
@@ -678,6 +703,76 @@ const MealsView = ({ meals, onAdd }) => {
           </div>
           <Button type="submit" className="mt-4">Save Recipe</Button>
         </form>
+      </Modal>
+
+      {/* View/Edit Recipe Modal */}
+      <Modal isOpen={!!selectedMeal} onClose={closeMealModal} title={isEditing ? "Edit Recipe" : (selectedMeal?.meal || "Recipe")}>
+        {selectedMeal && !isEditing && (
+          <div className="space-y-6">
+            <div className="flex gap-2">
+              <Badge variant="premium">{selectedMeal.day}</Badge>
+              <Badge variant="default">{selectedMeal.prepTime}</Badge>
+            </div>
+            
+            <div className="bg-slate-50 p-4 rounded-2xl ring-1 ring-slate-900/5">
+              <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><Utensils className="w-4 h-4"/> Ingredients</h4>
+              <ul className="list-disc pl-5 text-sm text-slate-600 space-y-1">
+                {(selectedMeal.ingredients || "").split('\n').map((item, i) => <li key={i}>{item}</li>)}
+              </ul>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl ring-1 ring-slate-900/5">
+              <h4 className="font-bold text-slate-800 mb-2">Instructions</h4>
+              <ol className="list-decimal pl-5 text-sm text-slate-600 space-y-2">
+                {(selectedMeal.instructions || "").split('\n').map((item, i) => <li key={i}>{item}</li>)}
+              </ol>
+            </div>
+
+            <div className="flex gap-3">
+              <Button onClick={closeMealModal} variant="secondary" className="flex-1">Close</Button>
+              <Button onClick={handleEditClick} className="flex-1">Edit Plan</Button>
+            </div>
+          </div>
+        )}
+
+        {selectedMeal && isEditing && (
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Recipe Name</label>
+              <input type="text" value={editForm.meal} onChange={e => setEditForm({...editForm, meal: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Day</label>
+                <select value={editForm.day} onChange={e => setEditForm({...editForm, day: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                  <option>Today</option>
+                  <option>Tomorrow</option>
+                  <option>Wednesday</option>
+                  <option>Thursday</option>
+                  <option>Friday</option>
+                  <option>Saturday</option>
+                  <option>Sunday</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Prep Time</label>
+                <input type="text" value={editForm.prepTime} onChange={e => setEditForm({...editForm, prepTime: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Ingredients</label>
+              <textarea value={editForm.ingredients} onChange={e => setEditForm({...editForm, ingredients: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 min-h-[100px]" placeholder="One ingredient per line" />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Instructions</label>
+              <textarea value={editForm.instructions} onChange={e => setEditForm({...editForm, instructions: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 min-h-[100px]" placeholder="One instruction per line" />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button type="button" onClick={() => setIsEditing(false)} variant="secondary" className="flex-1">Cancel</Button>
+              <Button type="submit" className="flex-1">Save Changes</Button>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );
@@ -729,6 +824,10 @@ const RewardsView = ({ rewards, points, onRedeem }) => {
 };
 
 const SettingsView = ({ user }) => {
+  const [activeModal, setActiveModal] = useState(null);
+
+  const handleModalClose = () => setActiveModal(null);
+
   return (
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
@@ -750,21 +849,93 @@ const SettingsView = ({ user }) => {
               <h3 className="text-lg font-bold text-slate-800 leading-tight">{user.name}</h3>
               <p className="text-sm font-medium text-slate-500">{user.role}</p>
             </div>
-            <Button variant="secondary" className="!w-auto !py-2 !px-4 text-xs ml-auto">Edit</Button>
+            <Button onClick={() => setActiveModal('editProfile')} variant="secondary" className="!w-auto !py-2 !px-4 text-xs ml-auto">Edit</Button>
           </div>
           <div className="p-2">
-            <SettingRow icon={Users} label="Family Members" value="4 Members" />
-            <SettingRow icon={BellRing} label="Notifications" value="Enabled" />
-            <SettingRow icon={CreditCard} label="Subscription" value="Premium" />
+            <SettingRow onClick={() => setActiveModal('family')} icon={Users} label="Family Members" value="4 Members" />
+            <SettingRow onClick={() => setActiveModal('notifications')} icon={BellRing} label="Notifications" value="Enabled" />
+            <SettingRow onClick={() => setActiveModal('subscription')} icon={CreditCard} label="Subscription" value="Premium" />
           </div>
         </Card>
 
         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider pl-2 mt-6 mb-2">App Settings</h3>
         <Card className="!p-2">
-          <SettingRow icon={Settings} label="General Preferences" />
-          <SettingRow icon={LogOut} label="Log Out" className="text-rose-600" iconClass="text-rose-500 bg-rose-50" hideArrow />
+          <SettingRow onClick={() => setActiveModal('general')} icon={Settings} label="General Preferences" />
+          <SettingRow onClick={() => setActiveModal('logout')} icon={LogOut} label="Log Out" className="text-rose-600" iconClass="text-rose-500 bg-rose-50" hideArrow />
         </Card>
       </div>
+
+      {/* Settings Modals */}
+      <Modal isOpen={activeModal === 'editProfile'} onClose={handleModalClose} title="Edit Profile">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Name</label>
+            <input type="text" defaultValue={user.name} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
+          </div>
+          <Button onClick={handleModalClose} className="mt-2">Save Changes</Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'family'} onClose={handleModalClose} title="Family Members">
+        <div className="space-y-3">
+          {['Sarah (Parent)', 'Dad (Parent)', 'Tommy (Child)', 'Lily (Child)'].map((member, i) => (
+            <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span className="font-medium text-slate-700">{member}</span>
+              <Button variant="secondary" className="!w-auto !py-1 !px-3 text-xs">Edit</Button>
+            </div>
+          ))}
+          <Button variant="outline" className="mt-2 w-full border-dashed"><Plus className="w-4 h-4"/> Add Member</Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'notifications'} onClose={handleModalClose} title="Notifications">
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="font-medium text-slate-700">Push Notifications</span>
+            <div className="w-12 h-6 bg-indigo-500 rounded-full relative cursor-pointer"><div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 shadow-sm"></div></div>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="font-medium text-slate-700">Daily Digest Email</span>
+            <div className="w-12 h-6 bg-slate-200 rounded-full relative cursor-pointer"><div className="w-5 h-5 bg-white rounded-full absolute left-0.5 top-0.5 shadow-sm"></div></div>
+          </div>
+          <Button onClick={handleModalClose} className="mt-4">Done</Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'subscription'} onClose={handleModalClose} title="Subscription">
+        <div className="space-y-4 text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-2xl mx-auto flex items-center justify-center text-white mb-4 shadow-lg shadow-indigo-500/30">
+            <Sparkles className="w-8 h-8" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900">Premium Plan</h3>
+          <p className="text-sm text-slate-500 pb-4">You have access to all features, including AI Copilot and advanced scheduling.</p>
+          <Button variant="secondary" onClick={handleModalClose}>Manage Billing</Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'general'} onClose={handleModalClose} title="General Preferences">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Language</label>
+            <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+              <option>English</option>
+              <option>Spanish</option>
+              <option>French</option>
+            </select>
+          </div>
+          <Button onClick={handleModalClose} className="mt-4">Save</Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'logout'} onClose={handleModalClose} title="Log Out">
+        <div className="space-y-4">
+          <p className="text-slate-600">Are you sure you want to log out of FamilyOS?</p>
+          <div className="flex gap-3 mt-4">
+            <Button variant="secondary" onClick={handleModalClose} className="flex-1">Cancel</Button>
+            <Button variant="primary" onClick={handleModalClose} className="flex-1 !bg-rose-600 hover:!bg-rose-700 !shadow-none">Log Out</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
