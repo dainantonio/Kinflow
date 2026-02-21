@@ -4,7 +4,7 @@ import {
   ChefHat, Gift, X, Plus, Sparkles, Bell, 
   ChevronRight, Clock, MapPin, Send, User, Check,
   Utensils, Star, Flame, MoreVertical, Users, BellRing, CreditCard, LogOut,
-  ShoppingCart, Loader2, Hourglass
+  ShoppingCart, Loader2, Hourglass, ArrowRight
 } from 'lucide-react';
 
 // --- CUSTOM STYLES & KEYFRAMES ---
@@ -24,7 +24,13 @@ const CustomStyles = () => (
         100% { transform: translateY(100px) rotate(360deg); opacity: 0; }
       }
 
+      @keyframes pulse-slow {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.05); opacity: 0.8; }
+      }
+
       .animate-pop-in { animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
       
       .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
     `}
@@ -131,7 +137,7 @@ const MOCK_USERS = [
 const mockTasks = [
   { id: 1, title: "Empty Dishwasher", assignee: "Tommy", points: 10, status: 'open' },
   { id: 2, title: "Walk the Dog", assignee: "Sarah", points: 20, status: 'approved' },
-  { id: 3, title: "Finish Math Homework", assignee: "Lily", points: 15, status: 'pending' }, // Shows up immediately for Parent to approve
+  { id: 3, title: "Finish Math Homework", assignee: "Lily", points: 15, status: 'pending' },
 ];
 const mockEvents = [
   { id: 1, title: "Tommy's Soccer Practice", time: "4:00 PM - 5:30 PM", location: "City Park", color: "bg-emerald-500" },
@@ -151,10 +157,15 @@ const mockRewards = [
 
 // --- MAIN APP COMPONENT ---
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
-  const [activeUser, setActiveUser] = useState(null); // Start logged out to show Login Screen
+  const [activeUser, setActiveUser] = useState(null);
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   
+  // Onboarding States
+  const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
   const isParent = activeUser?.role === 'Parent';
 
   const [tasks, setTasks] = useState(mockTasks);
@@ -166,7 +177,25 @@ export default function App() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
-  // Advanced Workflow: Open -> Pending -> Approved
+  // Auto-hide Splash Screen
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleLogin = (user) => {
+    setActiveUser(user);
+    if (user.role === 'Parent' && !hasOnboarded) {
+      setShowOnboarding(true);
+    }
+  };
+
+  const completeOnboarding = () => {
+    setShowOnboarding(false);
+    setHasOnboarded(true);
+    triggerConfetti();
+  };
+
   const handleCompleteTask = (taskId) => {
     setTasks(prevTasks => prevTasks.map(t => {
       if (t.id === taskId) {
@@ -174,40 +203,28 @@ export default function App() {
         
         if (t.status === 'open') {
           if (isParent) {
-            // Parent checks it off -> instant approval + points
-            if (assignee && userPoints[assignee] !== undefined) {
-               setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
-            }
+            if (assignee && userPoints[assignee] !== undefined) setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
             triggerConfetti();
             return { ...t, status: 'approved' };
           } else {
-            // Child checks it off -> needs parent approval
             triggerConfetti(); 
             return { ...t, status: 'pending' };
           }
         } 
         else if (t.status === 'pending') {
           if (isParent) {
-            // Parent reviews and approves pending task -> deposit points
-            if (assignee && userPoints[assignee] !== undefined) {
-               setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
-            }
+            if (assignee && userPoints[assignee] !== undefined) setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
             triggerConfetti();
             return { ...t, status: 'approved' };
           } else {
-            // Child undoes completion
             return { ...t, status: 'open' };
           }
         } 
         else if (t.status === 'approved') {
           if (isParent) {
-            // Parent undoes approval -> deduct points
-            if (assignee && userPoints[assignee] !== undefined) {
-               setUserPoints(p => ({...p, [assignee]: Math.max(0, p[assignee] - t.points)}));
-            }
+            if (assignee && userPoints[assignee] !== undefined) setUserPoints(p => ({...p, [assignee]: Math.max(0, p[assignee] - t.points)}));
             return { ...t, status: 'open' };
           }
-          // Children cannot un-approve a task
           return t;
         }
       }
@@ -252,19 +269,22 @@ export default function App() {
       case 'settings':
         return <SettingsView user={activeUser} isParent={isParent} onLogout={() => setActiveUser(null)} />;
       default:
-        return (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-            <Sparkles className="w-12 h-12 mb-4 opacity-20" />
-            <p className="font-medium">Coming soon in Premium Version</p>
-          </div>
-        );
+        return null;
     }
   };
 
   const pendingApprovalTasks = tasks.filter(t => t.status === 'pending');
 
+  if (showSplash) {
+    return <SplashScreen />;
+  }
+
   if (!activeUser) {
-    return <LoginScreen onLogin={setActiveUser} users={MOCK_USERS} />;
+    return <LoginScreen onLogin={handleLogin} users={MOCK_USERS} />;
+  }
+
+  if (showOnboarding) {
+    return <OnboardingFlow onComplete={completeOnboarding} />;
   }
 
   return (
@@ -294,7 +314,6 @@ export default function App() {
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 border-[2px] border-white rounded-full shadow-sm flex items-center justify-center text-[9px] text-white font-bold z-10">
                   {isParent ? 'P' : 'C'}
                 </span>
-                {/* Red dot if there are tasks awaiting parent approval */}
                 {isParent && pendingApprovalTasks.length > 0 && (
                   <span className="absolute top-0 right-0 w-3 h-3 bg-rose-500 border-2 border-white rounded-full shadow-sm animate-pulse -translate-y-1/2 translate-x-1/2 z-20"></span>
                 )}
@@ -380,6 +399,80 @@ export default function App() {
 }
 
 // --- SUB-VIEWS ---
+
+const SplashScreen = () => (
+  <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 flex flex-col items-center justify-center text-white relative overflow-hidden transition-opacity duration-500">
+    <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+    <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+    
+    <div className="w-28 h-28 bg-white/20 backdrop-blur-xl rounded-[2.5rem] flex items-center justify-center mb-6 shadow-2xl border border-white/30 animate-pulse-slow">
+      <Sparkles className="w-14 h-14 text-white" />
+    </div>
+    <h1 className="text-5xl font-extrabold tracking-tight drop-shadow-lg animate-pop-in">FamilyOS</h1>
+  </div>
+);
+
+const OnboardingFlow = ({ onComplete }) => {
+  const [step, setStep] = useState(0);
+  
+  const content = [
+    {
+      icon: <Users className="w-12 h-12 text-indigo-500" />,
+      title: "Welcome to FamilyOS",
+      desc: "The smart operating system designed to keep your modern family organized, together."
+    },
+    {
+      icon: <Sparkles className="w-12 h-12 text-violet-500" />,
+      title: "Meet Your Copilot",
+      desc: "Instantly generate meal plans, auto-create grocery lists, and resolve scheduling conflicts using AI."
+    },
+    {
+      icon: <Gift className="w-12 h-12 text-emerald-500" />,
+      title: "Gamify the Household",
+      desc: "Kids earn points by completing assigned chores and can redeem them for real-life rewards."
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-pop-in max-w-md mx-auto w-full">
+        
+        <div className="w-24 h-24 bg-white rounded-full shadow-xl shadow-indigo-500/10 flex items-center justify-center mb-8 ring-1 ring-slate-900/5 transition-all">
+          {content[step].icon}
+        </div>
+        
+        <h2 className="text-3xl font-extrabold text-slate-900 mb-4 tracking-tight leading-tight">
+          {content[step].title}
+        </h2>
+        
+        <p className="text-slate-500 text-lg leading-relaxed font-medium">
+          {content[step].desc}
+        </p>
+
+      </div>
+
+      <div className="bg-white px-6 pb-12 pt-6 rounded-t-[3rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.05)] flex flex-col items-center max-w-md mx-auto w-full">
+        {/* Dots */}
+        <div className="flex gap-2 mb-8">
+          {[0, 1, 2].map(idx => (
+            <div key={idx} className={`h-2 rounded-full transition-all duration-300 ${step === idx ? 'w-8 bg-indigo-600' : 'w-2 bg-slate-200'}`} />
+          ))}
+        </div>
+
+        <Button 
+          onClick={() => {
+            if (step < 2) setStep(step + 1);
+            else onComplete();
+          }} 
+          className="w-full !py-4 text-lg"
+        >
+          {step < 2 ? 'Continue' : 'Get Started'}
+          {step < 2 && <ArrowRight className="w-5 h-5 ml-1" />}
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 const LoginScreen = ({ onLogin, users }) => (
   <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
