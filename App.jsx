@@ -41,7 +41,7 @@ const Card = ({ children, className = '', onClick }) => (
 );
 
 const Button = ({ children, variant = 'primary', className = '', ...props }) => {
-  const baseStyle = "w-full font-bold rounded-2xl py-3.5 px-4 transition-all duration-300 active:scale-[0.97] flex items-center justify-center gap-2 relative overflow-hidden group";
+  const baseStyle = "w-full font-bold rounded-2xl py-3.5 px-4 transition-all duration-300 active:scale-[0.97] flex items-center justify-center gap-2 relative overflow-hidden group disabled:opacity-50 disabled:pointer-events-none";
   const variants = {
     primary: "bg-indigo-600 text-white shadow-[0_4px_20px_-4px_rgba(79,70,229,0.4)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] hover:bg-indigo-500 hover:shadow-[0_8px_25px_-5px_rgba(79,70,229,0.5)]",
     secondary: "bg-slate-100/80 backdrop-blur-sm text-slate-700 hover:bg-slate-200/80 ring-1 ring-slate-900/5",
@@ -132,13 +132,11 @@ const mockEvents = [
   { id: 2, title: "Family Dinner", time: "6:30 PM", location: "Home", color: "bg-indigo-500" },
   { id: 3, title: "Dentist Appointment", time: "Tomorrow, 9:00 AM", location: "Dr. Smith's Clinic", color: "bg-rose-500" },
 ];
-
 const mockMeals = [
   { id: 1, day: "Today", meal: "Spaghetti Bolognese", prepTime: "30m prep", tags: ["Pasta", "Kid-Friendly"] },
   { id: 2, day: "Tomorrow", meal: "Taco Tuesday", prepTime: "20m prep", tags: ["Mexican", "Quick"] },
   { id: 3, day: "Wednesday", meal: "Grilled Chicken & Veggies", prepTime: "45m prep", tags: ["Healthy"] },
 ];
-
 const mockRewards = [
   { id: 1, title: "30 Min Extra Screen Time", cost: 20, icon: "📱", color: "bg-blue-100 text-blue-600" },
   { id: 2, title: "Choose Movie Night Film", cost: 50, icon: "🍿", color: "bg-purple-100 text-purple-600" },
@@ -149,30 +147,58 @@ const mockRewards = [
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [tasks, setTasks] = useState(mockTasks);
+  const [events, setEvents] = useState(mockEvents);
+  const [meals, setMeals] = useState(mockMeals);
+  const [points, setPoints] = useState(45); // Live state for family points
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
+  // Wire checking off tasks to point additions
   const handleCompleteTask = (taskId) => {
-    setTasks(tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t));
-    const task = tasks.find(t => t.id === taskId);
-    if (!task.completed) {
-      setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 1500);
+    setTasks(prevTasks => prevTasks.map(t => {
+      if (t.id === taskId) {
+        const newCompleted = !t.completed;
+        if (newCompleted) {
+          setPoints(p => p + t.points);
+          triggerConfetti();
+        } else {
+          setPoints(p => Math.max(0, p - t.points));
+        }
+        return { ...t, completed: newCompleted };
+      }
+      return t;
+    }));
+  };
+
+  // Wire reward redemption to point deductions
+  const handleRedeemReward = (cost) => {
+    if (points >= cost) {
+      setPoints(p => p - cost);
+      triggerConfetti();
     }
   };
+
+  const triggerConfetti = () => {
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 1500);
+  };
+
+  const handleAddTask = (newTask) => setTasks([...tasks, { ...newTask, id: Date.now(), completed: false }]);
+  const handleAddEvent = (newEvent) => setEvents([...events, { ...newEvent, id: Date.now(), color: 'bg-indigo-500' }]);
+  const handleAddMeal = (newMeal) => setMeals([...meals, { ...newMeal, id: Date.now(), tags: ['New Recipe'] }]);
 
   const renderContent = () => {
     switch(activeTab) {
       case 'home':
-        return <Dashboard tasks={tasks} events={mockEvents} />;
+        return <Dashboard tasks={tasks} events={events} points={points} onNavigate={setActiveTab} />;
       case 'tasks':
-        return <TasksView tasks={tasks} onComplete={handleCompleteTask} />;
+        return <TasksView tasks={tasks} onComplete={handleCompleteTask} onAdd={handleAddTask} />;
       case 'calendar':
-        return <CalendarView events={mockEvents} />;
+        return <CalendarView events={events} onAdd={handleAddEvent} />;
       case 'meals':
-        return <MealsView meals={mockMeals} />;
+        return <MealsView meals={meals} onAdd={handleAddMeal} />;
       case 'rewards':
-        return <RewardsView rewards={mockRewards} points={45} />;
+        return <RewardsView rewards={mockRewards} points={points} onRedeem={handleRedeemReward} />;
       case 'settings':
         return <SettingsView user={mockUser} />;
       default:
@@ -269,26 +295,26 @@ export default function App() {
 
 // --- SUB-VIEWS ---
 
-const Dashboard = ({ tasks, events }) => {
+const Dashboard = ({ tasks, events, points, onNavigate }) => {
   const pendingTasks = tasks.filter(t => !t.completed).length;
   
   return (
     <div className="space-y-6 animate-pop-in">
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-2 gap-4">
-        <Card className="flex flex-col items-start gap-2 bg-gradient-to-br from-indigo-500 to-violet-600 text-white border-0 shadow-indigo-500/20">
+        <Card onClick={() => onNavigate('tasks')} className="flex flex-col items-start gap-2 bg-gradient-to-br from-indigo-500 to-violet-600 text-white border-0 shadow-indigo-500/20">
           <CheckSquare className="w-8 h-8 opacity-80" />
           <div>
             <p className="text-3xl font-extrabold">{pendingTasks}</p>
             <p className="text-sm font-medium opacity-80">Tasks Left</p>
           </div>
         </Card>
-        <Card className="flex flex-col items-start gap-2">
+        <Card onClick={() => onNavigate('rewards')} className="flex flex-col items-start gap-2">
           <div className="p-2 bg-amber-100 text-amber-600 rounded-xl">
             <Gift className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-3xl font-extrabold text-slate-800">45</p>
+            <p className="text-3xl font-extrabold text-slate-800">{points}</p>
             <p className="text-sm font-medium text-slate-500">Family Points</p>
           </div>
         </Card>
@@ -298,7 +324,9 @@ const Dashboard = ({ tasks, events }) => {
       <div>
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold text-slate-800">Up Next</h3>
-          <button className="text-sm font-bold text-indigo-600 flex items-center">View Schedule <ChevronRight className="w-4 h-4" /></button>
+          <button onClick={() => onNavigate('calendar')} className="text-sm font-bold text-indigo-600 flex items-center hover:opacity-80 transition-opacity">
+            View Schedule <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
         <Card className="!p-0 overflow-hidden">
           {events.slice(0, 2).map((event, i) => (
@@ -319,7 +347,20 @@ const Dashboard = ({ tasks, events }) => {
   );
 };
 
-const TasksView = ({ tasks, onComplete }) => {
+const TasksView = ({ tasks, onComplete, onAdd }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [assignee, setAssignee] = useState('Tommy');
+  const [taskPoints, setTaskPoints] = useState(10);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onAdd({ title, assignee, points: parseInt(taskPoints) });
+    setTitle('');
+    setIsModalOpen(false);
+  };
+
   return (
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
@@ -327,7 +368,7 @@ const TasksView = ({ tasks, onComplete }) => {
           <h2 className="text-2xl font-extrabold text-slate-900">Family Tasks</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">Check off to earn points!</p>
         </div>
-        <Button variant="premium" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> New</Button>
+        <Button onClick={() => setIsModalOpen(true)} variant="premium" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> New</Button>
       </div>
 
       <div className="space-y-3">
@@ -348,11 +389,58 @@ const TasksView = ({ tasks, onComplete }) => {
           </Card>
         ))}
       </div>
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Task">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Task Name</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" placeholder="e.g., Clean the garage" autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Assignee</label>
+              <select value={assignee} onChange={e => setAssignee(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                <option>Tommy</option>
+                <option>Lily</option>
+                <option>Sarah</option>
+                <option>Dad</option>
+                <option>Anyone</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Points</label>
+              <select value={taskPoints} onChange={e => setTaskPoints(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                <option value="5">5 pts</option>
+                <option value="10">10 pts</option>
+                <option value="15">15 pts</option>
+                <option value="20">20 pts</option>
+                <option value="50">50 pts</option>
+              </select>
+            </div>
+          </div>
+          <Button type="submit" className="mt-4">Add Task</Button>
+        </form>
+      </Modal>
     </div>
   );
 };
 
-const CalendarView = ({ events }) => {
+const CalendarView = ({ events, onAdd }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [time, setTime] = useState('');
+  const [location, setLocation] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onAdd({ title, time: time || 'TBD', location: location || 'Home' });
+    setTitle('');
+    setTime('');
+    setLocation('');
+    setIsModalOpen(false);
+  };
+
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const dates = [12, 13, 14, 15, 16, 17, 18];
   
@@ -360,7 +448,7 @@ const CalendarView = ({ events }) => {
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
         <h2 className="text-2xl font-extrabold text-slate-900">This Week</h2>
-        <Button variant="secondary" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Event</Button>
+        <Button onClick={() => setIsModalOpen(true)} variant="secondary" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Event</Button>
       </div>
 
       {/* Horizontal Date Picker */}
@@ -395,6 +483,26 @@ const CalendarView = ({ events }) => {
           </div>
         ))}
       </div>
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Event">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Event Name</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" placeholder="e.g., Dentist Appointment" autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Time</label>
+              <input type="text" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" placeholder="e.g., 2:00 PM" />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Location</label>
+              <input type="text" value={location} onChange={e => setLocation(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" placeholder="e.g., Clinic" />
+            </div>
+          </div>
+          <Button type="submit" className="mt-4">Add Event</Button>
+        </form>
+      </Modal>
     </div>
   );
 };
@@ -488,7 +596,20 @@ const AICopilotModal = ({ isOpen, onClose }) => {
   );
 };
 
-const MealsView = ({ meals }) => {
+const MealsView = ({ meals, onAdd }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [meal, setMeal] = useState('');
+  const [day, setDay] = useState('Today');
+  const [prepTime, setPrepTime] = useState('30m');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!meal.trim()) return;
+    onAdd({ meal, day, prepTime: prepTime + ' prep' });
+    setMeal('');
+    setIsModalOpen(false);
+  };
+
   return (
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
@@ -496,7 +617,7 @@ const MealsView = ({ meals }) => {
           <h2 className="text-2xl font-extrabold text-slate-900">Meal Plan</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">What's cooking this week?</p>
         </div>
-        <Button variant="premium" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Recipe</Button>
+        <Button onClick={() => setIsModalOpen(true)} variant="premium" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Recipe</Button>
       </div>
 
       <div className="space-y-4">
@@ -527,11 +648,42 @@ const MealsView = ({ meals }) => {
           </Card>
         ))}
       </div>
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Recipe">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Recipe Name</label>
+            <input type="text" value={meal} onChange={e => setMeal(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" placeholder="e.g., Chicken Parmesan" autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Day</label>
+              <select value={day} onChange={e => setDay(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                <option>Today</option>
+                <option>Tomorrow</option>
+                <option>Wednesday</option>
+                <option>Thursday</option>
+                <option>Friday</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Prep Time</label>
+              <select value={prepTime} onChange={e => setPrepTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                <option value="15m">15 mins</option>
+                <option value="30m">30 mins</option>
+                <option value="45m">45 mins</option>
+                <option value="1h">1 hour</option>
+              </select>
+            </div>
+          </div>
+          <Button type="submit" className="mt-4">Save Recipe</Button>
+        </form>
+      </Modal>
     </div>
   );
 };
 
-const RewardsView = ({ rewards, points }) => {
+const RewardsView = ({ rewards, points, onRedeem }) => {
   return (
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
@@ -539,7 +691,7 @@ const RewardsView = ({ rewards, points }) => {
           <h2 className="text-2xl font-extrabold text-slate-900">Rewards</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">Cash in your hard work!</p>
         </div>
-        <div className="bg-gradient-to-br from-amber-400 to-orange-500 text-white px-4 py-2 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center gap-2">
+        <div className="bg-gradient-to-br from-amber-400 to-orange-500 text-white px-4 py-2 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center gap-2 transition-all">
           <Star className="w-5 h-5 fill-white/50" />
           <span className="font-extrabold text-lg">{points} pts</span>
         </div>
@@ -565,6 +717,7 @@ const RewardsView = ({ rewards, points }) => {
               variant={points >= reward.cost ? 'primary' : 'secondary'} 
               className="!py-2.5 mt-2"
               disabled={points < reward.cost}
+              onClick={() => onRedeem(reward.cost)}
             >
               {points >= reward.cost ? 'Redeem Reward' : `Need ${reward.cost - points} more`}
             </Button>
