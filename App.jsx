@@ -589,7 +589,7 @@ const SplashScreen = () => (
     <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[100px]"></div>
     <div className="flex flex-col items-center animate-pulse-slow z-10">
       <Layers className="w-16 h-16 text-white mb-6 drop-shadow-2xl" strokeWidth={1.5} />
-      <h1 className="text-3xl font-semibold tracking-wide drop-shadow-lg">FamilyOS</h1>
+      <h1 className="text-3xl font-semibold tracking-wide drop-shadow-lg">Kinflow</h1>
     </div>
   </div>
 );
@@ -597,7 +597,7 @@ const SplashScreen = () => (
 const OnboardingFlow = ({ onComplete }) => {
   const [step, setStep] = useState(0);
   const content = [
-    { icon: <Users className="w-10 h-10 text-indigo-500" strokeWidth={1.5} />, title: "Welcome to FamilyOS", desc: "The smart operating system designed to keep your modern family organized, together." },
+    { icon: <Users className="w-10 h-10 text-indigo-500" strokeWidth={1.5} />, title: "Welcome to Kinflow", desc: "The smart operating system designed to keep your modern family organized, together." },
     { icon: <Wand2 className="w-10 h-10 text-purple-500" strokeWidth={1.5} />, title: "Meet Your Copilot", desc: "Instantly generate meal plans, auto-create grocery lists, and resolve scheduling conflicts using AI." },
     { icon: <Gift className="w-10 h-10 text-emerald-500" strokeWidth={1.5} />, title: "Gamify the Household", desc: "Kids earn points by completing assigned chores and can redeem them for real-life rewards." }
   ];
@@ -626,7 +626,7 @@ const LoginScreen = ({ onLogin, users }) => (
     <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-500/20 rounded-full blur-[100px]"></div>
     <div className="mb-16 text-center animate-pop-in relative z-10 flex flex-col items-center">
       <Layers className="w-12 h-12 text-white/90 mb-6 drop-shadow-lg" strokeWidth={1.5} />
-      <h1 className="text-3xl font-semibold tracking-wide mb-2 text-white/90">FamilyOS</h1>
+      <h1 className="text-3xl font-semibold tracking-wide mb-2 text-white/90">Kinflow</h1>
       <p className="text-white/50 text-sm font-medium tracking-wide">Select your profile</p>
     </div>
     <div className="grid grid-cols-2 gap-x-10 gap-y-12 w-full max-w-sm animate-pop-in relative z-10" style={{animationDelay: '0.1s'}}>
@@ -996,7 +996,7 @@ const CalendarView = ({ events, onAdd, isParent }) => {
 };
 
 const AICopilotModal = ({ isOpen, onClose }) => {
-  const [messages, setMessages] = useState([{ role: 'ai', text: "Hi! I'm your FamilyOS Copilot. I can help organize chores, plan meals, or resolve scheduling conflicts. What's up?" }]);
+  const [messages, setMessages] = useState([{ role: 'ai', text: "Hi! I'm your Kinflow Copilot. I can help organize chores, plan meals, or resolve scheduling conflicts. What's up?" }]);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -1297,7 +1297,7 @@ const SettingsView = ({ user, isParent, onLogout }) => {
 
       <Modal isOpen={activeModal === 'logout'} onClose={handleModalClose} title="Log Out">
         <div className="space-y-4">
-          <p className="text-slate-600 font-medium">Are you sure you want to log out of FamilyOS?</p>
+          <p className="text-slate-600 font-medium">Are you sure you want to log out of Kinflow?</p>
           <div className="flex gap-3 mt-4">
             <Button variant="secondary" onClick={handleModalClose} className="flex-1">Cancel</Button>
             <Button variant="primary" onClick={() => { handleModalClose(); onLogout(); }} className="flex-1 !bg-rose-500 hover:!bg-rose-600 !shadow-none">Log Out</Button>
