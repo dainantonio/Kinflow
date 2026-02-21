@@ -4,7 +4,7 @@ import {
   ChefHat, Gift, X, Plus, Sparkles, Bell, 
   ChevronRight, Clock, MapPin, Send, User, Check,
   Utensils, Star, Flame, MoreVertical, Users, BellRing, CreditCard, LogOut,
-  ShoppingCart, Loader2
+  ShoppingCart, Loader2, Hourglass
 } from 'lucide-react';
 
 // --- CUSTOM STYLES & KEYFRAMES ---
@@ -129,9 +129,9 @@ const MOCK_USERS = [
   { id: 'c2', name: "Lily", role: "Child", avatar: "👧" }
 ];
 const mockTasks = [
-  { id: 1, title: "Empty Dishwasher", assignee: "Tommy", points: 10, completed: false },
-  { id: 2, title: "Walk the Dog", assignee: "Sarah", points: 20, completed: true },
-  { id: 3, title: "Finish Math Homework", assignee: "Lily", points: 15, completed: false },
+  { id: 1, title: "Empty Dishwasher", assignee: "Tommy", points: 10, status: 'open' },
+  { id: 2, title: "Walk the Dog", assignee: "Sarah", points: 20, status: 'approved' },
+  { id: 3, title: "Finish Math Homework", assignee: "Lily", points: 15, status: 'pending' }, // Shows up immediately for Parent to approve
 ];
 const mockEvents = [
   { id: 1, title: "Tommy's Soccer Practice", time: "4:00 PM - 5:30 PM", location: "City Park", color: "bg-emerald-500" },
@@ -161,42 +161,67 @@ export default function App() {
   const [events, setEvents] = useState(mockEvents);
   const [meals, setMeals] = useState(mockMeals);
   const [groceries, setGroceries] = useState([]);
-  const [userPoints, setUserPoints] = useState({ 'Tommy': 45, 'Lily': 30 }); // Individual point banks
+  const [userPoints, setUserPoints] = useState({ 'Tommy': 45, 'Lily': 30 });
   
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
-  // Wire checking off tasks to point additions based on assignee
+  // Advanced Workflow: Open -> Pending -> Approved
   const handleCompleteTask = (taskId) => {
     setTasks(prevTasks => prevTasks.map(t => {
       if (t.id === taskId) {
-        const newCompleted = !t.completed;
         const assignee = t.assignee;
         
-        if (newCompleted) {
-          if (assignee && userPoints[assignee] !== undefined) {
-             setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
+        if (t.status === 'open') {
+          if (isParent) {
+            // Parent checks it off -> instant approval + points
+            if (assignee && userPoints[assignee] !== undefined) {
+               setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
+            }
+            triggerConfetti();
+            return { ...t, status: 'approved' };
+          } else {
+            // Child checks it off -> needs parent approval
+            triggerConfetti(); 
+            return { ...t, status: 'pending' };
           }
-          triggerConfetti();
-        } else {
-          if (assignee && userPoints[assignee] !== undefined) {
-             setUserPoints(p => ({...p, [assignee]: Math.max(0, p[assignee] - t.points)}));
+        } 
+        else if (t.status === 'pending') {
+          if (isParent) {
+            // Parent reviews and approves pending task -> deposit points
+            if (assignee && userPoints[assignee] !== undefined) {
+               setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
+            }
+            triggerConfetti();
+            return { ...t, status: 'approved' };
+          } else {
+            // Child undoes completion
+            return { ...t, status: 'open' };
           }
+        } 
+        else if (t.status === 'approved') {
+          if (isParent) {
+            // Parent undoes approval -> deduct points
+            if (assignee && userPoints[assignee] !== undefined) {
+               setUserPoints(p => ({...p, [assignee]: Math.max(0, p[assignee] - t.points)}));
+            }
+            return { ...t, status: 'open' };
+          }
+          // Children cannot un-approve a task
+          return t;
         }
-        return { ...t, completed: newCompleted };
       }
       return t;
     }));
   };
 
-  // Wire reward redemption to individual point deductions
   const handleRedeemReward = (cost) => {
     const pointsAvailable = userPoints[activeUser.name] || 0;
     if (!isParent && pointsAvailable >= cost) {
       setUserPoints(p => ({...p, [activeUser.name]: p[activeUser.name] - cost}));
       triggerConfetti();
     } else if (isParent) {
-      triggerConfetti(); // Just for visual feedback when parent tests it
+      triggerConfetti(); 
     }
   };
 
@@ -205,7 +230,7 @@ export default function App() {
     setTimeout(() => setShowConfetti(false), 1500);
   };
 
-  const handleAddTask = (newTask) => setTasks([...tasks, { ...newTask, id: Date.now(), completed: false }]);
+  const handleAddTask = (newTask) => setTasks([...tasks, { ...newTask, id: Date.now(), status: 'open' }]);
   const handleAddEvent = (newEvent) => setEvents([...events, { ...newEvent, id: Date.now(), color: 'bg-indigo-500' }]);
   const handleAddMeal = (newMeal) => setMeals([...meals, { ...newMeal, id: Date.now(), tags: ['New Recipe'], ingredients: "1 lb Main Protein/Base\n2 cups Fresh Vegetables\n1 tbsp Olive Oil\nAssorted Seasonings", instructions: "1. Preheat oven or heat pan to medium-high.\n2. Chop and prepare all ingredients.\n3. Cook the main base until fully done.\n4. Mix in vegetables and seasonings. Serve hot." }]);
   const handleUpdateMeal = (updatedMeal) => setMeals(meals.map(m => m.id === updatedMeal.id ? updatedMeal : m));
@@ -236,6 +261,8 @@ export default function App() {
     }
   };
 
+  const pendingApprovalTasks = tasks.filter(t => t.status === 'pending');
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col relative overflow-hidden">
       <CustomStyles />
@@ -243,7 +270,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto w-full max-w-2xl mx-auto pb-32 pt-8 px-4 sm:px-6 relative">
-        {/* Header section (Visible only on Home) */}
+        {/* Header section */}
         {activeTab === 'home' && (
           <header className="flex justify-between items-start mb-8 animate-pop-in">
             <div>
@@ -260,9 +287,13 @@ export default function App() {
                 <div className="relative w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl shadow-sm border-2 border-white ring-1 ring-slate-100/50">
                   {activeUser.avatar}
                 </div>
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 border-[2px] border-white rounded-full shadow-sm flex items-center justify-center text-[9px] text-white font-bold">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 border-[2px] border-white rounded-full shadow-sm flex items-center justify-center text-[9px] text-white font-bold z-10">
                   {isParent ? 'P' : 'C'}
                 </span>
+                {/* Red dot if there are tasks awaiting parent approval */}
+                {isParent && pendingApprovalTasks.length > 0 && (
+                  <span className="absolute top-0 right-0 w-3 h-3 bg-rose-500 border-2 border-white rounded-full shadow-sm animate-pulse -translate-y-1/2 translate-x-1/2 z-20"></span>
+                )}
               </div>
               {isParent && (
                 <button 
@@ -348,16 +379,32 @@ export default function App() {
 
 const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) => {
   const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser.name || t.assignee === 'Anyone');
-  const pendingTasks = visibleTasks.filter(t => !t.completed).length;
+  const openTasks = visibleTasks.filter(t => t.status === 'open').length;
+  const pendingApproval = tasks.filter(t => t.status === 'pending').length;
   
   return (
     <div className="space-y-6 animate-pop-in">
+      
+      {/* Approvals Banner for Parents */}
+      {isParent && pendingApproval > 0 && (
+        <Card onClick={() => onNavigate('tasks')} className="!bg-gradient-to-br from-amber-400 to-orange-500 text-white !border-0 flex items-center justify-between group shadow-lg shadow-orange-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-xl"><Bell className="w-5 h-5 text-white" /></div>
+            <div>
+              <h4 className="font-bold text-lg leading-tight">Approvals Needed</h4>
+              <p className="text-sm text-white/90 font-medium">{pendingApproval} task{pendingApproval > 1 ? 's' : ''} waiting for your review</p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+        </Card>
+      )}
+
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-2 gap-4">
         <Card onClick={() => onNavigate('tasks')} className="flex flex-col items-start gap-2 bg-gradient-to-br from-indigo-500 to-violet-600 text-white border-0 shadow-indigo-500/20">
           <CheckSquare className="w-8 h-8 opacity-80" />
           <div>
-            <p className="text-3xl font-extrabold">{pendingTasks}</p>
+            <p className="text-3xl font-extrabold">{openTasks}</p>
             <p className="text-sm font-medium opacity-80">Tasks Left</p>
           </div>
         </Card>
@@ -429,22 +476,45 @@ const TasksView = ({ tasks, onComplete, onAdd, activeUser, isParent }) => {
         {visibleTasks.length === 0 && (
             <div className="text-center py-10 text-slate-400 font-medium">No tasks assigned right now!</div>
         )}
-        {visibleTasks.map((task) => (
-          <Card key={task.id} onClick={() => onComplete(task.id)} className={`!p-4 flex items-center justify-between group ${task.completed ? 'opacity-60 bg-slate-50/50' : ''}`}>
-            <div className="flex items-center gap-4">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${task.completed ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300 group-hover:border-indigo-400'}`}>
-                {task.completed && <Check className="w-4 h-4 text-white" />}
+        {visibleTasks.map((task) => {
+          const isApproved = task.status === 'approved';
+          const isPending = task.status === 'pending';
+
+          return (
+            <Card 
+              key={task.id} 
+              onClick={() => onComplete(task.id)} 
+              className={`!p-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between group cursor-pointer 
+                ${isApproved ? 'opacity-60 bg-slate-50/50' : isPending ? 'ring-1 ring-amber-400/50 bg-amber-50/30' : ''}`
+              }
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-300 
+                  ${isApproved ? 'bg-indigo-500 border-indigo-500' : isPending ? 'bg-amber-400 border-amber-400' : 'border-slate-300 group-hover:border-indigo-400'}`
+                }>
+                  {isApproved && <Check className="w-4 h-4 text-white" />}
+                  {isPending && <Hourglass className="w-3.5 h-3.5 text-white" />}
+                </div>
+                <div>
+                  <p className={`font-bold transition-all ${isApproved ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                      <User className="w-3 h-3"/> {task.assignee}
+                    </p>
+                    {isPending && !isParent && <span className="text-[10px] font-bold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md">Waiting for Parent</span>}
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className={`font-bold transition-all ${task.completed ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</p>
-                <p className="text-xs font-medium text-slate-500 flex items-center gap-1 mt-0.5">
-                  <User className="w-3 h-3"/> {task.assignee}
-                </p>
+
+              <div className="flex items-center gap-3 justify-end sm:justify-start">
+                {isPending && isParent && (
+                    <Badge variant="warning" className="!bg-amber-500 !text-white !border-amber-600 animate-pulse !py-1.5 px-3">Tap to Approve</Badge>
+                )}
+                <Badge variant={isApproved ? 'default' : isPending ? 'warning' : 'premium'}>+{task.points} pt</Badge>
               </div>
-            </div>
-            <Badge variant={task.completed ? 'default' : 'warning'}>+{task.points} pt</Badge>
-          </Card>
-        ))}
+            </Card>
+          )
+        })}
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Task">
