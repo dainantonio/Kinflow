@@ -121,7 +121,12 @@ const Confetti = ({ active }) => {
 };
 
 // --- MOCK DATA ---
-const mockUser = { name: "Sarah", role: "Parent", avatar: "👩‍🦰" };
+const MOCK_USERS = [
+  { id: 'p1', name: "Sarah", role: "Parent", avatar: "👩‍🦰" },
+  { id: 'p2', name: "Dad", role: "Parent", avatar: "👨" },
+  { id: 'c1', name: "Tommy", role: "Child", avatar: "👦" },
+  { id: 'c2', name: "Lily", role: "Child", avatar: "👧" }
+];
 const mockTasks = [
   { id: 1, title: "Empty Dishwasher", assignee: "Tommy", points: 10, completed: false },
   { id: 2, title: "Walk the Dog", assignee: "Sarah", points: 20, completed: true },
@@ -146,23 +151,35 @@ const mockRewards = [
 // --- MAIN APP COMPONENT ---
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
+  const [activeUser, setActiveUser] = useState(MOCK_USERS[0]);
+  const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
+  
+  const isParent = activeUser.role === 'Parent';
+
   const [tasks, setTasks] = useState(mockTasks);
   const [events, setEvents] = useState(mockEvents);
   const [meals, setMeals] = useState(mockMeals);
-  const [points, setPoints] = useState(45); // Live state for family points
+  const [userPoints, setUserPoints] = useState({ 'Tommy': 45, 'Lily': 30 }); // Individual point banks
+  
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
-  // Wire checking off tasks to point additions
+  // Wire checking off tasks to point additions based on assignee
   const handleCompleteTask = (taskId) => {
     setTasks(prevTasks => prevTasks.map(t => {
       if (t.id === taskId) {
         const newCompleted = !t.completed;
+        const assignee = t.assignee;
+        
         if (newCompleted) {
-          setPoints(p => p + t.points);
+          if (assignee && userPoints[assignee] !== undefined) {
+             setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
+          }
           triggerConfetti();
         } else {
-          setPoints(p => Math.max(0, p - t.points));
+          if (assignee && userPoints[assignee] !== undefined) {
+             setUserPoints(p => ({...p, [assignee]: Math.max(0, p[assignee] - t.points)}));
+          }
         }
         return { ...t, completed: newCompleted };
       }
@@ -170,11 +187,14 @@ export default function App() {
     }));
   };
 
-  // Wire reward redemption to point deductions
+  // Wire reward redemption to individual point deductions
   const handleRedeemReward = (cost) => {
-    if (points >= cost) {
-      setPoints(p => p - cost);
+    const pointsAvailable = userPoints[activeUser.name] || 0;
+    if (!isParent && pointsAvailable >= cost) {
+      setUserPoints(p => ({...p, [activeUser.name]: p[activeUser.name] - cost}));
       triggerConfetti();
+    } else if (isParent) {
+      triggerConfetti(); // Just for visual feedback when parent tests it
     }
   };
 
@@ -189,19 +209,21 @@ export default function App() {
   const handleUpdateMeal = (updatedMeal) => setMeals(meals.map(m => m.id === updatedMeal.id ? updatedMeal : m));
 
   const renderContent = () => {
+    const displayPoints = isParent ? (userPoints['Tommy'] + userPoints['Lily']) : (userPoints[activeUser.name] || 0);
+
     switch(activeTab) {
       case 'home':
-        return <Dashboard tasks={tasks} events={events} points={points} onNavigate={setActiveTab} />;
+        return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
       case 'tasks':
-        return <TasksView tasks={tasks} onComplete={handleCompleteTask} onAdd={handleAddTask} />;
+        return <TasksView tasks={tasks} onComplete={handleCompleteTask} onAdd={handleAddTask} activeUser={activeUser} isParent={isParent} />;
       case 'calendar':
-        return <CalendarView events={events} onAdd={handleAddEvent} />;
+        return <CalendarView events={events} onAdd={handleAddEvent} isParent={isParent} />;
       case 'meals':
-        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} />;
+        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} isParent={isParent} />;
       case 'rewards':
-        return <RewardsView rewards={mockRewards} points={points} onRedeem={handleRedeemReward} />;
+        return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
       case 'settings':
-        return <SettingsView user={mockUser} />;
+        return <SettingsView user={activeUser} isParent={isParent} />;
       default:
         return (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400">
@@ -227,23 +249,27 @@ export default function App() {
                 <CalendarIcon className="w-4 h-4"/> Today
               </p>
               <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                Good afternoon,<br/>{mockUser.name}
+                Good afternoon,<br/>{activeUser.name}
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              <div className="relative cursor-pointer group">
+              <div className="relative cursor-pointer group" onClick={() => setIsUserSwitcherOpen(true)}>
                 <div className="absolute -inset-1.5 bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full blur opacity-20 group-hover:opacity-60 transition duration-500"></div>
                 <div className="relative w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl shadow-sm border-2 border-white ring-1 ring-slate-100/50">
-                  {mockUser.avatar}
+                  {activeUser.avatar}
                 </div>
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 border-[2px] border-white rounded-full shadow-sm"></span>
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 border-[2px] border-white rounded-full shadow-sm flex items-center justify-center text-[9px] text-white font-bold">
+                  {isParent ? 'P' : 'C'}
+                </span>
               </div>
-              <button 
-                onClick={() => setActiveTab('settings')}
-                className="p-3 bg-white/80 backdrop-blur-sm rounded-full shadow-sm ring-1 ring-slate-900/5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 active:scale-95 transition-all"
-              >
-                <MoreVertical className="w-5 h-5" />
-              </button>
+              {isParent && (
+                <button 
+                  onClick={() => setActiveTab('settings')}
+                  className="p-3 bg-white/80 backdrop-blur-sm rounded-full shadow-sm ring-1 ring-slate-900/5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 active:scale-95 transition-all"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </header>
         )}
@@ -252,15 +278,37 @@ export default function App() {
       </main>
 
       {/* Floating Action Button for AI Copilot */}
-      <button 
-        onClick={() => setIsCopilotOpen(true)}
-        className="fixed bottom-28 right-4 sm:right-8 z-40 bg-gradient-to-r from-violet-600 to-indigo-600 text-white p-4 rounded-full shadow-[0_8px_30px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all group"
-      >
-        <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-      </button>
+      {isParent && (
+        <button 
+          onClick={() => setIsCopilotOpen(true)}
+          className="fixed bottom-28 right-4 sm:right-8 z-40 bg-gradient-to-r from-violet-600 to-indigo-600 text-white p-4 rounded-full shadow-[0_8px_30px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all group"
+        >
+          <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+        </button>
+      )}
 
       {/* AI Copilot Modal */}
       <AICopilotModal isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} />
+
+      {/* User Switcher Modal */}
+      <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title="Switch Profile">
+        <div className="space-y-3">
+          {MOCK_USERS.map(user => (
+            <div 
+              key={user.id} 
+              onClick={() => { setActiveUser(user); setIsUserSwitcherOpen(false); }}
+              className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser.id === user.id ? 'bg-indigo-50 ring-2 ring-indigo-500' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}
+            >
+              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-2xl shadow-sm">{user.avatar}</div>
+              <div>
+                <h4 className="font-bold text-slate-800">{user.name}</h4>
+                <p className="text-xs font-medium text-slate-500">{user.role}</p>
+              </div>
+              {activeUser.id === user.id && <Check className="w-5 h-5 text-indigo-600 ml-auto" />}
+            </div>
+          ))}
+        </div>
+      </Modal>
 
       {/* Premium Floating iOS-Style Dock */}
       <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-4 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent z-40 pointer-events-none flex justify-center">
@@ -296,8 +344,9 @@ export default function App() {
 
 // --- SUB-VIEWS ---
 
-const Dashboard = ({ tasks, events, points, onNavigate }) => {
-  const pendingTasks = tasks.filter(t => !t.completed).length;
+const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) => {
+  const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser.name || t.assignee === 'Anyone');
+  const pendingTasks = visibleTasks.filter(t => !t.completed).length;
   
   return (
     <div className="space-y-6 animate-pop-in">
@@ -316,7 +365,7 @@ const Dashboard = ({ tasks, events, points, onNavigate }) => {
           </div>
           <div>
             <p className="text-3xl font-extrabold text-slate-800">{points}</p>
-            <p className="text-sm font-medium text-slate-500">Family Points</p>
+            <p className="text-sm font-medium text-slate-500">{isParent ? 'Total Family Pts' : 'My Points'}</p>
           </div>
         </Card>
       </div>
@@ -348,11 +397,13 @@ const Dashboard = ({ tasks, events, points, onNavigate }) => {
   );
 };
 
-const TasksView = ({ tasks, onComplete, onAdd }) => {
+const TasksView = ({ tasks, onComplete, onAdd, activeUser, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState('Tommy');
   const [taskPoints, setTaskPoints] = useState(10);
+
+  const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser.name || t.assignee === 'Anyone');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -366,14 +417,17 @@ const TasksView = ({ tasks, onComplete, onAdd }) => {
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">Family Tasks</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900">{isParent ? 'Family Tasks' : 'My Tasks'}</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">Check off to earn points!</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} variant="premium" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> New</Button>
+        {isParent && <Button onClick={() => setIsModalOpen(true)} variant="premium" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> New</Button>}
       </div>
 
       <div className="space-y-3">
-        {tasks.map((task) => (
+        {visibleTasks.length === 0 && (
+            <div className="text-center py-10 text-slate-400 font-medium">No tasks assigned right now!</div>
+        )}
+        {visibleTasks.map((task) => (
           <Card key={task.id} onClick={() => onComplete(task.id)} className={`!p-4 flex items-center justify-between group ${task.completed ? 'opacity-60 bg-slate-50/50' : ''}`}>
             <div className="flex items-center gap-4">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${task.completed ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300 group-hover:border-indigo-400'}`}>
@@ -426,7 +480,7 @@ const TasksView = ({ tasks, onComplete, onAdd }) => {
   );
 };
 
-const CalendarView = ({ events, onAdd }) => {
+const CalendarView = ({ events, onAdd, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
@@ -449,7 +503,7 @@ const CalendarView = ({ events, onAdd }) => {
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
         <h2 className="text-2xl font-extrabold text-slate-900">This Week</h2>
-        <Button onClick={() => setIsModalOpen(true)} variant="secondary" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Event</Button>
+        {isParent && <Button onClick={() => setIsModalOpen(true)} variant="secondary" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Event</Button>}
       </div>
 
       {/* Horizontal Date Picker */}
@@ -597,7 +651,7 @@ const AICopilotModal = ({ isOpen, onClose }) => {
   );
 };
 
-const MealsView = ({ meals, onAdd, onUpdate }) => {
+const MealsView = ({ meals, onAdd, onUpdate, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -640,7 +694,7 @@ const MealsView = ({ meals, onAdd, onUpdate }) => {
           <h2 className="text-2xl font-extrabold text-slate-900">Meal Plan</h2>
           <p className="text-slate-500 font-medium text-sm mt-1">What's cooking this week?</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} variant="premium" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Recipe</Button>
+        {isParent && <Button onClick={() => setIsModalOpen(true)} variant="premium" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Recipe</Button>}
       </div>
 
       <div className="space-y-4">
@@ -730,7 +784,7 @@ const MealsView = ({ meals, onAdd, onUpdate }) => {
 
             <div className="flex gap-3">
               <Button onClick={closeMealModal} variant="secondary" className="flex-1">Close</Button>
-              <Button onClick={handleEditClick} className="flex-1">Edit Plan</Button>
+              {isParent && <Button onClick={handleEditClick} className="flex-1">Edit Plan</Button>}
             </div>
           </div>
         )}
@@ -778,7 +832,7 @@ const MealsView = ({ meals, onAdd, onUpdate }) => {
   );
 };
 
-const RewardsView = ({ rewards, points, onRedeem }) => {
+const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
   return (
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
@@ -788,7 +842,7 @@ const RewardsView = ({ rewards, points, onRedeem }) => {
         </div>
         <div className="bg-gradient-to-br from-amber-400 to-orange-500 text-white px-4 py-2 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center gap-2 transition-all">
           <Star className="w-5 h-5 fill-white/50" />
-          <span className="font-extrabold text-lg">{points} pts</span>
+          <span className="font-extrabold text-lg">{points} {isParent ? 'Total pts' : 'pts'}</span>
         </div>
       </div>
 
@@ -811,10 +865,10 @@ const RewardsView = ({ rewards, points, onRedeem }) => {
             <Button 
               variant={points >= reward.cost ? 'primary' : 'secondary'} 
               className="!py-2.5 mt-2"
-              disabled={points < reward.cost}
+              disabled={points < reward.cost || isParent}
               onClick={() => onRedeem(reward.cost)}
             >
-              {points >= reward.cost ? 'Redeem Reward' : `Need ${reward.cost - points} more`}
+              {isParent ? 'Kids Redeem Here' : (points >= reward.cost ? 'Redeem Reward' : `Need ${reward.cost - points} more`)}
             </Button>
           </Card>
         ))}
@@ -823,7 +877,7 @@ const RewardsView = ({ rewards, points, onRedeem }) => {
   );
 };
 
-const SettingsView = ({ user }) => {
+const SettingsView = ({ user, isParent }) => {
   const [activeModal, setActiveModal] = useState(null);
 
   const handleModalClose = () => setActiveModal(null);
@@ -852,17 +906,27 @@ const SettingsView = ({ user }) => {
             <Button onClick={() => setActiveModal('editProfile')} variant="secondary" className="!w-auto !py-2 !px-4 text-xs ml-auto">Edit</Button>
           </div>
           <div className="p-2">
-            <SettingRow onClick={() => setActiveModal('family')} icon={Users} label="Family Members" value="4 Members" />
+            {isParent && <SettingRow onClick={() => setActiveModal('family')} icon={Users} label="Family Members" value="4 Members" />}
             <SettingRow onClick={() => setActiveModal('notifications')} icon={BellRing} label="Notifications" value="Enabled" />
-            <SettingRow onClick={() => setActiveModal('subscription')} icon={CreditCard} label="Subscription" value="Premium" />
+            {isParent && <SettingRow onClick={() => setActiveModal('subscription')} icon={CreditCard} label="Subscription" value="Premium" />}
           </div>
         </Card>
 
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider pl-2 mt-6 mb-2">App Settings</h3>
-        <Card className="!p-2">
-          <SettingRow onClick={() => setActiveModal('general')} icon={Settings} label="General Preferences" />
-          <SettingRow onClick={() => setActiveModal('logout')} icon={LogOut} label="Log Out" className="text-rose-600" iconClass="text-rose-500 bg-rose-50" hideArrow />
-        </Card>
+        {isParent && (
+          <>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider pl-2 mt-6 mb-2">App Settings</h3>
+            <Card className="!p-2">
+              <SettingRow onClick={() => setActiveModal('general')} icon={Settings} label="General Preferences" />
+              <SettingRow onClick={() => setActiveModal('logout')} icon={LogOut} label="Log Out" className="text-rose-600" iconClass="text-rose-500 bg-rose-50" hideArrow />
+            </Card>
+          </>
+        )}
+        
+        {!isParent && (
+            <Card className="!p-2 mt-6">
+                <SettingRow onClick={() => setActiveModal('logout')} icon={LogOut} label="Log Out" className="text-rose-600" iconClass="text-rose-500 bg-rose-50" hideArrow />
+            </Card>
+        )}
       </div>
 
       {/* Settings Modals */}
@@ -878,9 +942,9 @@ const SettingsView = ({ user }) => {
 
       <Modal isOpen={activeModal === 'family'} onClose={handleModalClose} title="Family Members">
         <div className="space-y-3">
-          {['Sarah (Parent)', 'Dad (Parent)', 'Tommy (Child)', 'Lily (Child)'].map((member, i) => (
+          {MOCK_USERS.map((member, i) => (
             <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <span className="font-medium text-slate-700">{member}</span>
+              <span className="font-medium text-slate-700">{member.name} ({member.role})</span>
               <Button variant="secondary" className="!w-auto !py-1 !px-3 text-xs">Edit</Button>
             </div>
           ))}
