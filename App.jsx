@@ -6,7 +6,7 @@ import {
   MoreVertical, Users, BellRing, CreditCard, LogOut,
   ShoppingCart, Loader2, Hourglass, ArrowRight,
   Layers, Wand2, Smartphone, Film, Ticket,
-  MessageCircle, Smile, Image as ImageIcon
+  MessageCircle, Smile, Image as ImageIcon, Camera
 } from 'lucide-react';
 
 // --- THEME CONTEXT ---
@@ -186,9 +186,10 @@ const MOCK_USERS = [
   { id: 'c2', name: "Lily", role: "Child", initials: "L", color: "from-purple-500 to-indigo-500" }
 ];
 const mockTasks = [
-  { id: 1, title: "Empty Dishwasher", assignee: "Tommy", points: 10, status: 'open' },
-  { id: 2, title: "Walk the Dog", assignee: "Sarah", points: 20, status: 'approved' },
-  { id: 3, title: "Finish Math Homework", assignee: "Lily", points: 15, status: 'pending' },
+  { id: 1, title: "Empty Dishwasher", assignee: "Tommy", points: 10, status: 'open', requiresPhoto: false },
+  { id: 4, title: "Clean Bedroom", assignee: "Tommy", points: 25, status: 'open', requiresPhoto: true }, // Added for Tommy to test taking photo
+  { id: 2, title: "Walk the Dog", assignee: "Sarah", points: 20, status: 'approved', requiresPhoto: false },
+  { id: 3, title: "Finish Math Homework", assignee: "Lily", points: 15, status: 'pending', requiresPhoto: true, photoUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=400&q=80" },
 ];
 const mockEvents = [
   { id: 1, title: "Tommy's Soccer Practice", time: "4:00 PM - 5:30 PM", location: "City Park", color: "bg-emerald-500" },
@@ -253,35 +254,45 @@ export default function App() {
     triggerConfetti();
   };
 
-  const handleCompleteTask = (taskId) => {
-    setTasks(prevTasks => prevTasks.map(t => {
-      if (t.id === taskId) {
-        const assignee = t.assignee;
-        if (t.status === 'open') {
-          if (isParent) {
+  // --- NEW ADVANCED TASK ACTION WORKFLOW ---
+  const handleTaskAction = (taskId, action, extra = {}) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+
+      const assignee = t.assignee;
+
+      if (action === 'toggle_simple') { 
+        if (isParent) {
+          if (t.status === 'open') {
             if (assignee && userPoints[assignee] !== undefined) setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
             triggerConfetti();
             return { ...t, status: 'approved' };
-          } else {
-            triggerConfetti(); 
-            return { ...t, status: 'pending' };
-          }
-        } else if (t.status === 'pending') {
-          if (isParent) {
-            if (assignee && userPoints[assignee] !== undefined) setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
-            triggerConfetti();
-            return { ...t, status: 'approved' };
-          } else {
-            return { ...t, status: 'open' };
-          }
-        } else if (t.status === 'approved') {
-          if (isParent) {
+          } else { 
             if (assignee && userPoints[assignee] !== undefined) setUserPoints(p => ({...p, [assignee]: Math.max(0, p[assignee] - t.points)}));
             return { ...t, status: 'open' };
           }
-          return t;
+        } else {
+          if (t.status === 'open') {
+            triggerConfetti();
+            return { ...t, status: 'pending' };
+          } else if (t.status === 'pending') {
+            return { ...t, status: 'open' };
+          }
         }
       }
+      else if (action === 'submit_with_photo') {
+        triggerConfetti();
+        return { ...t, status: 'pending', photoUrl: extra.photoUrl };
+      }
+      else if (action === 'approve') {
+        if (assignee && userPoints[assignee] !== undefined) setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
+        triggerConfetti();
+        return { ...t, status: 'approved' };
+      }
+      else if (action === 'reject') {
+        return { ...t, status: 'open', photoUrl: null };
+      }
+
       return t;
     }));
   };
@@ -313,7 +324,7 @@ export default function App() {
       case 'home':
         return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
       case 'tasks':
-        return <TasksView tasks={tasks} onComplete={handleCompleteTask} onAdd={handleAddTask} activeUser={activeUser} isParent={isParent} />;
+        return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} activeUser={activeUser} isParent={isParent} />;
       case 'calendar':
         return <CalendarView events={events} onAdd={handleAddEvent} isParent={isParent} />;
       case 'meals':
@@ -695,21 +706,58 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
   );
 };
 
-const TasksView = ({ tasks, onComplete, onAdd, activeUser, isParent }) => {
+const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState('Tommy');
   const [taskPoints, setTaskPoints] = useState(10);
+  const [requiresPhoto, setRequiresPhoto] = useState(false);
+
   const { isChild } = useContext(ThemeContext);
+
+  // Modals specific to the Photo-Proof feature
+  const [activeTaskForPhoto, setActiveTaskForPhoto] = useState(null); 
+  const [mockPhotoCaptured, setMockPhotoCaptured] = useState(null);
+  const [activeTaskForReview, setActiveTaskForReview] = useState(null); 
 
   const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser.name || t.assignee === 'Anyone');
 
-  const handleSubmit = (e) => {
+  const handleSubmitNewTask = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd({ title, assignee, points: parseInt(taskPoints) });
+    onAdd({ title, assignee, points: parseInt(taskPoints), requiresPhoto });
     setTitle('');
+    setRequiresPhoto(false);
     setIsModalOpen(false);
+  };
+
+  const handleTaskClick = (task) => {
+    if (isParent) {
+      if (task.status === 'pending') {
+        if (task.requiresPhoto && task.photoUrl) setActiveTaskForReview(task);
+        else onAction(task.id, 'approve');
+      } else {
+        onAction(task.id, 'toggle_simple');
+      }
+    } else {
+      if (task.status === 'open' && task.requiresPhoto) {
+        setActiveTaskForPhoto(task);
+        setMockPhotoCaptured(null);
+      } else {
+        onAction(task.id, 'toggle_simple');
+      }
+    }
+  };
+
+  const handleCapturePhoto = () => {
+    setTimeout(() => {
+      setMockPhotoCaptured("https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=400&q=80"); 
+    }, 600);
+  };
+
+  const handleSubmitPhoto = () => {
+    onAction(activeTaskForPhoto.id, 'submit_with_photo', { photoUrl: mockPhotoCaptured });
+    setActiveTaskForPhoto(null);
   };
 
   return (
@@ -733,7 +781,7 @@ const TasksView = ({ tasks, onComplete, onAdd, activeUser, isParent }) => {
           return (
             <Card 
               key={task.id} 
-              onClick={() => onComplete(task.id)} 
+              onClick={() => handleTaskClick(task)} 
               className={`!p-4 flex flex-col sm:flex-row gap-3 sm:items-center justify-between group cursor-pointer 
                 ${isApproved ? 'opacity-60 bg-slate-50/50' : isPending ? 'ring-2 ring-amber-400/50 bg-amber-50/50' : ''}`
               }
@@ -747,10 +795,15 @@ const TasksView = ({ tasks, onComplete, onAdd, activeUser, isParent }) => {
                 </div>
                 <div>
                   <p className={`font-bold text-sm transition-all ${isApproved ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                       <User className="w-3 h-3"/> {task.assignee}
                     </p>
+                    {task.requiresPhoto && (
+                      <span className="text-[9px] font-bold text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-md uppercase tracking-wider flex items-center gap-1">
+                        <Camera className="w-3 h-3" /> Photo Proof
+                      </span>
+                    )}
                     {isPending && isChild && <span className="text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Awaiting Parent</span>}
                   </div>
                 </div>
@@ -758,7 +811,7 @@ const TasksView = ({ tasks, onComplete, onAdd, activeUser, isParent }) => {
 
               <div className="flex items-center gap-3 justify-end sm:justify-start">
                 {isPending && isParent && (
-                    <Badge variant="warning" className="!bg-amber-500 !text-white !border-amber-600 animate-pulse !py-1.5 px-3">Tap to Approve</Badge>
+                    <Badge variant="warning" className="!bg-amber-500 !text-white !border-amber-600 animate-pulse !py-1.5 px-3">Tap to Review</Badge>
                 )}
                 <Badge variant={isApproved ? 'default' : isPending ? 'warning' : 'premium'}>+{task.points} pt</Badge>
               </div>
@@ -768,11 +821,12 @@ const TasksView = ({ tasks, onComplete, onAdd, activeUser, isParent }) => {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Task">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmitNewTask} className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1">Task Name</label>
             <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" placeholder="e.g., Clean the garage" autoFocus />
           </div>
+          
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1">Assignee</label>
@@ -795,9 +849,68 @@ const TasksView = ({ tasks, onComplete, onAdd, activeUser, isParent }) => {
               </select>
             </div>
           </div>
+
+          <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200 mt-2">
+            <div>
+              <h4 className="font-bold text-sm text-slate-700">Require Photo Proof</h4>
+              <p className="text-[11px] font-medium text-slate-500 mt-0.5">Child must snap a photo to finish.</p>
+            </div>
+            <div 
+              onClick={() => setRequiresPhoto(!requiresPhoto)}
+              className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${requiresPhoto ? 'bg-indigo-500' : 'bg-slate-300'}`}
+            >
+              <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-sm transition-all duration-300 ${requiresPhoto ? 'right-0.5' : 'left-0.5'}`}></div>
+            </div>
+          </div>
+
           <Button type="submit" className="mt-4">Add Task</Button>
         </form>
       </Modal>
+
+      {/* Child View: Snap a Photo Modal */}
+      <Modal isOpen={!!activeTaskForPhoto} onClose={() => setActiveTaskForPhoto(null)} title="Submit Proof">
+        {!mockPhotoCaptured ? (
+          <div className="space-y-4">
+            <div className="aspect-[4/3] bg-slate-100 rounded-[2rem] flex flex-col items-center justify-center border-4 border-dashed border-slate-300 mx-auto w-full max-w-[280px]">
+              <Camera className="w-12 h-12 text-slate-400 mb-2" />
+              <p className="font-bold text-sm text-slate-500">Frame your work clearly!</p>
+            </div>
+            <Button variant="primary" onClick={handleCapturePhoto}>Snap Photo</Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="aspect-[4/3] bg-slate-900 rounded-[2rem] overflow-hidden relative shadow-inner mx-auto w-full max-w-[280px]">
+              <img src={mockPhotoCaptured} className="w-full h-full object-cover" alt="Captured proof" />
+              <div className="absolute top-3 right-3 bg-emerald-500 text-white p-1.5 rounded-full shadow-lg">
+                <Check className="w-4 h-4" strokeWidth={3} />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setMockPhotoCaptured(null)}>Retake</Button>
+              <Button variant="primary" className="flex-1" onClick={handleSubmitPhoto}>Submit</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Parent View: Review Submitted Photo Modal */}
+      <Modal isOpen={!!activeTaskForReview} onClose={() => setActiveTaskForReview(null)} title="Review Work">
+        {activeTaskForReview && (
+          <div className="space-y-4">
+            <p className="font-medium text-sm text-slate-600 text-center">
+              {activeTaskForReview.assignee} submitted proof for <span className="font-bold text-slate-900">"{activeTaskForReview.title}"</span>
+            </p>
+            <div className="aspect-[4/3] bg-slate-900 rounded-[1.5rem] overflow-hidden shadow-inner mx-auto w-full max-w-[280px]">
+              <img src={activeTaskForReview.photoUrl} className="w-full h-full object-cover" alt="Submitted proof" />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1 !border-rose-200 !text-rose-600 hover:!bg-rose-50" onClick={() => { onAction(activeTaskForReview.id, 'reject'); setActiveTaskForReview(null); }}>Needs Work</Button>
+              <Button variant="primary" className="flex-1 !bg-emerald-500 hover:!bg-emerald-600 shadow-emerald-500/30" onClick={() => { onAction(activeTaskForReview.id, 'approve'); setActiveTaskForReview(null); }}>Approve</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
     </div>
   );
 };
