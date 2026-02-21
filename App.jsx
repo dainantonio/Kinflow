@@ -9,8 +9,19 @@ import {
   MessageCircle, Smile, Image as ImageIcon, Camera
 } from 'lucide-react';
 
+// --- FIREBASE IMPORTS ---
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
+
+// --- FIREBASE INITIALIZATION ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
 // --- THEME CONTEXT ---
-// This allows us to instantly morph the UI primitives based on the active user's role
 const ThemeContext = createContext({ isChild: false, user: null });
 
 // --- CUSTOM STYLES & KEYFRAMES ---
@@ -43,46 +54,32 @@ const CustomStyles = () => (
   </style>
 );
 
-// --- REUSABLE UI PRIMITIVES (Dynamically themed) ---
+// --- REUSABLE UI PRIMITIVES ---
 const Card = ({ children, className = '', onClick }) => {
   const { isChild } = useContext(ThemeContext);
-  
   const baseClass = isChild 
     ? `bg-white/95 rounded-[2.5rem] shadow-[0_10px_40px_rgb(0,0,0,0.06)] border-[4px] border-white ring-1 ring-slate-900/5 p-6` 
     : `bg-white/80 backdrop-blur-2xl rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-slate-900/5 p-5`;
-
-  return (
-    <div 
-      onClick={onClick} 
-      className={`${baseClass} transition-all duration-300 ${onClick ? 'cursor-pointer hover:-translate-y-1 active:scale-[0.98]' : ''} ${className}`}
-    >
-      {children}
-    </div>
-  );
+  return <div onClick={onClick} className={`${baseClass} transition-all duration-300 ${onClick ? 'cursor-pointer hover:-translate-y-1 active:scale-[0.98]' : ''} ${className}`}>{children}</div>;
 };
 
 const Button = ({ children, variant = 'primary', className = '', ...props }) => {
   const { isChild } = useContext(ThemeContext);
-
   const baseStyle = isChild
     ? "w-full font-bold rounded-[1.5rem] py-4 px-4 transition-all duration-200 active:scale-[0.96] flex items-center justify-center gap-2 relative shadow-[0_4px_0_rgb(0,0,0,0.12)] active:shadow-[0_0px_0_rgb(0,0,0,0)] active:translate-y-1 disabled:opacity-50"
     : "w-full font-semibold rounded-[1.25rem] py-3.5 px-4 transition-all duration-300 active:scale-[0.97] flex items-center justify-center gap-2 relative overflow-hidden group disabled:opacity-50 disabled:pointer-events-none";
 
-  const parentVariants = {
+  const variants = isChild ? {
+    primary: "bg-sky-500 text-white hover:bg-sky-400 border-2 border-sky-600",
+    secondary: "bg-white text-slate-800 border-2 border-slate-200",
+    premium: "bg-amber-400 text-amber-900 hover:bg-amber-300 border-2 border-amber-500",
+    outline: "bg-transparent border-2 border-slate-300 text-slate-700"
+  } : {
     primary: "bg-slate-900 text-white shadow-md shadow-slate-900/20 hover:bg-slate-800",
     secondary: "bg-white/80 backdrop-blur-md text-slate-800 hover:bg-white ring-1 ring-slate-900/10 shadow-sm",
     premium: "bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02]",
     outline: "border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
   };
-
-  const childVariants = {
-    primary: "bg-sky-500 text-white hover:bg-sky-400 border-2 border-sky-600",
-    secondary: "bg-white text-slate-800 border-2 border-slate-200",
-    premium: "bg-amber-400 text-amber-900 hover:bg-amber-300 border-2 border-amber-500",
-    outline: "bg-transparent border-2 border-slate-300 text-slate-700"
-  };
-
-  const variants = isChild ? childVariants : parentVariants;
 
   return (
     <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
@@ -94,91 +91,51 @@ const Button = ({ children, variant = 'primary', className = '', ...props }) => 
 
 const Badge = ({ children, variant = 'default', className = '' }) => {
   const { isChild } = useContext(ThemeContext);
-  
   const variants = {
     default: "bg-slate-100 text-slate-700 ring-1 ring-slate-900/5",
     success: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-900/5",
     warning: "bg-amber-100 text-amber-800 ring-1 ring-amber-900/10",
     premium: "bg-purple-100 text-purple-700 ring-1 ring-purple-900/5",
   };
-
-  return (
-    <span className={`${isChild ? 'text-xs px-3 py-1.5 rounded-xl' : 'text-[10px] sm:text-xs px-2.5 py-1 rounded-full uppercase tracking-wider backdrop-blur-sm'} font-bold ${variants[variant]} ${className}`}>
-      {children}
-    </span>
-  );
+  return <span className={`${isChild ? 'text-xs px-3 py-1.5 rounded-xl' : 'text-[10px] sm:text-xs px-2.5 py-1 rounded-full uppercase tracking-wider backdrop-blur-sm'} font-bold ${variants[variant]} ${className}`}>{children}</span>;
 };
 
-// --- SLEEK APPLE-STYLE AVATAR COMPONENT ---
 const Avatar = ({ user, size = 'md', className = '' }) => {
   if (!user) return null;
-  const sizes = {
-    sm: 'w-8 h-8 text-sm',
-    md: 'w-12 h-12 text-xl',
-    lg: 'w-16 h-16 text-3xl',
-    xl: 'w-24 h-24 text-5xl',
-    xxl: 'w-28 h-28 text-5xl'
-  };
-  return (
-    <div className={`flex items-center justify-center rounded-full bg-gradient-to-br ${user.color} text-white font-medium shadow-inner ring-1 ring-white/30 ${sizes[size]} ${className}`}>
-      {user.initials}
-    </div>
-  );
+  const sizes = { sm: 'w-8 h-8 text-sm', md: 'w-12 h-12 text-xl', lg: 'w-16 h-16 text-3xl', xl: 'w-24 h-24 text-5xl', xxl: 'w-28 h-28 text-5xl' };
+  return <div className={`flex items-center justify-center rounded-full bg-gradient-to-br ${user.color} text-white font-medium shadow-inner ring-1 ring-white/30 ${sizes[size]} ${className}`}>{user.initials}</div>;
 };
 
 const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
   const { isChild } = useContext(ThemeContext);
   if (!isOpen) return null;
-  
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-opacity"
-      onClick={onClose}
-    >
-      <div 
-        className={`${isChild ? 'bg-white rounded-t-[3rem] sm:rounded-[3rem] border-t-8 border-white/50' : 'bg-white/95 backdrop-blur-3xl rounded-t-[2.5rem] sm:rounded-[2.5rem]'} w-full sm:w-[90%] max-w-md ${fullHeight ? 'h-[90%]' : 'max-h-[90%]'} sm:h-auto p-6 shadow-2xl flex flex-col ring-1 ring-slate-900/5 relative animate-pop-in cursor-default`}
-        onClick={e => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}>
+      <div className={`${isChild ? 'bg-white rounded-t-[3rem] sm:rounded-[3rem] border-t-8 border-white/50' : 'bg-white/95 backdrop-blur-3xl rounded-t-[2.5rem] sm:rounded-[2.5rem]'} w-full sm:w-[90%] max-w-md ${fullHeight ? 'h-[90%]' : 'max-h-[90%]'} sm:h-auto p-6 shadow-2xl flex flex-col ring-1 ring-slate-900/5 relative animate-pop-in cursor-default`} onClick={e => e.stopPropagation()}>
         <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-6 sm:hidden opacity-60"></div>
         <div className="flex justify-between items-center mb-6 shrink-0">
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">{title}</h2>
-          <button onClick={onClose} className="p-2 bg-slate-100/80 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-all hover:rotate-90 duration-300">
-            <X className="w-5 h-5" />
-          </button>
+          <button onClick={onClose} className="p-2 bg-slate-100/80 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-all hover:rotate-90 duration-300"><X className="w-5 h-5" /></button>
         </div>
-        <div className="flex-1 overflow-y-auto no-scrollbar relative">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto no-scrollbar relative">{children}</div>
       </div>
     </div>
   );
 };
 
-// --- CONFETTI ANIMATION ---
 const Confetti = ({ active }) => {
   if (!active) return null;
   const colors = ['bg-indigo-500', 'bg-purple-500', 'bg-emerald-400', 'bg-amber-400', 'bg-pink-400'];
   return (
     <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden flex justify-center items-center">
       {[...Array(30)].map((_, i) => (
-        <div
-          key={i}
-          className={`absolute w-3 h-3 rounded-sm ${colors[i % colors.length]}`}
-          style={{
-            left: '50%',
-            top: '50%',
-            animation: `confetti-fall ${0.6 + Math.random() * 0.5}s ease-out forwards`,
-            transformOrigin: 'center',
-            transform: `translate(-50%, -50%)`,
-            margin: `${(Math.random() - 0.5) * 200}px ${(Math.random() - 0.5) * 200}px`
-          }}
-        />
+        <div key={i} className={`absolute w-3 h-3 rounded-sm ${colors[i % colors.length]}`} style={{ left: '50%', top: '50%', animation: `confetti-fall ${0.6 + Math.random() * 0.5}s ease-out forwards`, transformOrigin: 'center', transform: `translate(-50%, -50%)`, margin: `${(Math.random() - 0.5) * 200}px ${(Math.random() - 0.5) * 200}px` }} />
       ))}
     </div>
   );
 };
 
-// --- MOCK DATA ---
+// --- MOCK DATA FOR SEEDING FIREBASE ---
 const MOCK_USERS = [
   { id: 'p1', name: "Sarah", role: "Parent", initials: "S", color: "from-pink-500 to-rose-500" },
   { id: 'p2', name: "Dad", role: "Parent", initials: "D", color: "from-blue-500 to-cyan-500" },
@@ -187,27 +144,25 @@ const MOCK_USERS = [
 ];
 const mockTasks = [
   { id: 1, title: "Empty Dishwasher", assignee: "Tommy", points: 10, status: 'open', requiresPhoto: false },
-  { id: 4, title: "Clean Bedroom", assignee: "Tommy", points: 25, status: 'open', requiresPhoto: true }, // Added for Tommy to test taking photo
+  { id: 4, title: "Clean Bedroom", assignee: "Tommy", points: 25, status: 'open', requiresPhoto: true },
   { id: 2, title: "Walk the Dog", assignee: "Sarah", points: 20, status: 'approved', requiresPhoto: false },
   { id: 3, title: "Finish Math Homework", assignee: "Lily", points: 15, status: 'pending', requiresPhoto: true, photoUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=400&q=80" },
 ];
+const mockChats = [
+  { id: 1, senderId: 'p1', text: "Hey family, what's everyone doing?", time: "3:30 PM" },
+  { id: 2, senderId: 'c1', text: "Just finished my homework! Can I have a snack?", time: "3:32 PM" },
+];
 const mockEvents = [
   { id: 1, title: "Tommy's Soccer Practice", time: "4:00 PM - 5:30 PM", location: "City Park", color: "bg-emerald-500" },
-  { id: 2, title: "Family Dinner", time: "6:30 PM", location: "Home", color: "bg-indigo-500" },
-  { id: 3, title: "Dentist Appointment", time: "Tomorrow, 9:00 AM", location: "Dr. Smith's Clinic", color: "bg-rose-500" },
+  { id: 2, title: "Family Dinner", time: "6:30 PM", location: "Home", color: "bg-indigo-500" }
 ];
 const mockMeals = [
-  { id: 1, day: "Today", meal: "Spaghetti Bolognese", prepTime: "30m", tags: ["Pasta"], ingredients: "1 lb Ground Beef\n1 box Spaghetti\n1 jar Marinara Sauce", instructions: "1. Boil water and cook pasta.\n2. Brown ground beef.\n3. Simmer sauce." },
+  { id: 1, day: "Today", meal: "Spaghetti Bolognese", prepTime: "30m", tags: ["Pasta"], ingredients: "1 lb Ground Beef\n1 box Spaghetti\n1 jar Marinara Sauce", instructions: "1. Boil water and cook pasta.\n2. Brown ground beef.\n3. Simmer sauce." }
 ];
 const mockRewards = [
   { id: 1, title: "30 Min Screen Time", cost: 20, icon: <Smartphone className="w-6 h-6"/>, color: "bg-blue-100 text-blue-600" },
   { id: 2, title: "Choose Movie Night", cost: 50, icon: <Film className="w-6 h-6"/>, color: "bg-purple-100 text-purple-600" },
   { id: 3, title: "Special Activity", cost: 100, icon: <Ticket className="w-6 h-6"/>, color: "bg-pink-100 text-pink-600" },
-];
-const mockChats = [
-  { id: 1, senderId: 'p1', text: "Hey family, what's everyone doing?", time: "3:30 PM" },
-  { id: 2, senderId: 'c1', text: "Just finished my homework! Can I have a snack?", time: "3:32 PM" },
-  { id: 3, senderId: 'p2', text: "Great job Tommy. Yes, grab an apple.", time: "3:35 PM" },
 ];
 
 // --- MAIN APP COMPONENT ---
@@ -216,25 +171,86 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [activeUser, setActiveUser] = useState(null);
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
-  
-  // Onboarding States
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  const isParent = activeUser?.role === 'Parent';
-  const isChild = activeUser?.role === 'Child';
-
-  const [tasks, setTasks] = useState(mockTasks);
+  // Database States
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [userPoints, setUserPoints] = useState({ 'Tommy': 0, 'Lily': 0 });
+  
+  // Non-Firebase States (For Step 2)
   const [events, setEvents] = useState(mockEvents);
   const [meals, setMeals] = useState(mockMeals);
-  const [messages, setMessages] = useState(mockChats);
   const [groceries, setGroceries] = useState([]);
-  const [userPoints, setUserPoints] = useState({ 'Tommy': 45, 'Lily': 30 });
   
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
-  // Auto-hide Splash Screen
+  const isParent = activeUser?.role === 'Parent';
+  const isChild = activeUser?.role === 'Child';
+
+  // 1. Initialize Firebase Auth
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Firebase Auth Error:", error);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setFirebaseUser);
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Fetch & Sync Firestore Data
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    // Sync Tasks
+    const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks');
+    const unsubTasks = onSnapshot(tasksRef, (snap) => {
+      if (snap.empty) {
+        mockTasks.forEach(mt => setDoc(doc(tasksRef, mt.id.toString()), { ...mt, createdAt: Date.now() }));
+      } else {
+        const fetchedTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setTasks(fetchedTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+      }
+    }, console.error);
+
+    // Sync Messages (Chat)
+    const msgsRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages');
+    const unsubMsgs = onSnapshot(msgsRef, (snap) => {
+      if (snap.empty) {
+        mockChats.forEach(mc => setDoc(doc(msgsRef, mc.id.toString()), { ...mc, createdAt: Date.now() }));
+      } else {
+        const fetchedMsgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setMessages(fetchedMsgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+      }
+    }, console.error);
+
+    // Sync Points
+    const pointsRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_points');
+    const unsubPoints = onSnapshot(pointsRef, (snap) => {
+      if (snap.empty) {
+        setDoc(doc(pointsRef, 'Tommy'), { points: 45 });
+        setDoc(doc(pointsRef, 'Lily'), { points: 30 });
+      } else {
+        let p = { 'Tommy': 0, 'Lily': 0 };
+        snap.docs.forEach(d => { p[d.id] = d.data().points; });
+        setUserPoints(p);
+      }
+    }, console.error);
+
+    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); };
+  }, [firebaseUser]);
+
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2200);
     return () => clearTimeout(timer);
@@ -242,7 +258,7 @@ export default function App() {
 
   const handleLogin = (user) => {
     setActiveUser(user);
-    setActiveTab('home'); // Reset tab on login
+    setActiveTab('home'); 
     if (user.role === 'Parent' && !hasOnboarded) {
       setShowOnboarding(true);
     }
@@ -254,68 +270,91 @@ export default function App() {
     triggerConfetti();
   };
 
-  // --- NEW ADVANCED TASK ACTION WORKFLOW ---
-  const handleTaskAction = (taskId, action, extra = {}) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id !== taskId) return t;
-
-      const assignee = t.assignee;
-
-      if (action === 'toggle_simple') { 
-        if (isParent) {
-          if (t.status === 'open') {
-            if (assignee && userPoints[assignee] !== undefined) setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
-            triggerConfetti();
-            return { ...t, status: 'approved' };
-          } else { 
-            if (assignee && userPoints[assignee] !== undefined) setUserPoints(p => ({...p, [assignee]: Math.max(0, p[assignee] - t.points)}));
-            return { ...t, status: 'open' };
-          }
-        } else {
-          if (t.status === 'open') {
-            triggerConfetti();
-            return { ...t, status: 'pending' };
-          } else if (t.status === 'pending') {
-            return { ...t, status: 'open' };
-          }
-        }
-      }
-      else if (action === 'submit_with_photo') {
-        triggerConfetti();
-        return { ...t, status: 'pending', photoUrl: extra.photoUrl };
-      }
-      else if (action === 'approve') {
-        if (assignee && userPoints[assignee] !== undefined) setUserPoints(p => ({...p, [assignee]: p[assignee] + t.points}));
-        triggerConfetti();
-        return { ...t, status: 'approved' };
-      }
-      else if (action === 'reject') {
-        return { ...t, status: 'open', photoUrl: null };
-      }
-
-      return t;
-    }));
+  // --- FIREBASE WRITE OPERATIONS ---
+  
+  const handleAddTask = async (newTask) => {
+    if (!firebaseUser) return;
+    const newId = Date.now().toString();
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), {
+      ...newTask, id: newId, status: 'open', createdAt: Date.now()
+    });
   };
 
-  const handleRedeemReward = (cost) => {
+  const handleTaskAction = async (taskId, action, extra = {}) => {
+    const t = tasks.find(x => x.id === taskId);
+    if (!t || !firebaseUser) return;
+
+    const assignee = t.assignee;
+    let newStatus = t.status;
+    let newPhotoUrl = t.photoUrl || null;
+    let pointsChange = 0;
+
+    if (action === 'toggle_simple') { 
+      if (isParent) {
+        if (t.status === 'open') { pointsChange = t.points; newStatus = 'approved'; } 
+        else { pointsChange = -t.points; newStatus = 'open'; }
+      } else {
+        if (t.status === 'open') newStatus = 'pending';
+        else if (t.status === 'pending') newStatus = 'open';
+      }
+    }
+    else if (action === 'submit_with_photo') {
+      newStatus = 'pending';
+      newPhotoUrl = extra.photoUrl;
+    }
+    else if (action === 'approve') {
+      pointsChange = t.points;
+      newStatus = 'approved';
+    }
+    else if (action === 'reject') {
+      newStatus = 'open';
+      newPhotoUrl = null;
+    }
+
+    if (newStatus === 'pending' || newStatus === 'approved') {
+      if (t.status !== newStatus && action !== 'reject') triggerConfetti();
+    }
+
+    // Write Task Update to Cloud
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), {
+      status: newStatus, photoUrl: newPhotoUrl
+    });
+
+    // Write Points Update to Cloud
+    if (pointsChange !== 0 && assignee) {
+      const currentPoints = userPoints[assignee] || 0;
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', assignee), {
+        points: Math.max(0, currentPoints + pointsChange)
+      }, { merge: true });
+    }
+  };
+
+  const handleSendMessage = async (text) => {
+    if (!firebaseUser) return;
+    const newId = Date.now().toString();
+    const msg = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msg);
+  };
+
+  const handleRedeemReward = async (cost) => {
     const pointsAvailable = userPoints[activeUser.name] || 0;
     if (!isParent && pointsAvailable >= cost) {
-      setUserPoints(p => ({...p, [activeUser.name]: p[activeUser.name] - cost}));
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), {
+        points: pointsAvailable - cost
+      }, { merge: true });
       triggerConfetti();
     } else if (isParent) {
       triggerConfetti(); 
     }
   };
 
+  const handleAddEvent = (newEvent) => setEvents([...events, { ...newEvent, id: Date.now(), color: 'bg-indigo-500' }]);
+  const handleAddMeal = (newMeal) => setMeals([...meals, { ...newMeal, id: Date.now(), tags: ['New Recipe'] }]);
+
   const triggerConfetti = () => {
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 1500);
   };
-
-  const handleSendMessage = (msg) => setMessages([...messages, msg]);
-  const handleAddTask = (newTask) => setTasks([...tasks, { ...newTask, id: Date.now(), status: 'open' }]);
-  const handleAddEvent = (newEvent) => setEvents([...events, { ...newEvent, id: Date.now(), color: 'bg-indigo-500' }]);
-  const handleAddMeal = (newMeal) => setMeals([...meals, { ...newMeal, id: Date.now(), tags: ['New Recipe'] }]);
 
   const renderContent = () => {
     const displayPoints = isParent ? (userPoints['Tommy'] + userPoints['Lily']) : (userPoints[activeUser.name] || 0);
@@ -346,27 +385,11 @@ export default function App() {
   if (!activeUser) return <LoginScreen onLogin={handleLogin} users={MOCK_USERS} />;
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
-  // Define dynamic nav items based on role
   const navItems = isParent 
-    ? [
-        { id: 'home', icon: Home, label: 'Today' },
-        { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
-        { id: 'calendar', icon: CalendarIcon, label: 'Plan' },
-        { id: 'meals', icon: ChefHat, label: 'Meals' },
-        { id: 'chat', icon: MessageCircle, label: 'Chat' },
-        { id: 'rewards', icon: Gift, label: 'Rewards' }
-      ]
-    : [
-        { id: 'home', icon: Home, label: 'Home' },
-        { id: 'tasks', icon: CheckSquare, label: 'Chores' },
-        { id: 'chat', icon: MessageCircle, label: 'Chat' },
-        { id: 'rewards', icon: Gift, label: 'Rewards' }
-      ];
+    ? [{ id: 'home', icon: Home, label: 'Today' }, { id: 'tasks', icon: CheckSquare, label: 'Tasks' }, { id: 'calendar', icon: CalendarIcon, label: 'Plan' }, { id: 'meals', icon: ChefHat, label: 'Meals' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }]
+    : [{ id: 'home', icon: Home, label: 'Home' }, { id: 'tasks', icon: CheckSquare, label: 'Chores' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }];
 
-  // Dynamic Background based on role
-  const appBgClass = isChild 
-    ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' 
-    : 'bg-slate-50 text-slate-800';
+  const appBgClass = isChild ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' : 'bg-slate-50 text-slate-800';
 
   return (
     <ThemeContext.Provider value={{ isChild, user: activeUser }}>
@@ -374,10 +397,7 @@ export default function App() {
         <CustomStyles />
         <Confetti active={showConfetti} />
 
-        {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto w-full max-w-2xl mx-auto pb-32 pt-6 px-4 sm:px-6 relative">
-          
-          {/* Global Header */}
           <header className="flex justify-between items-start mb-6 min-h-[64px] shrink-0">
             <div className="flex-1">
               {activeTab === 'home' && (
@@ -403,10 +423,7 @@ export default function App() {
                 )}
               </div>
               {isParent && (
-                <button 
-                  onClick={() => setActiveTab('settings')}
-                  className={`w-11 h-11 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-full shadow-sm ring-1 ring-slate-900/5 hover:text-slate-800 hover:bg-slate-100 active:scale-95 transition-all ${activeTab === 'settings' ? 'text-indigo-600 bg-indigo-50 ring-indigo-200' : 'text-slate-500'}`}
-                >
+                <button onClick={() => setActiveTab('settings')} className={`w-11 h-11 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-full shadow-sm ring-1 ring-slate-900/5 hover:text-slate-800 hover:bg-slate-100 active:scale-95 transition-all ${activeTab === 'settings' ? 'text-indigo-600 bg-indigo-50 ring-indigo-200' : 'text-slate-500'}`}>
                   <MoreVertical className="w-5 h-5" />
                 </button>
               )}
@@ -416,58 +433,36 @@ export default function App() {
           {renderContent()}
         </main>
 
-        {/* Sleek Minimalist AI Copilot FAB (Parents Only) */}
         {isParent && (
-          <button 
-            onClick={() => setIsCopilotOpen(true)}
-            className="fixed bottom-24 right-4 sm:right-8 z-40 bg-white/95 backdrop-blur-xl text-indigo-600 p-3.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] ring-1 ring-slate-900/5 hover:scale-105 active:scale-95 transition-all group flex items-center justify-center"
-          >
+          <button onClick={() => setIsCopilotOpen(true)} className="fixed bottom-24 right-4 sm:right-8 z-40 bg-white/95 backdrop-blur-xl text-indigo-600 p-3.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] ring-1 ring-slate-900/5 hover:scale-105 active:scale-95 transition-all group flex items-center justify-center">
             <Wand2 className="w-5 h-5 group-hover:rotate-12 transition-transform" />
           </button>
         )}
 
         <AICopilotModal isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} />
 
-        {/* User Switcher Modal */}
         <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title="Switch Profile">
           <div className="space-y-3">
             {MOCK_USERS.map(user => (
-              <div 
-                key={user.id} 
-                onClick={() => { setActiveUser(user); setIsUserSwitcherOpen(false); }}
-                className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser.id === user.id ? 'bg-slate-100 ring-2 ring-slate-400' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}
-              >
+              <div key={user.id} onClick={() => { setActiveUser(user); setIsUserSwitcherOpen(false); }} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser?.id === user.id ? 'bg-slate-100 ring-2 ring-slate-400' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}>
                 <Avatar user={user} size="md" />
-                <div>
-                  <h4 className="font-bold text-slate-800">{user.name}</h4>
-                  <p className="text-xs font-medium text-slate-500">{user.role}</p>
-                </div>
-                {activeUser.id === user.id && <Check className="w-5 h-5 text-slate-800 ml-auto" />}
+                <div><h4 className="font-bold text-slate-800">{user.name}</h4><p className="text-xs font-medium text-slate-500">{user.role}</p></div>
+                {activeUser?.id === user.id && <Check className="w-5 h-5 text-slate-800 ml-auto" />}
               </div>
             ))}
           </div>
         </Modal>
 
-        {/* Dynamic Dock Navigation */}
         <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-4 bg-gradient-to-t from-black/5 via-black/5 to-transparent z-40 pointer-events-none flex justify-center">
           <nav className={`${isChild ? 'bg-white rounded-[2rem] px-2 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.1)] border-4 border-white/50' : 'bg-white/90 backdrop-blur-2xl px-2 py-2 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] rounded-full ring-1 ring-slate-900/5'} flex justify-between items-center overflow-x-auto no-scrollbar w-full max-w-md pointer-events-auto transition-all duration-500`}>
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
-              
-              // Dynamic active colors based on role
               const activeColor = isChild ? 'text-sky-500' : 'text-indigo-600';
               const activeBg = isChild ? 'bg-sky-50' : 'bg-indigo-50/80';
-              
               return (
-                <button 
-                  key={item.id} 
-                  onClick={() => setActiveTab(item.id)}
-                  className={`relative flex flex-col items-center justify-center gap-1 transition-all duration-300 flex-1 min-w-[50px] ${isChild ? 'py-2' : 'py-2'} ${isActive ? `${activeColor} scale-105` : 'text-slate-400 hover:text-slate-600 hover:scale-105 active:scale-95'}`}
-                >
-                  {isActive && (
-                    <div className={`absolute inset-0 ${activeBg} ${isChild ? 'rounded-2xl' : 'rounded-full'} -z-10`}></div>
-                  )}
+                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`relative flex flex-col items-center justify-center gap-1 transition-all duration-300 flex-1 min-w-[50px] ${isChild ? 'py-2' : 'py-2'} ${isActive ? `${activeColor} scale-105` : 'text-slate-400 hover:text-slate-600 hover:scale-105 active:scale-95'}`}>
+                  {isActive && <div className={`absolute inset-0 ${activeBg} ${isChild ? 'rounded-2xl' : 'rounded-full'} -z-10`}></div>}
                   <Icon className={`${isChild ? 'w-6 h-6' : 'w-5 h-5'} transition-all duration-300 ${isActive ? 'fill-current opacity-20' : ''}`} />
                   <span className={`tracking-wide transition-all mt-0.5 ${isChild ? 'text-[10px] font-bold' : 'text-[9px] font-bold'}`}>{item.label}</span>
                 </button>
@@ -487,13 +482,11 @@ const ChatView = ({ messages, onSend }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const handleSend = (text) => {
     if (!text.trim()) return;
-    onSend({ id: Date.now(), senderId: user.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) });
+    onSend(text);
     setInput('');
   };
 
@@ -502,29 +495,17 @@ const ChatView = ({ messages, onSend }) => {
       <div className="flex justify-between items-end mb-4 shrink-0">
         <h2 className="text-2xl font-bold text-slate-900">Family Chat</h2>
       </div>
-
       <Card className="flex-1 flex flex-col !p-0 overflow-hidden relative">
-        {/* Chat Messages Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
           {messages.map((msg, idx) => {
             const isMe = msg.senderId === user.id;
             const sender = MOCK_USERS.find(u => u.id === msg.senderId);
-            
             return (
               <div key={msg.id} className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
                 {!isMe && <Avatar user={sender} size="sm" className="shrink-0 mt-1" />}
-                
                 <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
                   {!isMe && <span className="text-[10px] font-bold text-slate-400 ml-1 mb-0.5">{sender?.name}</span>}
-                  
-                  <div className={`p-3 text-sm font-medium leading-relaxed shadow-sm
-                    ${isMe 
-                      ? (isChild ? 'bg-sky-500 text-white rounded-2xl rounded-br-sm' : 'bg-slate-800 text-white rounded-2xl rounded-br-sm') 
-                      : 'bg-slate-100 text-slate-800 rounded-2xl rounded-bl-sm ring-1 ring-slate-900/5'
-                    }`}
-                  >
-                    {msg.text}
-                  </div>
+                  <div className={`p-3 text-sm font-medium leading-relaxed shadow-sm ${isMe ? (isChild ? 'bg-sky-500 text-white rounded-2xl rounded-br-sm' : 'bg-slate-800 text-white rounded-2xl rounded-br-sm') : 'bg-slate-100 text-slate-800 rounded-2xl rounded-bl-sm ring-1 ring-slate-900/5'}`}>{msg.text}</div>
                   <span className="text-[9px] font-bold text-slate-300 mt-1">{msg.time}</span>
                 </div>
               </div>
@@ -532,48 +513,18 @@ const ChatView = ({ messages, onSend }) => {
           })}
           <div ref={messagesEndRef} />
         </div>
-
-        {/* Input Area */}
         <div className="bg-slate-50 border-t border-slate-100 p-3 shrink-0">
-          
-          {/* Child Quick Replies */}
           {isChild && (
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3">
               {['👍', '❤️', 'Done!', 'Need help', 'Snack time?'].map(reply => (
-                <button 
-                  key={reply}
-                  onClick={() => handleSend(reply)}
-                  className="whitespace-nowrap bg-white border-2 border-slate-200 text-slate-700 px-4 py-1.5 rounded-xl text-sm font-bold hover:bg-slate-100 active:scale-95 transition-all shadow-sm"
-                >
-                  {reply}
-                </button>
+                <button key={reply} onClick={() => handleSend(reply)} className="whitespace-nowrap bg-white border-2 border-slate-200 text-slate-700 px-4 py-1.5 rounded-xl text-sm font-bold hover:bg-slate-100 active:scale-95 transition-all shadow-sm">{reply}</button>
               ))}
             </div>
           )}
-
           <div className="flex items-center gap-2">
-            {!isChild && (
-              <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
-                <ImageIcon className="w-5 h-5" />
-              </button>
-            )}
-            
-            <input 
-              type="text" 
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSend(input)}
-              placeholder={isChild ? "Type a message..." : "Message family..."}
-              className={`flex-1 bg-white border text-slate-800 focus:outline-none transition-all font-medium ${isChild ? 'border-slate-200 rounded-xl px-4 py-3 shadow-sm' : 'border-slate-200 rounded-full pl-4 pr-4 py-2.5 focus:ring-1 focus:ring-slate-300'}`}
-            />
-            
-            <button 
-              onClick={() => handleSend(input)}
-              disabled={!input.trim()}
-              className={`p-3 text-white transition-all shadow-sm disabled:opacity-50 flex items-center justify-center ${isChild ? 'bg-sky-500 rounded-xl hover:bg-sky-400 active:scale-95' : 'bg-slate-800 rounded-full hover:bg-slate-700'}`}
-            >
-              <Send className={`${isChild ? 'w-5 h-5' : 'w-4 h-4'}`} />
-            </button>
+            {!isChild && <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors"><ImageIcon className="w-5 h-5" /></button>}
+            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend(input)} placeholder={isChild ? "Type a message..." : "Message family..."} className={`flex-1 bg-white border text-slate-800 focus:outline-none transition-all font-medium ${isChild ? 'border-slate-200 rounded-xl px-4 py-3 shadow-sm' : 'border-slate-200 rounded-full pl-4 pr-4 py-2.5 focus:ring-1 focus:ring-slate-300'}`} />
+            <button onClick={() => handleSend(input)} disabled={!input.trim()} className={`p-3 text-white transition-all shadow-sm disabled:opacity-50 flex items-center justify-center ${isChild ? 'bg-sky-500 rounded-xl hover:bg-sky-400 active:scale-95' : 'bg-slate-800 rounded-full hover:bg-slate-700'}`}><Send className={`${isChild ? 'w-5 h-5' : 'w-4 h-4'}`} /></button>
           </div>
         </div>
       </Card>
@@ -581,7 +532,7 @@ const ChatView = ({ messages, onSend }) => {
   );
 };
 
-// ... (Rest of existing sub-components unchanged, dynamically utilizing ThemeContext via primitives) ...
+// ... ALL OTHER SUB-VIEWS REMAIN UNCHANGED FROM THE PROTOTYPE ...
 
 const SplashScreen = () => (
   <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white relative overflow-hidden transition-opacity duration-500">
@@ -715,7 +666,6 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
 
   const { isChild } = useContext(ThemeContext);
 
-  // Modals specific to the Photo-Proof feature
   const [activeTaskForPhoto, setActiveTaskForPhoto] = useState(null); 
   const [mockPhotoCaptured, setMockPhotoCaptured] = useState(null);
   const [activeTaskForReview, setActiveTaskForReview] = useState(null); 
@@ -995,52 +945,6 @@ const CalendarView = ({ events, onAdd, isParent }) => {
   );
 };
 
-const AICopilotModal = ({ isOpen, onClose }) => {
-  const [messages, setMessages] = useState([{ role: 'ai', text: "Hi! I'm your Kinflow Copilot. I can help organize chores, plan meals, or resolve scheduling conflicts. What's up?" }]);
-  const [input, setInput] = useState('');
-  const messagesEndRef = useRef(null);
-
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
-
-  const handleSend = (presetText = null) => {
-    const textToSend = presetText || input;
-    if (!textToSend.trim()) return;
-    setMessages([...messages, { role: 'user', text: textToSend }]);
-    setInput('');
-    setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'ai', text: "I've drafted a plan based on your request. Should I add it to the calendar?" }]);
-    }, 1200);
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title={<div className="flex items-center gap-2"><Wand2 className="w-5 h-5 text-indigo-500"/> Copilot</div>} fullHeight>
-      <div className="flex flex-col h-full h-[60vh]">
-        <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-4">
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed ${msg.role === 'user' ? 'bg-slate-900 text-white rounded-br-sm' : 'bg-slate-100 text-slate-800 rounded-bl-sm ring-1 ring-slate-900/5'}`}>
-                {msg.text}
-              </div>
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-        {messages.length < 3 && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-4 pt-2 shrink-0">
-            {["Plan Dinners", "Assign Chores", "Find Free Time"].map(action => (
-              <button key={action} onClick={() => handleSend(action)} className="whitespace-nowrap bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-full text-xs font-semibold hover:bg-slate-50 transition-colors shadow-sm">{action}</button>
-            ))}
-          </div>
-        )}
-        <div className="relative mt-auto shrink-0 pt-2">
-          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} placeholder="Ask Copilot anything..." className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-full pl-5 pr-12 py-4 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:bg-white transition-all font-medium" />
-          <button onClick={() => handleSend()} disabled={!input.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"><Send className="w-4 h-4" /></button>
-        </div>
-      </div>
-    </Modal>
-  );
-};
-
 const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState(null);
@@ -1165,6 +1069,8 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }
     </div>
   );
 };
+
+// ... ALL OTHER SUB-VIEWS REMAIN UNCHANGED FROM THE PROTOTYPE ...
 
 const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
   const { isChild } = useContext(ThemeContext);
