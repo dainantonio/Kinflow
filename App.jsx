@@ -152,10 +152,10 @@ const mockRewards = [
 // --- MAIN APP COMPONENT ---
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
-  const [activeUser, setActiveUser] = useState(MOCK_USERS[0]);
+  const [activeUser, setActiveUser] = useState(null); // Start logged out to show Login Screen
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   
-  const isParent = activeUser.role === 'Parent';
+  const isParent = activeUser?.role === 'Parent';
 
   const [tasks, setTasks] = useState(mockTasks);
   const [events, setEvents] = useState(mockEvents);
@@ -250,7 +250,7 @@ export default function App() {
       case 'rewards':
         return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
       case 'settings':
-        return <SettingsView user={activeUser} isParent={isParent} />;
+        return <SettingsView user={activeUser} isParent={isParent} onLogout={() => setActiveUser(null)} />;
       default:
         return (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400">
@@ -262,6 +262,10 @@ export default function App() {
   };
 
   const pendingApprovalTasks = tasks.filter(t => t.status === 'pending');
+
+  if (!activeUser) {
+    return <LoginScreen onLogin={setActiveUser} users={MOCK_USERS} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col relative overflow-hidden">
@@ -376,6 +380,33 @@ export default function App() {
 }
 
 // --- SUB-VIEWS ---
+
+const LoginScreen = ({ onLogin, users }) => (
+  <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
+    {/* Background decorative blobs */}
+    <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+    <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+    
+    <div className="mb-16 text-center animate-pop-in relative z-10">
+      <div className="w-24 h-24 bg-white/20 backdrop-blur-xl rounded-[2rem] mx-auto flex items-center justify-center mb-6 shadow-2xl border border-white/30">
+        <Sparkles className="w-12 h-12 text-white" />
+      </div>
+      <h1 className="text-5xl font-extrabold tracking-tight mb-3 drop-shadow-lg">FamilyOS</h1>
+      <p className="text-indigo-50 text-lg font-medium tracking-wide">Who's using the app today?</p>
+    </div>
+    
+    <div className="grid grid-cols-2 gap-x-8 gap-y-10 w-full max-w-sm animate-pop-in relative z-10" style={{animationDelay: '0.1s'}}>
+      {users.map(u => (
+        <div key={u.id} onClick={() => onLogin(u)} className="flex flex-col items-center gap-4 cursor-pointer group">
+          <div className="w-28 h-28 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-5xl shadow-xl border-2 border-white/40 group-hover:scale-110 group-hover:bg-white/30 transition-all duration-300">
+            {u.avatar}
+          </div>
+          <span className="font-bold text-lg tracking-wide text-white/90 group-hover:text-white">{u.name}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) => {
   const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser.name || t.assignee === 'Anyone');
@@ -1023,7 +1054,7 @@ const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
   );
 };
 
-const SettingsView = ({ user, isParent }) => {
+const SettingsView = ({ user, isParent, onLogout }) => {
   const [activeModal, setActiveModal] = useState(null);
 
   const handleModalClose = () => setActiveModal(null);
@@ -1142,7 +1173,7 @@ const SettingsView = ({ user, isParent }) => {
           <p className="text-slate-600">Are you sure you want to log out of FamilyOS?</p>
           <div className="flex gap-3 mt-4">
             <Button variant="secondary" onClick={handleModalClose} className="flex-1">Cancel</Button>
-            <Button variant="primary" onClick={handleModalClose} className="flex-1 !bg-rose-600 hover:!bg-rose-700 !shadow-none">Log Out</Button>
+            <Button variant="primary" onClick={() => { handleModalClose(); onLogout(); }} className="flex-1 !bg-rose-600 hover:!bg-rose-700 !shadow-none">Log Out</Button>
           </div>
         </div>
       </Modal>
