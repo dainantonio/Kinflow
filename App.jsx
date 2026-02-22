@@ -402,7 +402,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <Card onClick={() => onNavigate('tasks')} className={`flex flex-col items-start gap-2 border-0 shadow-lg ${isChild ? '!bg-sky-500 text-white !ring-0 shadow-sky-500/30' : 'bg-slate-900 text-white shadow-slate-900/10'}`}>
+        <Card onClick={() => onNavigate('tasks')} className={`flex flex-col items-start gap-2 border-0 shadow-lg ${isChild ? '!bg-sky-500 text-white !ring-0 shadow-sky-500/30' : '!bg-slate-900 text-white shadow-slate-900/10'}`}>
           <CheckSquare className="w-6 h-6 opacity-80" strokeWidth={2} />
           <div>
             <p className="text-3xl font-bold tracking-tight">{openTasks}</p>
@@ -1357,6 +1357,11 @@ export default function App() {
     if (!firebaseUser) return;
     const newId = Date.now().toString();
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), { ...newTask, id: newId, status: 'open', createdAt: Date.now() });
+    
+    // Trigger notification for the specific child
+    if (newTask.assignee && newTask.assignee !== 'Anyone') {
+      sendNotification("New Chore", `You were assigned a new chore: "${newTask.title}"`, newTask.assignee);
+    }
   };
 
   const requestDeleteTask = (id) => {
