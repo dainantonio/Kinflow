@@ -1,2 +1,37 @@
-Kins — The AI-Powered Family Command CenterKins is a high-performance, mobile-first command center designed to eliminate the "mental load" of modern parenting. Unlike standard checklist apps, Kins acts as a central operating system for the home, combining role-based task management, intelligent calendar synchronization, and advanced AI-driven meal planning into a single, premium experience.✨ Key FeaturesRole-Based Dashboards: Tailored experiences for Parents (oversight & approval), Teens (independence & growth), and Kids (gamified engagement).AI Daily Planner: Leverages Google Gemini 2.5 to analyze family schedules and auto-generate age-appropriate chores and educational tasks.The AI Kitchen: A complete recipe vault that generates custom meal plans and interactive shopping lists based on ingredients currently in your fridge.Smart Rewards System: An immutable points ledger that allows kids to earn points for tasks and redeem them for real-life rewards (e.g., screen time, movie nights).Native Experience: Integrated browser Notification API for OS-level push notifications and simulated OAuth handshakes for Google/Outlook calendars.Commercial Ready: Fully integrated Stripe checkout simulation for PLUS and PRO subscription tiers.🛠️ Tech Stack & ArchitectureKins is engineered as a robust Single-Page Application (SPA) with a focus on real-time data integrity and buttery-smooth UI.Frontend: React.js with a mobile-first, glassmorphic design language powered by Tailwind CSS.State Engine: A sophisticated useReducer pattern mirroring a Prisma/PostgreSQL schema for predictable state transitions.Cloud Infrastructure: Firebase/Firestore integration for real-time, multi-device synchronization.Intelligence Layer: Direct API hooks into Google Gemini for routine automation and conversational AI (The Copilot).Database Schema: Rigorous Prisma-based modeling (see schema.prisma) ensuring data consistency across families, users, and ledgers.🚀 Getting StartedTo transition this project from a sandbox to a production environment:Install Dependencies:npm install lucide-react firebase clsx tailwind-merge
-Environment Configuration:Ensure your Firebase configuration and Gemini API keys are provided via the __firebase_config global or a standard .env file.Deploy:The application is optimized for deployment as a Progressive Web App (PWA) on Vercel, Netlify, or Firebase Hosting.📈 RoadmapSprint 1: Full CRUD lifecycle for tasks, rewards, and family member management. (Completed)Sprint 2: Native API integrations (Push Notifications) and OAuth simulations. (Completed)Sprint 3: Monetization flow and database-aware AI Copilot. (Completed)Sprint 4: Real-world Stripe/Google API production handshakes. (Planned)
+Sources: landing page content + feature flow + learning paths :contentReference[oaicite:3]{index=3}
+
+---
+
+
+# Kinflow (Kins) — The AI-Powered Family Command Center
+
+Kins is a high-performance, mobile-first command center designed to eliminate the **mental load** of modern parenting.
+
+Unlike standard checklist apps, Kins acts as a central operating system for the home—combining role-based task management, calendar coordination, and AI-driven meal planning into a single premium experience.
+
+---
+
+## Key Features
+- **Role-based dashboards** for Parents, Teens, and Kids
+- **AI Daily Planner** (Gemini) to generate age-appropriate chores and learning tasks
+- **AI Kitchen** for meal planning + interactive shopping lists
+- **Smart Rewards System** (points ledger → real-life rewards like screen time)
+- **Notifications** via browser Notification API
+- **Calendar connection simulation** (Google/Outlook OAuth-style flows)
+- **Tiered plans simulation** (PLUS / PRO mock checkout)
+
+---
+
+## Tech Stack (Current Direction)
+- React (SPA)
+- Tailwind CSS (glassmorphic UI)
+- State engine: `useReducer` patterns
+- Firebase/Firestore (planned/option for realtime sync)
+- Gemini hooks (planned/option for AI)
+
+---
+
+## Getting Started
+```bash
+npm install
+npm run dev
