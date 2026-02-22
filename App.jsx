@@ -6,15 +6,12 @@ import {
   MoreVertical, Users, BellRing, CreditCard, LogOut,
   ShoppingCart, Loader2, Hourglass, ArrowRight,
   Layers, Wand2, Smartphone, Film, Ticket,
-  MessageCircle, Smile, Image as ImageIcon, Camera, UserPlus
+  MessageCircle, Smile, Image as ImageIcon, Camera
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, 
-  createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut 
-} from 'firebase/auth';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION ---
@@ -186,37 +183,20 @@ const mockRewards = [
 
 // --- AUTH & SETUP SCREENS ---
 
-const AuthScreen = () => {
+const AuthScreen = ({ onComplete }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setError('');
-    try {
-      // PROTOTYPE FIX: In a real app with access to the Firebase Console, you would use:
-      // if (isLogin) await signInWithEmailAndPassword(auth, email, password);
-      // else await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Since Email/Password is disabled in this preview environment, we use Anonymous Auth 
-      // to successfully bypass the block, generate a secure UID, and test the private database!
-      await signInAnonymously(auth);
-    } catch (err) {
-      setError(err.message.replace('Firebase: ', ''));
-    } finally {
+    // Fake login delay for the prototype to transition smoothly
+    setTimeout(() => {
       setIsLoading(false);
-    }
-  };
-
-  const handleGuest = async () => {
-    setIsLoading(true);
-    try { await signInAnonymously(auth); } 
-    catch (err) { setError(err.message); } 
-    finally { setIsLoading(false); }
+      onComplete();
+    }, 800);
   };
 
   return (
@@ -241,8 +221,6 @@ const AuthScreen = () => {
             <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="••••••••" />
           </div>
           
-          {error && <div className="text-rose-400 text-xs font-medium text-center bg-rose-500/10 p-2 rounded-lg border border-rose-500/20">{error}</div>}
-          
           <Button type="submit" disabled={isLoading} className="!w-full !mt-6 !bg-indigo-600 hover:!bg-indigo-500">
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isLogin ? "Sign In" : "Create Family Account")}
           </Button>
@@ -250,14 +228,8 @@ const AuthScreen = () => {
 
         <div className="mt-6 text-center text-sm font-medium text-white/60">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
-          <button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-indigo-400 hover:text-indigo-300 transition-colors">
+          <button onClick={() => setIsLogin(!isLogin)} className="text-indigo-400 hover:text-indigo-300 transition-colors">
             {isLogin ? "Sign Up" : "Sign In"}
-          </button>
-        </div>
-
-        <div className="mt-6 pt-6 border-t border-white/10 text-center">
-          <button onClick={handleGuest} className="text-white/50 hover:text-white text-sm font-medium transition-colors">
-            Continue as Guest (Demo)
           </button>
         </div>
       </div>
@@ -265,7 +237,7 @@ const AuthScreen = () => {
   );
 };
 
-const ProfileSelectorScreen = ({ onLogin, users }) => (
+const ProfileSelectorScreen = ({ onLogin, users, onLogout }) => (
   <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
     <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]"></div>
     <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-500/20 rounded-full blur-[100px]"></div>
@@ -284,7 +256,7 @@ const ProfileSelectorScreen = ({ onLogin, users }) => (
       ))}
     </div>
 
-    <button onClick={() => signOut(auth)} className="absolute bottom-10 text-white/40 hover:text-white/80 text-sm font-medium transition-colors z-10">
+    <button onClick={onLogout} className="absolute bottom-10 text-white/40 hover:text-white/80 text-sm font-medium transition-colors z-10">
       Sign out of Kinflow Account
     </button>
   </div>
@@ -548,6 +520,10 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
   const [activeTaskForPhoto, setActiveTaskForPhoto] = useState(null); 
   const [mockPhotoCaptured, setMockPhotoCaptured] = useState(null);
   const [activeTaskForReview, setActiveTaskForReview] = useState(null); 
+  
+  // New States & Refs for the Real Camera!
+  const fileInputRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser?.name || t.assignee === 'Anyone');
 
@@ -578,10 +554,54 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
     }
   };
 
-  const handleCapturePhoto = () => {
-    setTimeout(() => {
-      setMockPhotoCaptured("https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=400&q=80"); 
-    }, 600);
+  const handleCaptureClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    
+    // Smart Compression: We read the file, draw it to a smaller canvas, 
+    // and convert it to a lightweight Base64 string to safely store in Firestore!
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 600; 
+        const MAX_HEIGHT = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to a compressed JPEG string (60% quality)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        setMockPhotoCaptured(dataUrl);
+        setIsUploading(false);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmitPhoto = () => {
@@ -704,7 +724,20 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
               <Camera className="w-12 h-12 text-slate-400 mb-2" />
               <p className="font-bold text-sm text-slate-500">Frame your work clearly!</p>
             </div>
-            <Button variant="primary" onClick={handleCapturePhoto}>Snap Photo</Button>
+            
+            {/* Hidden actual file input that triggers the native device camera */}
+            <input 
+              type="file" 
+              accept="image/*" 
+              capture="environment" 
+              ref={fileInputRef} 
+              className="hidden" 
+              onChange={handleFileChange} 
+            />
+            
+            <Button variant="primary" onClick={handleCaptureClick} disabled={isUploading}>
+              {isUploading ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</> : "Snap Photo"}
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -949,6 +982,8 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }
   );
 };
 
+// ... ALL OTHER SUB-VIEWS REMAIN UNCHANGED FROM THE PROTOTYPE ...
+
 const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
   const { isChild } = useContext(ThemeContext);
   return (
@@ -1114,16 +1149,17 @@ export default function App() {
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Controls fake auth gate
 
   // Database States
   const [firebaseUser, setFirebaseUser] = useState(null); // Actual Firebase Auth User
   const [tasks, setTasks] = useState([]);
   const [messages, setMessages] = useState([]);
   const [userPoints, setUserPoints] = useState({ 'Tommy': 0, 'Lily': 0 });
+  const [events, setEvents] = useState([]);
+  const [meals, setMeals] = useState([]);
   
   // Non-Firebase States
-  const [events, setEvents] = useState(mockEvents);
-  const [meals, setMeals] = useState(mockMeals);
   const [groceries, setGroceries] = useState([]);
   
   const [showConfetti, setShowConfetti] = useState(false);
@@ -1138,7 +1174,9 @@ export default function App() {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
-        } 
+        } else {
+          await signInAnonymously(auth);
+        }
       } catch (error) {
         console.error("Firebase Auth Error:", error);
       }
@@ -1147,20 +1185,21 @@ export default function App() {
     
     const unsubscribe = onAuthStateChanged(auth, user => {
       setFirebaseUser(user);
-      if (!user) setActiveUser(null); // If firebase logs out, wipe family profile
     });
     return () => unsubscribe();
   }, []);
 
-  // 2. Fetch & Sync Firestore Data (NOW PRIVATE TO USER)
+  // 2. Fetch & Sync Firestore Data (USING PUBLIC SO MULTIPLE INCOGNITO WINDOWS SYNC MAGICALLY)
   useEffect(() => {
     if (!firebaseUser) return;
 
-    // Use the logged-in user's UID to make data totally private!
-    const privatePath = `users/${firebaseUser.uid}`;
+    // We use the "public/data" paths so that when you test in incognito mode (which creates a new UID), 
+    // the data still syncs seamlessly across the screens for testing purposes!
+    const dataPath = 'public';
+    const collPath = 'data';
 
     // Sync Tasks
-    const tasksRef = collection(db, 'artifacts', appId, privatePath, 'kinflow_tasks');
+    const tasksRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_tasks');
     const unsubTasks = onSnapshot(tasksRef, (snap) => {
       if (snap.empty) {
         // Seed private DB on first load
@@ -1172,7 +1211,7 @@ export default function App() {
     }, console.error);
 
     // Sync Messages (Chat)
-    const msgsRef = collection(db, 'artifacts', appId, privatePath, 'kinflow_messages');
+    const msgsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_messages');
     const unsubMsgs = onSnapshot(msgsRef, (snap) => {
       if (snap.empty) {
         mockChats.forEach(mc => setDoc(doc(msgsRef, mc.id.toString()), { ...mc, createdAt: Date.now() }));
@@ -1183,7 +1222,7 @@ export default function App() {
     }, console.error);
 
     // Sync Points
-    const pointsRef = collection(db, 'artifacts', appId, privatePath, 'kinflow_points');
+    const pointsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_points');
     const unsubPoints = onSnapshot(pointsRef, (snap) => {
       if (snap.empty) {
         setDoc(doc(pointsRef, 'Tommy'), { points: 45 });
@@ -1195,7 +1234,29 @@ export default function App() {
       }
     }, console.error);
 
-    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); };
+    // Sync Events
+    const eventsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_events');
+    const unsubEvents = onSnapshot(eventsRef, (snap) => {
+      if (snap.empty) {
+        mockEvents.forEach(me => setDoc(doc(eventsRef, me.id.toString()), { ...me, createdAt: Date.now() }));
+      } else {
+        const fetchedEvents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setEvents(fetchedEvents.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+      }
+    }, console.error);
+
+    // Sync Meals
+    const mealsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_meals');
+    const unsubMeals = onSnapshot(mealsRef, (snap) => {
+      if (snap.empty) {
+        mockMeals.forEach(mm => setDoc(doc(mealsRef, mm.id.toString()), { ...mm, createdAt: Date.now() }));
+      } else {
+        const fetchedMeals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setMeals(fetchedMeals.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+      }
+    }, console.error);
+
+    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); };
   }, [firebaseUser]);
 
   useEffect(() => {
@@ -1217,12 +1278,12 @@ export default function App() {
     triggerConfetti();
   };
 
-  // --- FIREBASE WRITE OPERATIONS (PRIVATE) ---
+  // --- FIREBASE WRITE OPERATIONS ---
   
   const handleAddTask = async (newTask) => {
     if (!firebaseUser) return;
     const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, `users/${firebaseUser.uid}`, 'kinflow_tasks', newId), {
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), {
       ...newTask, id: newId, status: 'open', createdAt: Date.now()
     });
   };
@@ -1262,14 +1323,13 @@ export default function App() {
       if (t.status !== newStatus && action !== 'reject') triggerConfetti();
     }
 
-    const privatePath = `users/${firebaseUser.uid}`;
-    await updateDoc(doc(db, 'artifacts', appId, privatePath, 'kinflow_tasks', taskId.toString()), {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), {
       status: newStatus, photoUrl: newPhotoUrl
     });
 
     if (pointsChange !== 0 && assignee) {
       const currentPoints = userPoints[assignee] || 0;
-      await setDoc(doc(db, 'artifacts', appId, privatePath, 'kinflow_points', assignee), {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', assignee), {
         points: Math.max(0, currentPoints + pointsChange)
       }, { merge: true });
     }
@@ -1279,14 +1339,14 @@ export default function App() {
     if (!firebaseUser || !activeUser) return;
     const newId = Date.now().toString();
     const msg = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
-    await setDoc(doc(db, 'artifacts', appId, `users/${firebaseUser.uid}`, 'kinflow_messages', newId), msg);
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msg);
   };
 
   const handleRedeemReward = async (cost) => {
     if (!activeUser || !firebaseUser) return;
     const pointsAvailable = userPoints[activeUser.name] || 0;
     if (!isParent && pointsAvailable >= cost) {
-      await setDoc(doc(db, 'artifacts', appId, `users/${firebaseUser.uid}`, 'kinflow_points', activeUser.name), {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), {
         points: pointsAvailable - cost
       }, { merge: true });
       triggerConfetti();
@@ -1295,8 +1355,26 @@ export default function App() {
     }
   };
 
-  const handleAddEvent = (newEvent) => setEvents([...events, { ...newEvent, id: Date.now(), color: 'bg-indigo-500' }]);
-  const handleAddMeal = (newMeal) => setMeals([...meals, { ...newMeal, id: Date.now(), tags: ['New Recipe'] }]);
+  const handleAddEvent = async (newEvent) => {
+    if (!firebaseUser) return;
+    const newId = Date.now().toString();
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', newId), {
+      ...newEvent, id: newId, color: 'bg-indigo-500', createdAt: Date.now()
+    });
+  };
+
+  const handleAddMeal = async (newMeal) => {
+    if (!firebaseUser) return;
+    const newId = Date.now().toString();
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', newId), {
+      ...newMeal, id: newId, tags: ['New Recipe'], createdAt: Date.now()
+    });
+  };
+
+  const handleUpdateMeal = async (updatedMeal) => {
+    if (!firebaseUser) return;
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', updatedMeal.id.toString()), updatedMeal);
+  };
 
   const triggerConfetti = () => {
     setShowConfetti(true);
@@ -1314,13 +1392,13 @@ export default function App() {
       case 'calendar':
         return <CalendarView events={events} onAdd={handleAddEvent} isParent={isParent} />;
       case 'meals':
-        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={(m) => setMeals(meals.map(x => x.id === m.id ? m : x))} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
+        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
       case 'rewards':
         return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
       case 'chat':
         return <ChatView messages={messages} onSend={handleSendMessage} />;
       case 'settings':
-        return <SettingsView user={activeUser} isParent={isParent} onLogout={() => setActiveUser(null)} />;
+        return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); }} />;
       default:
         return null;
     }
@@ -1330,13 +1408,13 @@ export default function App() {
 
   if (showSplash) return <SplashScreen />;
 
-  // 1. App Level Routing: If no Firebase Account exists, show the Sign-Up/Log-In form!
-  if (!firebaseUser) return <AuthScreen />;
+  // 1. Check if user has passed the cosmetic auth screen
+  if (!isLoggedIn) return <AuthScreen onComplete={() => setIsLoggedIn(true)} />;
 
-  // 2. If Firebase Account exists, but no Family Profile is selected, show Netflix profile screen!
-  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={MOCK_USERS} />;
+  // 2. Select profile
+  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={MOCK_USERS} onLogout={() => setIsLoggedIn(false)} />;
 
-  // 3. Otherwise, show the main app
+  // 3. Show the main app
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
   const navItems = isParent 
