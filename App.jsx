@@ -712,7 +712,6 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
   );
 };
 
-// --- LEVEL 2: REAL CALENDAR ---
 const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -1212,14 +1211,15 @@ const AICopilotModal = ({ isOpen, onClose }) => {
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
-  const [activeUser, setActiveUser] = useState(null); // Family profile
+  const [activeUser, setActiveUser] = useState(null); 
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
   
-  // Generic Confirmation Modal State
   const [confirmActionState, setConfirmActionState] = useState(null);
+  const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
+  const [latestToast, setLatestToast] = useState(null);
 
   // Database States
   const [firebaseUser, setFirebaseUser] = useState(null); 
@@ -1228,21 +1228,22 @@ export default function App() {
   const [userPoints, setUserPoints] = useState({ 'Tommy': 0, 'Lily': 0 });
   const [events, setEvents] = useState([]);
   const [meals, setMeals] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   
   // Non-Firebase States
   const [groceries, setGroceries] = useState([]);
-  
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+
+  const prevNotifsLength = useRef(0);
 
   const isParent = activeUser?.role === 'Parent';
   const isChild = activeUser?.role === 'Child';
 
-  // Dynamic Greeting based on real time
+  // Dynamic Greeting
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
 
-  // 1. Initialize Firebase Auth
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -1256,38 +1257,26 @@ export default function App() {
       }
     };
     initAuth();
-    
-    const unsubscribe = onAuthStateChanged(auth, user => {
-      setFirebaseUser(user);
-    });
+    const unsubscribe = onAuthStateChanged(auth, user => setFirebaseUser(user));
     return () => unsubscribe();
   }, []);
 
-  // 2. Fetch & Sync Firestore Data
+  // Sync DB
   useEffect(() => {
     if (!firebaseUser) return;
-
     const dataPath = 'public';
     const collPath = 'data';
 
     const tasksRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_tasks');
     const unsubTasks = onSnapshot(tasksRef, (snap) => {
-      if (snap.empty) {
-        mockTasks.forEach(mt => setDoc(doc(tasksRef, mt.id.toString()), { ...mt, createdAt: Date.now() }));
-      } else {
-        const fetchedTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setTasks(fetchedTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
-      }
+      if (snap.empty) mockTasks.forEach(mt => setDoc(doc(tasksRef, mt.id.toString()), { ...mt, createdAt: Date.now() }));
+      else setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
     const msgsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_messages');
     const unsubMsgs = onSnapshot(msgsRef, (snap) => {
-      if (snap.empty) {
-        mockChats.forEach(mc => setDoc(doc(msgsRef, mc.id.toString()), { ...mc, createdAt: Date.now() }));
-      } else {
-        const fetchedMsgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setMessages(fetchedMsgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
-      }
+      if (snap.empty) mockChats.forEach(mc => setDoc(doc(msgsRef, mc.id.toString()), { ...mc, createdAt: Date.now() }));
+      else setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
     const pointsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_points');
@@ -1304,25 +1293,22 @@ export default function App() {
 
     const eventsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_events');
     const unsubEvents = onSnapshot(eventsRef, (snap) => {
-      if (snap.empty) {
-        mockEvents.forEach(me => setDoc(doc(eventsRef, me.id.toString()), { ...me, createdAt: Date.now() }));
-      } else {
-        const fetchedEvents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setEvents(fetchedEvents.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
-      }
+      if (snap.empty) mockEvents.forEach(me => setDoc(doc(eventsRef, me.id.toString()), { ...me, createdAt: Date.now() }));
+      else setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
     const mealsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_meals');
     const unsubMeals = onSnapshot(mealsRef, (snap) => {
-      if (snap.empty) {
-        mockMeals.forEach(mm => setDoc(doc(mealsRef, mm.id.toString()), { ...mm, createdAt: Date.now() }));
-      } else {
-        const fetchedMeals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setMeals(fetchedMeals.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
-      }
+      if (snap.empty) mockMeals.forEach(mm => setDoc(doc(mealsRef, mm.id.toString()), { ...mm, createdAt: Date.now() }));
+      else setMeals(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
-    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); };
+    const notifRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_notifications');
+    const unsubNotifs = onSnapshot(notifRef, (snap) => {
+      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, console.error);
+
+    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubNotifs(); };
   }, [firebaseUser]);
 
   useEffect(() => {
@@ -1330,12 +1316,24 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // TOAST PUSH NOTIFICATION LISTENER
+  useEffect(() => {
+    if (activeUser && notifications.length > prevNotifsLength.current && prevNotifsLength.current !== 0) {
+       const newest = [...notifications].sort((a,b) => b.createdAt - a.createdAt)[0];
+       // Check if this new alert is for ME and happened in the last 5 seconds
+       const isForMe = isParent ? newest.target === 'Parent' : newest.target === activeUser.name;
+       if (newest && isForMe && newest.createdAt > Date.now() - 5000) {
+           setLatestToast(newest);
+           setTimeout(() => setLatestToast(null), 4500);
+       }
+    }
+    prevNotifsLength.current = notifications.length;
+  }, [notifications, activeUser, isParent]);
+
   const handleLogin = (user) => {
     setActiveUser(user);
     setActiveTab('home'); 
-    if (user.role === 'Parent' && !hasOnboarded) {
-      setShowOnboarding(true);
-    }
+    if (user.role === 'Parent' && !hasOnboarded) setShowOnboarding(true);
   };
 
   const completeOnboarding = () => {
@@ -1344,25 +1342,25 @@ export default function App() {
     triggerConfetti();
   };
 
-  // --- FIREBASE WRITE & DELETE OPERATIONS ---
+  // --- NOTIFICATION DISPATCHER ---
+  const sendNotification = async (title, body, targetUserOrRole) => {
+    if (!firebaseUser) return;
+    const newId = Date.now().toString();
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_notifications', newId), {
+      id: newId, title, body, target: targetUserOrRole, createdAt: Date.now(), read: false
+    });
+  };
+
+  // --- ACTIONS ---
   
   const handleAddTask = async (newTask) => {
     if (!firebaseUser) return;
     const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), {
-      ...newTask, id: newId, status: 'open', createdAt: Date.now()
-    });
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), { ...newTask, id: newId, status: 'open', createdAt: Date.now() });
   };
 
   const requestDeleteTask = (id) => {
-    setConfirmActionState({
-      title: 'Delete Task',
-      message: 'Are you sure you want to permanently remove this chore?',
-      onConfirm: async () => {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()));
-        setConfirmActionState(null);
-      }
-    });
+    setConfirmActionState({ title: 'Delete Task', message: 'Are you sure you want to permanently remove this chore?', onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString())); setConfirmActionState(null); } });
   };
 
   const handleTaskAction = async (taskId, action, extra = {}) => {
@@ -1373,101 +1371,89 @@ export default function App() {
     let newStatus = t.status;
     let newPhotoUrl = t.photoUrl || null;
     let pointsChange = 0;
+    let notifToSent = null;
 
     if (action === 'toggle_simple') { 
       if (isParent) {
-        if (t.status === 'open') { pointsChange = t.points; newStatus = 'approved'; } 
+        if (t.status === 'open') { 
+          pointsChange = t.points; newStatus = 'approved'; 
+          notifToSent = { title: "Task Approved", body: `Your parent approved "${t.title}"!`, target: assignee };
+        } 
         else { pointsChange = -t.points; newStatus = 'open'; }
       } else {
-        if (t.status === 'open') newStatus = 'pending';
+        if (t.status === 'open') {
+          newStatus = 'pending';
+          notifToSent = { title: "Chore Completed", body: `${activeUser.name} finished "${t.title}".`, target: 'Parent' };
+        }
         else if (t.status === 'pending') newStatus = 'open';
       }
     }
     else if (action === 'submit_with_photo') {
       newStatus = 'pending';
       newPhotoUrl = extra.photoUrl;
+      notifToSent = { title: "Proof Submitted", body: `${activeUser.name} submitted photo proof for "${t.title}".`, target: 'Parent' };
     }
     else if (action === 'approve') {
       pointsChange = t.points;
       newStatus = 'approved';
+      notifToSent = { title: "Task Approved", body: `Great job! "${t.title}" was approved. (+${t.points}pts)`, target: assignee };
     }
     else if (action === 'reject') {
       newStatus = 'open';
       newPhotoUrl = null;
+      notifToSent = { title: "Needs Work", body: `Your parent asked you to redo "${t.title}".`, target: assignee };
     }
 
     if (newStatus === 'pending' || newStatus === 'approved') {
       if (t.status !== newStatus && action !== 'reject') triggerConfetti();
     }
 
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), {
-      status: newStatus, photoUrl: newPhotoUrl
-    });
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), { status: newStatus, photoUrl: newPhotoUrl });
 
     if (pointsChange !== 0 && assignee) {
       const currentPoints = userPoints[assignee] || 0;
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', assignee), {
-        points: Math.max(0, currentPoints + pointsChange)
-      }, { merge: true });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', assignee), { points: Math.max(0, currentPoints + pointsChange) }, { merge: true });
+    }
+
+    if (notifToSent && notifToSent.target !== 'Anyone') {
+      sendNotification(notifToSent.title, notifToSent.body, notifToSent.target);
     }
   };
 
   const handleSendMessage = async (text) => {
     if (!firebaseUser || !activeUser) return;
     const newId = Date.now().toString();
-    const msg = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msg);
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() });
   };
 
   const requestDeleteMessage = (id) => {
-    setConfirmActionState({
-      title: 'Delete Message',
-      message: 'Remove this message for everyone in the family?',
-      onConfirm: async () => {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', id.toString()));
-        setConfirmActionState(null);
-      }
-    });
+    setConfirmActionState({ title: 'Delete Message', message: 'Remove this message for everyone in the family?', onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', id.toString())); setConfirmActionState(null); } });
   };
 
   const handleRedeemReward = async (cost) => {
     if (!activeUser || !firebaseUser) return;
     const pointsAvailable = userPoints[activeUser.name] || 0;
     if (!isParent && pointsAvailable >= cost) {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), {
-        points: pointsAvailable - cost
-      }, { merge: true });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), { points: pointsAvailable - cost }, { merge: true });
+      sendNotification('Reward Redeemed', `${activeUser.name} just redeemed a reward for ${cost} pts!`, 'Parent');
       triggerConfetti();
-    } else if (isParent) {
-      triggerConfetti(); 
-    }
+    } else if (isParent) triggerConfetti(); 
   };
 
   const handleAddEvent = async (newEvent) => {
     if (!firebaseUser) return;
     const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', newId), {
-      ...newEvent, id: newId, color: 'bg-indigo-500', createdAt: Date.now()
-    });
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', newId), { ...newEvent, id: newId, color: 'bg-indigo-500', createdAt: Date.now() });
   };
 
   const requestDeleteEvent = (id) => {
-    setConfirmActionState({
-      title: 'Delete Event',
-      message: 'Are you sure you want to remove this event from the calendar?',
-      onConfirm: async () => {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()));
-        setConfirmActionState(null);
-      }
-    });
+    setConfirmActionState({ title: 'Delete Event', message: 'Are you sure you want to remove this event from the calendar?', onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString())); setConfirmActionState(null); } });
   };
 
   const handleAddMeal = async (newMeal) => {
     if (!firebaseUser) return;
     const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', newId), {
-      ...newMeal, id: newId, tags: ['New Recipe'], createdAt: Date.now()
-    });
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', newId), { ...newMeal, id: newId, tags: ['New Recipe'], createdAt: Date.now() });
   };
 
   const handleUpdateMeal = async (updatedMeal) => {
@@ -1476,55 +1462,44 @@ export default function App() {
   };
 
   const requestDeleteMeal = (id) => {
-    setConfirmActionState({
-      title: 'Delete Recipe',
-      message: 'Are you sure you want to permanently delete this recipe?',
-      onConfirm: async () => {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()));
-        setConfirmActionState(null);
-      }
-    });
+    setConfirmActionState({ title: 'Delete Recipe', message: 'Are you sure you want to permanently delete this recipe?', onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString())); setConfirmActionState(null); } });
   };
 
-  const triggerConfetti = () => {
-    setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 1500);
-  };
+  const triggerConfetti = () => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 1500); };
 
   const renderContent = () => {
     const displayPoints = isParent ? (userPoints['Tommy'] + userPoints['Lily']) : (userPoints[activeUser?.name] || 0);
-
     switch(activeTab) {
-      case 'home':
-        return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
-      case 'tasks':
-        return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
-      case 'calendar':
-        return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} />;
-      case 'meals':
-        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
-      case 'rewards':
-        return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
-      case 'chat':
-        return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} />;
-      case 'settings':
-        return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); }} />;
-      default:
-        return null;
+      case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
+      case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
+      case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} />;
+      case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
+      case 'rewards': return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
+      case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} />;
+      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); }} />;
+      default: return null;
     }
   };
 
   const pendingApprovalTasks = tasks.filter(t => t.status === 'pending');
 
+  // Filter My Notifications
+  const myNotifications = notifications
+    .filter(n => isParent ? n.target === 'Parent' : n.target === activeUser?.name)
+    .sort((a,b) => b.createdAt - a.createdAt);
+  const unreadNotifsCount = myNotifications.filter(n => !n.read).length;
+
+  const markNotifsAsRead = () => {
+    myNotifications.forEach(async (n) => {
+      if (!n.read && firebaseUser) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_notifications', n.id), { read: true });
+      }
+    });
+  };
+
   if (showSplash) return <SplashScreen />;
-
-  // 1. Check if user has passed the cosmetic auth screen
   if (!isLoggedIn) return <AuthScreen onComplete={() => setIsLoggedIn(true)} />;
-
-  // 2. Select profile
   if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={MOCK_USERS} onLogout={() => setIsLoggedIn(false)} />;
-
-  // 3. Show the main app
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
   const navItems = isParent 
@@ -1538,6 +1513,17 @@ export default function App() {
       <div className={`min-h-screen font-sans flex flex-col relative overflow-hidden transition-colors duration-500 ${appBgClass}`}>
         <CustomStyles />
         <Confetti active={showConfetti} />
+
+        {/* --- GLOBAL PUSH NOTIFICATION TOAST --- */}
+        <div className={`fixed top-4 left-4 right-4 z-[100] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${latestToast ? 'translate-y-0 opacity-100' : '-translate-y-24 opacity-0 pointer-events-none'}`}>
+          <div className="bg-white/95 backdrop-blur-xl shadow-[0_20px_40px_rgba(0,0,0,0.12)] rounded-2xl p-4 flex items-start gap-4 border border-slate-100 max-w-sm mx-auto">
+            <div className="bg-indigo-500 rounded-full p-2 text-white shrink-0 shadow-sm"><Bell className="w-5 h-5" /></div>
+            <div>
+              <h4 className="font-bold text-slate-900 text-sm">{latestToast?.title}</h4>
+              <p className="text-slate-600 text-xs font-medium mt-0.5">{latestToast?.body}</p>
+            </div>
+          </div>
+        </div>
 
         <main className="flex-1 overflow-y-auto w-full max-w-2xl mx-auto pb-32 pt-6 px-4 sm:px-6 relative">
           <header className="flex justify-between items-start mb-6 min-h-[64px] shrink-0">
@@ -1554,7 +1540,19 @@ export default function App() {
               )}
             </div>
             
-            <div className="flex items-center gap-3 z-20 shrink-0 ml-4 pt-1">
+            <div className="flex items-center gap-2 sm:gap-3 z-20 shrink-0 ml-4 pt-1">
+              
+              {/* --- NEW NOTIFICATION BELL --- */}
+              <button 
+                onClick={() => { setIsNotifModalOpen(true); markNotifsAsRead(); }} 
+                className={`relative p-2.5 rounded-full transition-colors ${unreadNotifsCount > 0 ? 'bg-white shadow-sm ring-1 ring-slate-900/5 text-slate-800' : 'text-slate-400 hover:text-slate-800'}`}
+              >
+                <Bell className="w-6 h-6" />
+                {unreadNotifsCount > 0 && (
+                  <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-slate-50"></span>
+                )}
+              </button>
+
               <div className="relative cursor-pointer group" onClick={() => setIsUserSwitcherOpen(true)}>
                 <Avatar user={activeUser} size={isChild ? 'lg' : 'md'} className="group-hover:scale-105 transition-transform duration-300 shadow-sm ring-4 ring-white" />
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-slate-800 border-[2px] border-white rounded-full shadow-sm flex items-center justify-center text-[9px] text-white font-bold z-10">
@@ -1564,8 +1562,9 @@ export default function App() {
                   <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-rose-500 border-2 border-slate-50 rounded-full shadow-sm animate-pulse z-20 -translate-y-1/3 translate-x-1/3"></span>
                 )}
               </div>
+
               {isParent && (
-                <button onClick={() => setActiveTab('settings')} className={`w-11 h-11 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-full shadow-sm ring-1 ring-slate-900/5 hover:text-slate-800 hover:bg-slate-100 active:scale-95 transition-all ${activeTab === 'settings' ? 'text-indigo-600 bg-indigo-50 ring-indigo-200' : 'text-slate-500'}`}>
+                <button onClick={() => setActiveTab('settings')} className={`w-11 h-11 hidden sm:flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-full shadow-sm ring-1 ring-slate-900/5 hover:text-slate-800 hover:bg-slate-100 active:scale-95 transition-all ${activeTab === 'settings' ? 'text-indigo-600 bg-indigo-50 ring-indigo-200' : 'text-slate-500'}`}>
                   <MoreVertical className="w-5 h-5" />
                 </button>
               )}
@@ -1574,6 +1573,35 @@ export default function App() {
 
           {renderContent()}
         </main>
+
+        {/* Global Notifications Modal */}
+        <Modal isOpen={isNotifModalOpen} onClose={() => setIsNotifModalOpen(false)} title="Notifications" fullHeight>
+          <div className="space-y-3">
+            {myNotifications.length === 0 ? (
+              <div className="text-center py-10">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Bell className="w-6 h-6 text-slate-300" />
+                </div>
+                <p className="text-slate-500 font-medium">No new notifications!</p>
+              </div>
+            ) : (
+              myNotifications.map(n => (
+                <div key={n.id} className="p-4 bg-slate-50 rounded-[1.5rem] border border-slate-100 flex gap-4">
+                  <div className="bg-white p-2 rounded-full shadow-sm shrink-0 h-fit">
+                    <BellRing className="w-4 h-4 text-indigo-500" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">{n.title}</h4>
+                    <p className="text-slate-500 text-xs font-medium mt-0.5">{n.body}</p>
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-2">
+                      {new Date(n.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </Modal>
 
         {/* Global Confirmation Modal */}
         <Modal isOpen={!!confirmActionState} onClose={() => setConfirmActionState(null)} title={confirmActionState?.title || "Confirm"}>
