@@ -6,7 +6,7 @@ import {
   MoreVertical, Users, BellRing, CreditCard, LogOut,
   ShoppingCart, Loader2, Hourglass, ArrowRight,
   Layers, Wand2, Smartphone, Film, Ticket,
-  MessageCircle, Smile, Image as ImageIcon, Camera, Trash2
+  MessageCircle, Smile, Image as ImageIcon, Camera, Trash2, ChevronLeft
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -126,14 +126,21 @@ const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
   const { isChild } = useContext(ThemeContext);
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}>
-      <div className={`${isChild ? 'bg-white rounded-t-[3rem] sm:rounded-[3rem] border-t-8 border-white/50' : 'bg-white/95 backdrop-blur-3xl rounded-t-[2.5rem] sm:rounded-[2.5rem]'} w-full sm:w-[90%] max-w-md ${fullHeight ? 'h-[90%]' : 'max-h-[90vh]'} sm:h-auto p-6 shadow-2xl flex flex-col ring-1 ring-slate-900/5 relative animate-pop-in cursor-default`} onClick={e => e.stopPropagation()}>
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-6 sm:hidden opacity-60 shrink-0"></div>
-        <div className="flex justify-between items-center mb-6 shrink-0">
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">{title}</h2>
-          <button onClick={onClose} className="p-2 bg-slate-100/80 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-all hover:rotate-90 duration-300"><X className="w-5 h-5" /></button>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 pt-12 sm:p-6 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}>
+      <div className={`${isChild ? 'bg-white rounded-[2rem] border-t-8 border-white/50' : 'bg-white/95 backdrop-blur-3xl rounded-[2rem]'} w-full max-w-md max-h-full flex flex-col shadow-2xl ring-1 ring-slate-900/5 relative animate-pop-in cursor-default overflow-hidden`} onClick={e => e.stopPropagation()}>
+        
+        <div className="p-6 pb-4 shrink-0">
+          <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-4 sm:hidden opacity-60 shrink-0"></div>
+          <div className="flex justify-between items-center shrink-0">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight truncate pr-4">{title}</h2>
+            <button onClick={onClose} className="p-2 bg-slate-100/80 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-all hover:rotate-90 duration-300 shrink-0"><X className="w-5 h-5" /></button>
+          </div>
         </div>
-        <div className={`overflow-y-auto no-scrollbar relative ${fullHeight ? 'flex-1' : ''}`}>{children}</div>
+        
+        <div className={`px-6 pb-6 overflow-y-auto no-scrollbar relative ${fullHeight ? 'flex-1 h-[60vh]' : ''}`}>
+          {children}
+        </div>
+        
       </div>
     </div>
   );
@@ -182,6 +189,43 @@ const mockRewards = [
 ];
 
 // --- AUTH & SETUP SCREENS ---
+
+const SplashScreen = () => (
+  <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white relative overflow-hidden transition-opacity duration-500">
+    <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[100px]"></div>
+    <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[100px]"></div>
+    <div className="flex flex-col items-center animate-pulse-slow z-10">
+      <Layers className="w-16 h-16 text-white mb-6 drop-shadow-2xl" strokeWidth={1.5} />
+      <h1 className="text-3xl font-semibold tracking-wide drop-shadow-lg">Kinflow</h1>
+    </div>
+  </div>
+);
+
+const OnboardingFlow = ({ onComplete }) => {
+  const [step, setStep] = useState(0);
+  const content = [
+    { icon: <Users className="w-10 h-10 text-indigo-500" strokeWidth={1.5} />, title: "Welcome to Kinflow", desc: "The smart operating system designed to keep your modern family organized, together." },
+    { icon: <Wand2 className="w-10 h-10 text-purple-500" strokeWidth={1.5} />, title: "Meet Your Copilot", desc: "Instantly generate meal plans, auto-create grocery lists, and resolve scheduling conflicts using AI." },
+    { icon: <Gift className="w-10 h-10 text-emerald-500" strokeWidth={1.5} />, title: "Gamify the Household", desc: "Kids earn points by completing assigned chores and can redeem them for real-life rewards." }
+  ];
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-pop-in max-w-md mx-auto w-full">
+        <div className="w-20 h-20 bg-white rounded-[1.5rem] shadow-xl shadow-slate-200/50 flex items-center justify-center mb-8 ring-1 ring-slate-900/5 transition-all">
+          {content[step].icon}
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">{content[step].title}</h2>
+        <p className="text-slate-500 text-base leading-relaxed font-medium">{content[step].desc}</p>
+      </div>
+      <div className="bg-white px-6 pb-12 pt-8 rounded-t-[2.5rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.03)] flex flex-col items-center max-w-md mx-auto w-full">
+        <div className="flex gap-2 mb-8">
+          {[0, 1, 2].map(idx => (<div key={idx} className={`h-1.5 rounded-full transition-all duration-300 ${step === idx ? 'w-6 bg-slate-800' : 'w-1.5 bg-slate-200'}`} />))}
+        </div>
+        <Button onClick={() => { if (step < 2) setStep(step + 1); else onComplete(); }} className="w-full text-base">{step < 2 ? 'Continue' : 'Get Started'}</Button>
+      </div>
+    </div>
+  );
+};
 
 const AuthScreen = ({ onComplete }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -333,129 +377,6 @@ const ChatView = ({ messages, onSend, onDelete }) => {
         </div>
       </Card>
     </div>
-  );
-};
-
-const SplashScreen = () => (
-  <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white relative overflow-hidden transition-opacity duration-500">
-    <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[100px]"></div>
-    <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[100px]"></div>
-    <div className="flex flex-col items-center animate-pulse-slow z-10">
-      <Layers className="w-16 h-16 text-white mb-6 drop-shadow-2xl" strokeWidth={1.5} />
-      <h1 className="text-3xl font-semibold tracking-wide drop-shadow-lg">Kinflow</h1>
-    </div>
-  </div>
-);
-
-const OnboardingFlow = ({ onComplete }) => {
-  const [step, setStep] = useState(0);
-  const content = [
-    { icon: <Users className="w-10 h-10 text-indigo-500" strokeWidth={1.5} />, title: "Welcome to Kinflow", desc: "The smart operating system designed to keep your modern family organized, together." },
-    { icon: <Wand2 className="w-10 h-10 text-purple-500" strokeWidth={1.5} />, title: "Meet Your Copilot", desc: "Instantly generate meal plans, auto-create grocery lists, and resolve scheduling conflicts using AI." },
-    { icon: <Gift className="w-10 h-10 text-emerald-500" strokeWidth={1.5} />, title: "Gamify the Household", desc: "Kids earn points by completing assigned chores and can redeem them for real-life rewards." }
-  ];
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-pop-in max-w-md mx-auto w-full">
-        <div className="w-20 h-20 bg-white rounded-[1.5rem] shadow-xl shadow-slate-200/50 flex items-center justify-center mb-8 ring-1 ring-slate-900/5 transition-all">
-          {content[step].icon}
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">{content[step].title}</h2>
-        <p className="text-slate-500 text-base leading-relaxed font-medium">{content[step].desc}</p>
-      </div>
-      <div className="bg-white px-6 pb-12 pt-8 rounded-t-[2.5rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.03)] flex flex-col items-center max-w-md mx-auto w-full">
-        <div className="flex gap-2 mb-8">
-          {[0, 1, 2].map(idx => (<div key={idx} className={`h-1.5 rounded-full transition-all duration-300 ${step === idx ? 'w-6 bg-slate-800' : 'w-1.5 bg-slate-200'}`} />))}
-        </div>
-        <Button onClick={() => { if (step < 2) setStep(step + 1); else onComplete(); }} className="w-full text-base">{step < 2 ? 'Continue' : 'Get Started'}</Button>
-      </div>
-    </div>
-  );
-};
-
-const AICopilotModal = ({ isOpen, onClose }) => {
-  const [messages, setMessages] = useState([{ role: 'ai', text: "Hi! I'm your Kinflow Copilot. I can help organize chores, plan meals, or resolve scheduling conflicts. What's up?" }]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef(null);
-
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isLoading]);
-
-  const handleSend = async (presetText = null) => {
-    const textToSend = presetText || input;
-    if (!textToSend.trim() || isLoading) return;
-    
-    const newMessages = [...messages, { role: 'user', text: textToSend }];
-    setMessages(newMessages);
-    setInput('');
-    setIsLoading(true);
-
-    try {
-      const apiKey = ""; // API Key injected by environment
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-      const geminiMessages = newMessages.map(m => ({
-        role: m.role === 'ai' ? 'model' : 'user',
-        parts: [{ text: m.text }]
-      }));
-
-      const payload = {
-        systemInstruction: { parts: [{ text: "You are Kinflow Copilot, a helpful AI assistant for a family organization app. Help parents plan meals, suggest age-appropriate chores, manage schedules, and give brief, friendly, practical advice. Keep your responses concise (under 3 sentences) and use emojis occasionally." }] },
-        contents: geminiMessages
-      };
-
-      const data = await fetchWithRetry(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that right now.";
-      setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'ai', text: "Oops, I'm having trouble connecting right now. Please try again later." }]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="AI Copilot" fullHeight>
-      <div className="flex flex-col h-full h-[60vh]">
-        <div className="flex items-center gap-2 mb-4 p-2 bg-indigo-50 rounded-xl border border-indigo-100">
-          <Wand2 className="w-5 h-5 text-indigo-500"/>
-          <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">AI Assistant</span>
-        </div>
-        <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-4">
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed ${msg.role === 'user' ? 'bg-slate-900 text-white rounded-br-sm' : 'bg-slate-100 text-slate-800 rounded-bl-sm ring-1 ring-slate-900/5'}`}>
-                {msg.text}
-              </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="max-w-[85%] p-4 rounded-[1.5rem] bg-slate-100 text-slate-500 rounded-bl-sm ring-1 ring-slate-900/5 flex items-center gap-2 text-sm font-medium">
-                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" /> Thinking...
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-        {messages.length < 3 && !isLoading && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-4 pt-2 shrink-0">
-            {["Plan Dinners", "Assign Chores", "Find Free Time"].map(action => (
-              <button key={action} onClick={() => handleSend(action)} className="whitespace-nowrap bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-full text-xs font-semibold hover:bg-slate-50 transition-colors shadow-sm">{action}</button>
-            ))}
-          </div>
-        )}
-        <div className="relative mt-auto shrink-0 pt-2">
-          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} disabled={isLoading} placeholder={isLoading ? "Copilot is thinking..." : "Ask Copilot anything..."} className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-full pl-5 pr-12 py-4 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:bg-white transition-all font-medium disabled:opacity-50" />
-          <button onClick={() => handleSend()} disabled={!input.trim() || isLoading} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"><Send className="w-4 h-4" /></button>
-        </div>
-      </div>
-    </Modal>
   );
 };
 
@@ -791,11 +712,38 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
   );
 };
 
+// --- LEVEL 2: REAL CALENDAR ---
 const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
   const [location, setLocation] = useState('');
+  const [baseDate, setBaseDate] = useState(new Date());
+
+  const startOfWeek = new Date(baseDate);
+  const day = startOfWeek.getDay();
+  const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+  startOfWeek.setDate(diff);
+
+  const weekDays = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + i);
+    weekDays.push(d);
+  }
+
+  const moveWeek = (offset) => {
+    const newDate = new Date(baseDate);
+    newDate.setDate(baseDate.getDate() + offset * 7);
+    setBaseDate(newDate);
+  };
+
+  const isToday = (date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() && 
+           date.getMonth() === today.getMonth() && 
+           date.getFullYear() === today.getFullYear();
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -807,23 +755,29 @@ const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
     setIsModalOpen(false);
   };
 
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const dates = [12, 13, 14, 15, 16, 17, 18];
-  
   return (
     <div className="space-y-6 animate-pop-in">
       <div className="flex justify-between items-end">
-        <h2 className="text-2xl font-bold text-slate-900">This Week</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Plan</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <button onClick={() => moveWeek(-1)} className="p-1 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-md transition-colors"><ChevronLeft className="w-4 h-4" /></button>
+            <p className="text-slate-600 font-bold text-sm tracking-wide uppercase">
+              {weekDays[0].toLocaleString('en-US', { month: 'short' })} {weekDays[0].getFullYear()}
+            </p>
+            <button onClick={() => moveWeek(1)} className="p-1 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-md transition-colors"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        </div>
         {isParent && <Button onClick={() => setIsModalOpen(true)} variant="secondary" className="!w-auto !py-2 !px-4 text-sm"><Plus className="w-4 h-4"/> Event</Button>}
       </div>
 
-      <div className="flex justify-between items-center bg-white/60 p-2 rounded-[1.5rem] ring-1 ring-slate-900/5">
-        {days.map((day, idx) => {
-          const isToday = idx === 2; 
+      <div className="flex justify-between items-center bg-white/60 p-2 rounded-[1.5rem] ring-1 ring-slate-900/5 overflow-x-auto no-scrollbar">
+        {weekDays.map((d, idx) => {
+          const today = isToday(d); 
           return (
-            <div key={day} className={`flex flex-col items-center justify-center w-12 h-16 rounded-2xl transition-all ${isToday ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-white'}`}>
-              <span className="text-[10px] font-bold uppercase tracking-wider">{day}</span>
-              <span className={`text-lg font-bold mt-0.5 ${isToday ? 'text-white' : 'text-slate-800'}`}>{dates[idx]}</span>
+            <div key={idx} className={`flex flex-col items-center justify-center min-w-[3rem] sm:min-w-[3.5rem] h-16 rounded-2xl transition-all ${today ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-white'}`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider">{d.toLocaleString('en-US', { weekday: 'short' })}</span>
+              <span className={`text-lg font-bold mt-0.5 ${today ? 'text-white' : 'text-slate-800'}`}>{d.getDate()}</span>
             </div>
           );
         })}
@@ -1011,8 +965,6 @@ const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setG
   );
 };
 
-// ... ALL OTHER SUB-VIEWS REMAIN UNCHANGED FROM THE PROTOTYPE ...
-
 const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
   const { isChild } = useContext(ThemeContext);
   return (
@@ -1170,6 +1122,92 @@ const SettingRow = ({ icon: Icon, label, value, className = '', iconClass = '', 
   </div>
 );
 
+const AICopilotModal = ({ isOpen, onClose }) => {
+  const [messages, setMessages] = useState([{ role: 'ai', text: "Hi! I'm your Kinflow Copilot. I can help organize chores, plan meals, or resolve scheduling conflicts. What's up?" }]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isLoading]);
+
+  const handleSend = async (presetText = null) => {
+    const textToSend = presetText || input;
+    if (!textToSend.trim() || isLoading) return;
+    
+    const newMessages = [...messages, { role: 'user', text: textToSend }];
+    setMessages(newMessages);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const apiKey = ""; 
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+      const geminiMessages = newMessages.map(m => ({
+        role: m.role === 'ai' ? 'model' : 'user',
+        parts: [{ text: m.text }]
+      }));
+
+      const payload = {
+        systemInstruction: { parts: [{ text: "You are Kinflow Copilot, a helpful AI assistant for a family organization app. Help parents plan meals, suggest age-appropriate chores, manage schedules, and give brief, friendly, practical advice. Keep your responses concise (under 3 sentences) and use emojis occasionally." }] },
+        contents: geminiMessages
+      };
+
+      const data = await fetchWithRetry(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that right now.";
+      setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'ai', text: "Oops, I'm having trouble connecting right now. Please try again later." }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="AI Copilot" fullHeight>
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-2 mb-4 p-2 bg-indigo-50 rounded-xl border border-indigo-100 shrink-0">
+          <Wand2 className="w-5 h-5 text-indigo-500"/>
+          <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">AI Assistant</span>
+        </div>
+        <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-4">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed ${msg.role === 'user' ? 'bg-slate-900 text-white rounded-br-sm' : 'bg-slate-100 text-slate-800 rounded-bl-sm ring-1 ring-slate-900/5'}`}>
+                {msg.text}
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] p-4 rounded-[1.5rem] bg-slate-100 text-slate-500 rounded-bl-sm ring-1 ring-slate-900/5 flex items-center gap-2 text-sm font-medium">
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" /> Thinking...
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+        {messages.length < 3 && !isLoading && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-4 pt-2 shrink-0">
+            {["Plan Dinners", "Assign Chores", "Find Free Time"].map(action => (
+              <button key={action} onClick={() => handleSend(action)} className="whitespace-nowrap bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-full text-xs font-semibold hover:bg-slate-50 transition-colors shadow-sm">{action}</button>
+            ))}
+          </div>
+        )}
+        <div className="relative mt-auto shrink-0 pt-2">
+          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} disabled={isLoading} placeholder={isLoading ? "Copilot is thinking..." : "Ask Copilot anything..."} className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-full pl-5 pr-12 py-4 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:bg-white transition-all font-medium disabled:opacity-50" />
+          <button onClick={() => handleSend()} disabled={!input.trim() || isLoading} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"><Send className="w-4 h-4" /></button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // --- MAIN APP COMPONENT ---
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -1178,13 +1216,13 @@ export default function App() {
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // Controls fake auth gate
+  const [isLoggedIn, setIsLoggedIn] = useState(false); 
   
   // Generic Confirmation Modal State
   const [confirmActionState, setConfirmActionState] = useState(null);
 
   // Database States
-  const [firebaseUser, setFirebaseUser] = useState(null); // Actual Firebase Auth User
+  const [firebaseUser, setFirebaseUser] = useState(null); 
   const [tasks, setTasks] = useState([]);
   const [messages, setMessages] = useState([]);
   const [userPoints, setUserPoints] = useState({ 'Tommy': 0, 'Lily': 0 });
@@ -1199,6 +1237,10 @@ export default function App() {
 
   const isParent = activeUser?.role === 'Parent';
   const isChild = activeUser?.role === 'Child';
+
+  // Dynamic Greeting based on real time
+  const currentHour = new Date().getHours();
+  const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
 
   // 1. Initialize Firebase Auth
   useEffect(() => {
@@ -1506,7 +1548,7 @@ export default function App() {
                     <CalendarIcon className="w-3.5 h-3.5"/> Today
                   </p>
                   <h1 className={`font-bold tracking-tight leading-tight ${isChild ? 'text-4xl text-slate-800' : 'text-3xl text-slate-900'}`}>
-                    {isChild ? `Hi, ${activeUser.name}!` : `Good afternoon,\n${activeUser.name}`}
+                    {isChild ? `Hi, ${activeUser.name}!` : `${greeting},\n${activeUser.name}`}
                   </h1>
                 </div>
               )}
