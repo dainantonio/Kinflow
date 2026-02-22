@@ -127,13 +127,13 @@ const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}>
-      <div className={`${isChild ? 'bg-white rounded-t-[3rem] sm:rounded-[3rem] border-t-8 border-white/50' : 'bg-white/95 backdrop-blur-3xl rounded-t-[2.5rem] sm:rounded-[2.5rem]'} w-full sm:w-[90%] max-w-md ${fullHeight ? 'h-[90%]' : 'max-h-[90%]'} sm:h-auto p-6 shadow-2xl flex flex-col ring-1 ring-slate-900/5 relative animate-pop-in cursor-default`} onClick={e => e.stopPropagation()}>
-        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-6 sm:hidden opacity-60"></div>
+      <div className={`${isChild ? 'bg-white rounded-t-[3rem] sm:rounded-[3rem] border-t-8 border-white/50' : 'bg-white/95 backdrop-blur-3xl rounded-t-[2.5rem] sm:rounded-[2.5rem]'} w-full sm:w-[90%] max-w-md ${fullHeight ? 'h-[90%]' : 'max-h-[90vh]'} sm:h-auto p-6 shadow-2xl flex flex-col ring-1 ring-slate-900/5 relative animate-pop-in cursor-default`} onClick={e => e.stopPropagation()}>
+        <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-6 sm:hidden opacity-60 shrink-0"></div>
         <div className="flex justify-between items-center mb-6 shrink-0">
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">{title}</h2>
           <button onClick={onClose} className="p-2 bg-slate-100/80 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-all hover:rotate-90 duration-300"><X className="w-5 h-5" /></button>
         </div>
-        <div className="flex-1 overflow-y-auto no-scrollbar relative">{children}</div>
+        <div className={`overflow-y-auto no-scrollbar relative ${fullHeight ? 'flex-1' : ''}`}>{children}</div>
       </div>
     </div>
   );
@@ -720,7 +720,7 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
       <Modal isOpen={!!activeTaskForPhoto} onClose={() => setActiveTaskForPhoto(null)} title="Submit Proof">
         {!mockPhotoCaptured ? (
           <div className="space-y-4">
-            <div className="aspect-[4/3] bg-slate-100 rounded-[2rem] flex flex-col items-center justify-center border-4 border-dashed border-slate-300 mx-auto w-full max-w-[280px]">
+            <div className="h-44 bg-slate-100 rounded-[2rem] flex flex-col items-center justify-center border-4 border-dashed border-slate-300 mx-auto w-full max-w-sm transition-all">
               <Camera className="w-12 h-12 text-slate-400 mb-2" />
               <p className="font-bold text-sm text-slate-500">Frame your work clearly!</p>
             </div>
@@ -741,7 +741,7 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="aspect-[4/3] bg-slate-900 rounded-[2rem] overflow-hidden relative shadow-inner mx-auto w-full max-w-[280px]">
+            <div className="h-48 bg-slate-900 rounded-[2rem] overflow-hidden relative shadow-inner mx-auto w-full max-w-sm">
               <img src={mockPhotoCaptured} className="w-full h-full object-cover" alt="Captured proof" />
               <div className="absolute top-3 right-3 bg-emerald-500 text-white p-1.5 rounded-full shadow-lg">
                 <Check className="w-4 h-4" strokeWidth={3} />
@@ -762,7 +762,7 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
             <p className="font-medium text-sm text-slate-600 text-center">
               {activeTaskForReview.assignee} submitted proof for <span className="font-bold text-slate-900">"{activeTaskForReview.title}"</span>
             </p>
-            <div className="aspect-[4/3] bg-slate-900 rounded-[1.5rem] overflow-hidden shadow-inner mx-auto w-full max-w-[280px]">
+            <div className="h-48 bg-slate-900 rounded-[1.5rem] overflow-hidden shadow-inner mx-auto w-full max-w-sm">
               <img src={activeTaskForReview.photoUrl} className="w-full h-full object-cover" alt="Submitted proof" />
             </div>
             <div className="flex gap-3 pt-2">
