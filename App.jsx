@@ -21,6 +21,22 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
+// --- GEMINI API HELPER ---
+const fetchWithRetry = async (url, options, retries = 5) => {
+  let delay = 1000;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 2;
+    }
+  }
+};
+
 // --- THEME CONTEXT ---
 const ThemeContext = createContext({ isChild: false, user: null });
 
@@ -165,316 +181,6 @@ const mockRewards = [
   { id: 3, title: "Special Activity", cost: 100, icon: <Ticket className="w-6 h-6"/>, color: "bg-pink-100 text-pink-600" },
 ];
 
-// --- MAIN APP COMPONENT ---
-export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
-  const [activeTab, setActiveTab] = useState('home');
-  const [activeUser, setActiveUser] = useState(null);
-  const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
-  const [hasOnboarded, setHasOnboarded] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  // Database States
-  const [firebaseUser, setFirebaseUser] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [userPoints, setUserPoints] = useState({ 'Tommy': 0, 'Lily': 0 });
-  
-  // Non-Firebase States (For Step 2)
-  const [events, setEvents] = useState(mockEvents);
-  const [meals, setMeals] = useState(mockMeals);
-  const [groceries, setGroceries] = useState([]);
-  
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
-
-  const isParent = activeUser?.role === 'Parent';
-  const isChild = activeUser?.role === 'Child';
-
-  // 1. Initialize Firebase Auth
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.error("Firebase Auth Error:", error);
-      }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setFirebaseUser);
-    return () => unsubscribe();
-  }, []);
-
-  // 2. Fetch & Sync Firestore Data
-  useEffect(() => {
-    if (!firebaseUser) return;
-
-    // Sync Tasks
-    const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks');
-    const unsubTasks = onSnapshot(tasksRef, (snap) => {
-      if (snap.empty) {
-        mockTasks.forEach(mt => setDoc(doc(tasksRef, mt.id.toString()), { ...mt, createdAt: Date.now() }));
-      } else {
-        const fetchedTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setTasks(fetchedTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
-      }
-    }, console.error);
-
-    // Sync Messages (Chat)
-    const msgsRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages');
-    const unsubMsgs = onSnapshot(msgsRef, (snap) => {
-      if (snap.empty) {
-        mockChats.forEach(mc => setDoc(doc(msgsRef, mc.id.toString()), { ...mc, createdAt: Date.now() }));
-      } else {
-        const fetchedMsgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setMessages(fetchedMsgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
-      }
-    }, console.error);
-
-    // Sync Points
-    const pointsRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_points');
-    const unsubPoints = onSnapshot(pointsRef, (snap) => {
-      if (snap.empty) {
-        setDoc(doc(pointsRef, 'Tommy'), { points: 45 });
-        setDoc(doc(pointsRef, 'Lily'), { points: 30 });
-      } else {
-        let p = { 'Tommy': 0, 'Lily': 0 };
-        snap.docs.forEach(d => { p[d.id] = d.data().points; });
-        setUserPoints(p);
-      }
-    }, console.error);
-
-    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); };
-  }, [firebaseUser]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 2200);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleLogin = (user) => {
-    setActiveUser(user);
-    setActiveTab('home'); 
-    if (user.role === 'Parent' && !hasOnboarded) {
-      setShowOnboarding(true);
-    }
-  };
-
-  const completeOnboarding = () => {
-    setShowOnboarding(false);
-    setHasOnboarded(true);
-    triggerConfetti();
-  };
-
-  // --- FIREBASE WRITE OPERATIONS ---
-  
-  const handleAddTask = async (newTask) => {
-    if (!firebaseUser) return;
-    const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), {
-      ...newTask, id: newId, status: 'open', createdAt: Date.now()
-    });
-  };
-
-  const handleTaskAction = async (taskId, action, extra = {}) => {
-    const t = tasks.find(x => x.id === taskId);
-    if (!t || !firebaseUser) return;
-
-    const assignee = t.assignee;
-    let newStatus = t.status;
-    let newPhotoUrl = t.photoUrl || null;
-    let pointsChange = 0;
-
-    if (action === 'toggle_simple') { 
-      if (isParent) {
-        if (t.status === 'open') { pointsChange = t.points; newStatus = 'approved'; } 
-        else { pointsChange = -t.points; newStatus = 'open'; }
-      } else {
-        if (t.status === 'open') newStatus = 'pending';
-        else if (t.status === 'pending') newStatus = 'open';
-      }
-    }
-    else if (action === 'submit_with_photo') {
-      newStatus = 'pending';
-      newPhotoUrl = extra.photoUrl;
-    }
-    else if (action === 'approve') {
-      pointsChange = t.points;
-      newStatus = 'approved';
-    }
-    else if (action === 'reject') {
-      newStatus = 'open';
-      newPhotoUrl = null;
-    }
-
-    if (newStatus === 'pending' || newStatus === 'approved') {
-      if (t.status !== newStatus && action !== 'reject') triggerConfetti();
-    }
-
-    // Write Task Update to Cloud
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), {
-      status: newStatus, photoUrl: newPhotoUrl
-    });
-
-    // Write Points Update to Cloud
-    if (pointsChange !== 0 && assignee) {
-      const currentPoints = userPoints[assignee] || 0;
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', assignee), {
-        points: Math.max(0, currentPoints + pointsChange)
-      }, { merge: true });
-    }
-  };
-
-  const handleSendMessage = async (text) => {
-    if (!firebaseUser) return;
-    const newId = Date.now().toString();
-    const msg = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msg);
-  };
-
-  const handleRedeemReward = async (cost) => {
-    const pointsAvailable = userPoints[activeUser.name] || 0;
-    if (!isParent && pointsAvailable >= cost) {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), {
-        points: pointsAvailable - cost
-      }, { merge: true });
-      triggerConfetti();
-    } else if (isParent) {
-      triggerConfetti(); 
-    }
-  };
-
-  const handleAddEvent = (newEvent) => setEvents([...events, { ...newEvent, id: Date.now(), color: 'bg-indigo-500' }]);
-  const handleAddMeal = (newMeal) => setMeals([...meals, { ...newMeal, id: Date.now(), tags: ['New Recipe'] }]);
-
-  const triggerConfetti = () => {
-    setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 1500);
-  };
-
-  const renderContent = () => {
-    const displayPoints = isParent ? (userPoints['Tommy'] + userPoints['Lily']) : (userPoints[activeUser.name] || 0);
-
-    switch(activeTab) {
-      case 'home':
-        return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
-      case 'tasks':
-        return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} activeUser={activeUser} isParent={isParent} />;
-      case 'calendar':
-        return <CalendarView events={events} onAdd={handleAddEvent} isParent={isParent} />;
-      case 'meals':
-        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={(m) => setMeals(meals.map(x => x.id === m.id ? m : x))} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
-      case 'rewards':
-        return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
-      case 'chat':
-        return <ChatView messages={messages} onSend={handleSendMessage} />;
-      case 'settings':
-        return <SettingsView user={activeUser} isParent={isParent} onLogout={() => setActiveUser(null)} />;
-      default:
-        return null;
-    }
-  };
-
-  const pendingApprovalTasks = tasks.filter(t => t.status === 'pending');
-
-  if (showSplash) return <SplashScreen />;
-  if (!activeUser) return <LoginScreen onLogin={handleLogin} users={MOCK_USERS} />;
-  if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
-
-  const navItems = isParent 
-    ? [{ id: 'home', icon: Home, label: 'Today' }, { id: 'tasks', icon: CheckSquare, label: 'Tasks' }, { id: 'calendar', icon: CalendarIcon, label: 'Plan' }, { id: 'meals', icon: ChefHat, label: 'Meals' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }]
-    : [{ id: 'home', icon: Home, label: 'Home' }, { id: 'tasks', icon: CheckSquare, label: 'Chores' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }];
-
-  const appBgClass = isChild ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' : 'bg-slate-50 text-slate-800';
-
-  return (
-    <ThemeContext.Provider value={{ isChild, user: activeUser }}>
-      <div className={`min-h-screen font-sans flex flex-col relative overflow-hidden transition-colors duration-500 ${appBgClass}`}>
-        <CustomStyles />
-        <Confetti active={showConfetti} />
-
-        <main className="flex-1 overflow-y-auto w-full max-w-2xl mx-auto pb-32 pt-6 px-4 sm:px-6 relative">
-          <header className="flex justify-between items-start mb-6 min-h-[64px] shrink-0">
-            <div className="flex-1">
-              {activeTab === 'home' && (
-                <div className="animate-pop-in">
-                  <p className={`text-[12px] font-bold uppercase tracking-widest mb-1 flex items-center gap-1.5 ${isChild ? 'text-sky-600' : 'text-slate-500'}`}>
-                    <CalendarIcon className="w-3.5 h-3.5"/> Today
-                  </p>
-                  <h1 className={`font-bold tracking-tight leading-tight ${isChild ? 'text-4xl text-slate-800' : 'text-3xl text-slate-900'}`}>
-                    {isChild ? `Hi, ${activeUser.name}!` : `Good afternoon,\n${activeUser.name}`}
-                  </h1>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-3 z-20 shrink-0 ml-4 pt-1">
-              <div className="relative cursor-pointer group" onClick={() => setIsUserSwitcherOpen(true)}>
-                <Avatar user={activeUser} size={isChild ? 'lg' : 'md'} className="group-hover:scale-105 transition-transform duration-300 shadow-sm ring-4 ring-white" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-slate-800 border-[2px] border-white rounded-full shadow-sm flex items-center justify-center text-[9px] text-white font-bold z-10">
-                  {isParent ? 'P' : 'C'}
-                </span>
-                {isParent && pendingApprovalTasks.length > 0 && (
-                  <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-rose-500 border-2 border-slate-50 rounded-full shadow-sm animate-pulse z-20 -translate-y-1/3 translate-x-1/3"></span>
-                )}
-              </div>
-              {isParent && (
-                <button onClick={() => setActiveTab('settings')} className={`w-11 h-11 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-full shadow-sm ring-1 ring-slate-900/5 hover:text-slate-800 hover:bg-slate-100 active:scale-95 transition-all ${activeTab === 'settings' ? 'text-indigo-600 bg-indigo-50 ring-indigo-200' : 'text-slate-500'}`}>
-                  <MoreVertical className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-          </header>
-
-          {renderContent()}
-        </main>
-
-        {isParent && (
-          <button onClick={() => setIsCopilotOpen(true)} className="fixed bottom-24 right-4 sm:right-8 z-40 bg-white/95 backdrop-blur-xl text-indigo-600 p-3.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] ring-1 ring-slate-900/5 hover:scale-105 active:scale-95 transition-all group flex items-center justify-center">
-            <Wand2 className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-          </button>
-        )}
-
-        <AICopilotModal isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} />
-
-        <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title="Switch Profile">
-          <div className="space-y-3">
-            {MOCK_USERS.map(user => (
-              <div key={user.id} onClick={() => { setActiveUser(user); setIsUserSwitcherOpen(false); }} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser?.id === user.id ? 'bg-slate-100 ring-2 ring-slate-400' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}>
-                <Avatar user={user} size="md" />
-                <div><h4 className="font-bold text-slate-800">{user.name}</h4><p className="text-xs font-medium text-slate-500">{user.role}</p></div>
-                {activeUser?.id === user.id && <Check className="w-5 h-5 text-slate-800 ml-auto" />}
-              </div>
-            ))}
-          </div>
-        </Modal>
-
-        <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-4 bg-gradient-to-t from-black/5 via-black/5 to-transparent z-40 pointer-events-none flex justify-center">
-          <nav className={`${isChild ? 'bg-white rounded-[2rem] px-2 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.1)] border-4 border-white/50' : 'bg-white/90 backdrop-blur-2xl px-2 py-2 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] rounded-full ring-1 ring-slate-900/5'} flex justify-between items-center overflow-x-auto no-scrollbar w-full max-w-md pointer-events-auto transition-all duration-500`}>
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              const activeColor = isChild ? 'text-sky-500' : 'text-indigo-600';
-              const activeBg = isChild ? 'bg-sky-50' : 'bg-indigo-50/80';
-              return (
-                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`relative flex flex-col items-center justify-center gap-1 transition-all duration-300 flex-1 min-w-[50px] ${isChild ? 'py-2' : 'py-2'} ${isActive ? `${activeColor} scale-105` : 'text-slate-400 hover:text-slate-600 hover:scale-105 active:scale-95'}`}>
-                  {isActive && <div className={`absolute inset-0 ${activeBg} ${isChild ? 'rounded-2xl' : 'rounded-full'} -z-10`}></div>}
-                  <Icon className={`${isChild ? 'w-6 h-6' : 'w-5 h-5'} transition-all duration-300 ${isActive ? 'fill-current opacity-20' : ''}`} />
-                  <span className={`tracking-wide transition-all mt-0.5 ${isChild ? 'text-[10px] font-bold' : 'text-[9px] font-bold'}`}>{item.label}</span>
-                </button>
-              )
-            })}
-          </nav>
-        </div>
-      </div>
-    </ThemeContext.Provider>
-  );
-}
-
 // --- SUB-VIEWS ---
 
 const ChatView = ({ messages, onSend }) => {
@@ -531,8 +237,6 @@ const ChatView = ({ messages, onSend }) => {
     </div>
   );
 };
-
-// ... ALL OTHER SUB-VIEWS REMAIN UNCHANGED FROM THE PROTOTYPE ...
 
 const SplashScreen = () => (
   <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white relative overflow-hidden transition-opacity duration-500">
@@ -591,9 +295,99 @@ const LoginScreen = ({ onLogin, users }) => (
   </div>
 );
 
+const AICopilotModal = ({ isOpen, onClose }) => {
+  const [messages, setMessages] = useState([{ role: 'ai', text: "Hi! I'm your Kinflow Copilot. I can help organize chores, plan meals, or resolve scheduling conflicts. What's up?" }]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isLoading]);
+
+  const handleSend = async (presetText = null) => {
+    const textToSend = presetText || input;
+    if (!textToSend.trim() || isLoading) return;
+    
+    const newMessages = [...messages, { role: 'user', text: textToSend }];
+    setMessages(newMessages);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const apiKey = ""; // API Key is dynamically injected by the execution environment
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+      // Map our internal chat format to Gemini's expected format
+      const geminiMessages = newMessages.map(m => ({
+        role: m.role === 'ai' ? 'model' : 'user',
+        parts: [{ text: m.text }]
+      }));
+
+      const payload = {
+        systemInstruction: {
+          parts: [{ text: "You are Kinflow Copilot, a helpful AI assistant for a family organization app. Help parents plan meals, suggest age-appropriate chores, manage schedules, and give brief, friendly, practical advice. Keep your responses concise (under 3 sentences) and use emojis occasionally." }]
+        },
+        contents: geminiMessages
+      };
+
+      const data = await fetchWithRetry(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that right now.";
+      setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'ai', text: "Oops, I'm having trouble connecting right now. Please try again later." }]);
+      console.error("Gemini AI Error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="AI Copilot" fullHeight>
+      <div className="flex flex-col h-full h-[60vh]">
+        <div className="flex items-center gap-2 mb-4 p-2 bg-indigo-50 rounded-xl border border-indigo-100">
+          <Wand2 className="w-5 h-5 text-indigo-500"/>
+          <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">AI Assistant</span>
+        </div>
+        <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-4">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed ${msg.role === 'user' ? 'bg-slate-900 text-white rounded-br-sm' : 'bg-slate-100 text-slate-800 rounded-bl-sm ring-1 ring-slate-900/5'}`}>
+                {msg.text}
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] p-4 rounded-[1.5rem] bg-slate-100 text-slate-500 rounded-bl-sm ring-1 ring-slate-900/5 flex items-center gap-2 text-sm font-medium">
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" /> Thinking...
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+        {messages.length < 3 && !isLoading && (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-4 pt-2 shrink-0">
+            {["Plan Dinners", "Assign Chores", "Find Free Time"].map(action => (
+              <button key={action} onClick={() => handleSend(action)} className="whitespace-nowrap bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-full text-xs font-semibold hover:bg-slate-50 transition-colors shadow-sm">{action}</button>
+            ))}
+          </div>
+        )}
+        <div className="relative mt-auto shrink-0 pt-2">
+          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} disabled={isLoading} placeholder={isLoading ? "Copilot is thinking..." : "Ask Copilot anything..."} className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-full pl-5 pr-12 py-4 focus:outline-none focus:ring-1 focus:ring-slate-300 focus:bg-white transition-all font-medium disabled:opacity-50" />
+          <button onClick={() => handleSend()} disabled={!input.trim() || isLoading} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"><Send className="w-4 h-4" /></button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) => {
   const { isChild } = useContext(ThemeContext);
-  const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser.name || t.assignee === 'Anyone');
+  const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser?.name || t.assignee === 'Anyone');
   const openTasks = visibleTasks.filter(t => t.status === 'open').length;
   const pendingApproval = tasks.filter(t => t.status === 'pending').length;
   
@@ -670,7 +464,7 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
   const [mockPhotoCaptured, setMockPhotoCaptured] = useState(null);
   const [activeTaskForReview, setActiveTaskForReview] = useState(null); 
 
-  const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser.name || t.assignee === 'Anyone');
+  const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser?.name || t.assignee === 'Anyone');
 
   const handleSubmitNewTask = (e) => {
     e.preventDefault();
@@ -741,7 +535,7 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
                   ${isApproved ? 'bg-emerald-500 border-emerald-500' : isPending ? 'bg-amber-400 border-amber-400' : 'border-slate-300 group-hover:border-slate-400'}`
                 }>
                   {isApproved && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
-                  {isPending && <Hourglass className="w-4 h-4 text-white" />}
+                  {isPending && <Hourglass className="w-3.5 h-3.5 text-white" />}
                 </div>
                 <div>
                   <p className={`font-bold text-sm transition-all ${isApproved ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</p>
@@ -1070,53 +864,20 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }
   );
 };
 
-// ... ALL OTHER SUB-VIEWS REMAIN UNCHANGED FROM THE PROTOTYPE ...
-
-const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
-  const { isChild } = useContext(ThemeContext);
-  return (
-    <div className="space-y-6 animate-pop-in">
-      <div className="flex justify-between items-end">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Rewards</h2>
-          <p className="text-slate-500 font-medium text-sm mt-1">Cash in your hard work!</p>
-        </div>
-        <div className={`${isChild ? 'bg-amber-400 text-amber-900 border-2 border-amber-500 shadow-[0_4px_0_rgb(217,119,6)]' : 'bg-slate-900 text-white'} px-4 py-2 rounded-2xl flex items-center gap-2 transition-all`}>
-          <Star className={`w-4 h-4 ${isChild ? 'fill-amber-700' : 'fill-white/50'}`} />
-          <span className="font-bold text-lg">{points} {isParent ? 'Total pts' : 'pts'}</span>
-        </div>
+const SettingRow = ({ icon: Icon, label, value, className = '', iconClass = '', hideArrow = false, onClick }) => (
+  <div onClick={onClick} className={`flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors ${className}`}>
+    <div className="flex items-center gap-3">
+      <div className={`p-2.5 rounded-xl bg-slate-100 text-slate-600 ${iconClass}`}>
+        <Icon className="w-4 h-4" />
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {rewards.map((reward) => (
-          <Card key={reward.id} className="!p-5 flex flex-col justify-between gap-4 group">
-            <div className="flex items-start justify-between">
-              <div className={`w-12 h-12 rounded-[1.25rem] flex items-center justify-center shadow-sm ${reward.color} group-hover:scale-110 transition-transform duration-300`}>
-                {reward.icon}
-              </div>
-              <Badge variant="warning" className="!bg-amber-100 !text-amber-700 !border-0 shadow-sm flex items-center gap-1">
-                <Flame className="w-3 h-3"/> {reward.cost} pts
-              </Badge>
-            </div>
-            
-            <div>
-              <h4 className="font-bold text-slate-800 text-base">{reward.title}</h4>
-            </div>
-
-            <Button 
-              variant={points >= reward.cost ? (isChild ? 'premium' : 'primary') : (isChild ? 'outline' : 'secondary')} 
-              className="!py-2.5 mt-2 text-sm"
-              disabled={points < reward.cost || isParent}
-              onClick={() => onRedeem(reward.cost)}
-            >
-              {isParent ? 'Kids Redeem Here' : (points >= reward.cost ? 'Redeem Reward' : `Need ${reward.cost - points} more`)}
-            </Button>
-          </Card>
-        ))}
-      </div>
+      <span className="font-semibold text-sm text-slate-700">{label}</span>
     </div>
-  );
-};
+    <div className="flex items-center gap-2">
+      {value && <span className="text-sm font-medium text-slate-500">{value}</span>}
+      {!hideArrow && <ChevronRight className="w-4 h-4 text-slate-400" />}
+    </div>
+  </div>
+);
 
 const SettingsView = ({ user, isParent, onLogout }) => {
   const [activeModal, setActiveModal] = useState(null);
@@ -1170,7 +931,7 @@ const SettingsView = ({ user, isParent, onLogout }) => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1">Name</label>
-            <input type="text" defaultValue={user.name} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-slate-300" />
+            <input type="text" defaultValue={user?.name || ""} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-slate-300" />
           </div>
           <Button onClick={handleModalClose} className="mt-2">Save Changes</Button>
         </div>
@@ -1214,17 +975,313 @@ const SettingsView = ({ user, isParent, onLogout }) => {
   );
 };
 
-const SettingRow = ({ icon: Icon, label, value, className = '', iconClass = '', hideArrow = false, onClick }) => (
-  <div onClick={onClick} className={`flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors ${className}`}>
-    <div className="flex items-center gap-3">
-      <div className={`p-2.5 rounded-xl bg-slate-100 text-slate-600 ${iconClass}`}>
-        <Icon className="w-4 h-4" />
+// --- MAIN APP COMPONENT ---
+export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+  const [activeTab, setActiveTab] = useState('home');
+  const [activeUser, setActiveUser] = useState(null);
+  const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
+  const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Database States
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [userPoints, setUserPoints] = useState({ 'Tommy': 0, 'Lily': 0 });
+  
+  // Non-Firebase States (For Step 2)
+  const [events, setEvents] = useState(mockEvents);
+  const [meals, setMeals] = useState(mockMeals);
+  const [groceries, setGroceries] = useState([]);
+  
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+
+  const isParent = activeUser?.role === 'Parent';
+  const isChild = activeUser?.role === 'Child';
+
+  // 1. Initialize Firebase Auth
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Firebase Auth Error:", error);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setFirebaseUser);
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Fetch & Sync Firestore Data
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    // Sync Tasks
+    const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks');
+    const unsubTasks = onSnapshot(tasksRef, (snap) => {
+      if (snap.empty) {
+        mockTasks.forEach(mt => setDoc(doc(tasksRef, mt.id.toString()), { ...mt, createdAt: Date.now() }));
+      } else {
+        const fetchedTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setTasks(fetchedTasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+      }
+    }, console.error);
+
+    // Sync Messages (Chat)
+    const msgsRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages');
+    const unsubMsgs = onSnapshot(msgsRef, (snap) => {
+      if (snap.empty) {
+        mockChats.forEach(mc => setDoc(doc(msgsRef, mc.id.toString()), { ...mc, createdAt: Date.now() }));
+      } else {
+        const fetchedMsgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setMessages(fetchedMsgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+      }
+    }, console.error);
+
+    // Sync Points
+    const pointsRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_points');
+    const unsubPoints = onSnapshot(pointsRef, (snap) => {
+      if (snap.empty) {
+        setDoc(doc(pointsRef, 'Tommy'), { points: 45 });
+        setDoc(doc(pointsRef, 'Lily'), { points: 30 });
+      } else {
+        let p = { 'Tommy': 0, 'Lily': 0 };
+        snap.docs.forEach(d => { p[d.id] = d.data().points; });
+        setUserPoints(p);
+      }
+    }, console.error);
+
+    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); };
+  }, [firebaseUser]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleLogin = (user) => {
+    setActiveUser(user);
+    setActiveTab('home'); 
+    if (user.role === 'Parent' && !hasOnboarded) {
+      setShowOnboarding(true);
+    }
+  };
+
+  const completeOnboarding = () => {
+    setShowOnboarding(false);
+    setHasOnboarded(true);
+    triggerConfetti();
+  };
+
+  // --- FIREBASE WRITE OPERATIONS ---
+  
+  const handleAddTask = async (newTask) => {
+    if (!firebaseUser) return;
+    const newId = Date.now().toString();
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), {
+      ...newTask, id: newId, status: 'open', createdAt: Date.now()
+    });
+  };
+
+  const handleTaskAction = async (taskId, action, extra = {}) => {
+    const t = tasks.find(x => x.id === taskId);
+    if (!t || !firebaseUser) return;
+
+    const assignee = t.assignee;
+    let newStatus = t.status;
+    let newPhotoUrl = t.photoUrl || null;
+    let pointsChange = 0;
+
+    if (action === 'toggle_simple') { 
+      if (isParent) {
+        if (t.status === 'open') { pointsChange = t.points; newStatus = 'approved'; } 
+        else { pointsChange = -t.points; newStatus = 'open'; }
+      } else {
+        if (t.status === 'open') newStatus = 'pending';
+        else if (t.status === 'pending') newStatus = 'open';
+      }
+    }
+    else if (action === 'submit_with_photo') {
+      newStatus = 'pending';
+      newPhotoUrl = extra.photoUrl;
+    }
+    else if (action === 'approve') {
+      pointsChange = t.points;
+      newStatus = 'approved';
+    }
+    else if (action === 'reject') {
+      newStatus = 'open';
+      newPhotoUrl = null;
+    }
+
+    if (newStatus === 'pending' || newStatus === 'approved') {
+      if (t.status !== newStatus && action !== 'reject') triggerConfetti();
+    }
+
+    // Write Task Update to Cloud
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), {
+      status: newStatus, photoUrl: newPhotoUrl
+    });
+
+    // Write Points Update to Cloud
+    if (pointsChange !== 0 && assignee) {
+      const currentPoints = userPoints[assignee] || 0;
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', assignee), {
+        points: Math.max(0, currentPoints + pointsChange)
+      }, { merge: true });
+    }
+  };
+
+  const handleSendMessage = async (text) => {
+    if (!firebaseUser || !activeUser) return;
+    const newId = Date.now().toString();
+    const msg = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msg);
+  };
+
+  const handleRedeemReward = async (cost) => {
+    if (!activeUser) return;
+    const pointsAvailable = userPoints[activeUser.name] || 0;
+    if (!isParent && pointsAvailable >= cost) {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), {
+        points: pointsAvailable - cost
+      }, { merge: true });
+      triggerConfetti();
+    } else if (isParent) {
+      triggerConfetti(); 
+    }
+  };
+
+  const handleAddEvent = (newEvent) => setEvents([...events, { ...newEvent, id: Date.now(), color: 'bg-indigo-500' }]);
+  const handleAddMeal = (newMeal) => setMeals([...meals, { ...newMeal, id: Date.now(), tags: ['New Recipe'] }]);
+
+  const triggerConfetti = () => {
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 1500);
+  };
+
+  const renderContent = () => {
+    const displayPoints = isParent ? (userPoints['Tommy'] + userPoints['Lily']) : (userPoints[activeUser?.name] || 0);
+
+    switch(activeTab) {
+      case 'home':
+        return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
+      case 'tasks':
+        return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} activeUser={activeUser} isParent={isParent} />;
+      case 'calendar':
+        return <CalendarView events={events} onAdd={handleAddEvent} isParent={isParent} />;
+      case 'meals':
+        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={(m) => setMeals(meals.map(x => x.id === m.id ? m : x))} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
+      case 'rewards':
+        return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
+      case 'chat':
+        return <ChatView messages={messages} onSend={handleSendMessage} />;
+      case 'settings':
+        return <SettingsView user={activeUser} isParent={isParent} onLogout={() => setActiveUser(null)} />;
+      default:
+        return null;
+    }
+  };
+
+  const pendingApprovalTasks = tasks.filter(t => t.status === 'pending');
+
+  if (showSplash) return <SplashScreen />;
+  if (!activeUser) return <LoginScreen onLogin={handleLogin} users={MOCK_USERS} />;
+  if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
+
+  const navItems = isParent 
+    ? [{ id: 'home', icon: Home, label: 'Today' }, { id: 'tasks', icon: CheckSquare, label: 'Tasks' }, { id: 'calendar', icon: CalendarIcon, label: 'Plan' }, { id: 'meals', icon: ChefHat, label: 'Meals' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }]
+    : [{ id: 'home', icon: Home, label: 'Home' }, { id: 'tasks', icon: CheckSquare, label: 'Chores' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }];
+
+  const appBgClass = isChild ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' : 'bg-slate-50 text-slate-800';
+
+  return (
+    <ThemeContext.Provider value={{ isChild, user: activeUser }}>
+      <div className={`min-h-screen font-sans flex flex-col relative overflow-hidden transition-colors duration-500 ${appBgClass}`}>
+        <CustomStyles />
+        <Confetti active={showConfetti} />
+
+        <main className="flex-1 overflow-y-auto w-full max-w-2xl mx-auto pb-32 pt-6 px-4 sm:px-6 relative">
+          <header className="flex justify-between items-start mb-6 min-h-[64px] shrink-0">
+            <div className="flex-1">
+              {activeTab === 'home' && (
+                <div className="animate-pop-in">
+                  <p className={`text-[12px] font-bold uppercase tracking-widest mb-1 flex items-center gap-1.5 ${isChild ? 'text-sky-600' : 'text-slate-500'}`}>
+                    <CalendarIcon className="w-3.5 h-3.5"/> Today
+                  </p>
+                  <h1 className={`font-bold tracking-tight leading-tight ${isChild ? 'text-4xl text-slate-800' : 'text-3xl text-slate-900'}`}>
+                    {isChild ? `Hi, ${activeUser.name}!` : `Good afternoon,\n${activeUser.name}`}
+                  </h1>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-3 z-20 shrink-0 ml-4 pt-1">
+              <div className="relative cursor-pointer group" onClick={() => setIsUserSwitcherOpen(true)}>
+                <Avatar user={activeUser} size={isChild ? 'lg' : 'md'} className="group-hover:scale-105 transition-transform duration-300 shadow-sm ring-4 ring-white" />
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-slate-800 border-[2px] border-white rounded-full shadow-sm flex items-center justify-center text-[9px] text-white font-bold z-10">
+                  {isParent ? 'P' : 'C'}
+                </span>
+                {isParent && pendingApprovalTasks.length > 0 && (
+                  <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-rose-500 border-2 border-slate-50 rounded-full shadow-sm animate-pulse z-20 -translate-y-1/3 translate-x-1/3"></span>
+                )}
+              </div>
+              {isParent && (
+                <button onClick={() => setActiveTab('settings')} className={`w-11 h-11 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-full shadow-sm ring-1 ring-slate-900/5 hover:text-slate-800 hover:bg-slate-100 active:scale-95 transition-all ${activeTab === 'settings' ? 'text-indigo-600 bg-indigo-50 ring-indigo-200' : 'text-slate-500'}`}>
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          </header>
+
+          {renderContent()}
+        </main>
+
+        {isParent && (
+          <button onClick={() => setIsCopilotOpen(true)} className="fixed bottom-24 right-4 sm:right-8 z-40 bg-white/95 backdrop-blur-xl text-indigo-600 p-3.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] ring-1 ring-slate-900/5 hover:scale-105 active:scale-95 transition-all group flex items-center justify-center">
+            <Wand2 className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+          </button>
+        )}
+
+        <AICopilotModal isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} />
+
+        <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title="Switch Profile">
+          <div className="space-y-3">
+            {MOCK_USERS.map(user => (
+              <div key={user.id} onClick={() => { setActiveUser(user); setIsUserSwitcherOpen(false); }} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser?.id === user.id ? 'bg-slate-100 ring-2 ring-slate-400' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}>
+                <Avatar user={user} size="md" />
+                <div><h4 className="font-bold text-slate-800">{user.name}</h4><p className="text-xs font-medium text-slate-500">{user.role}</p></div>
+                {activeUser?.id === user.id && <Check className="w-5 h-5 text-slate-800 ml-auto" />}
+              </div>
+            ))}
+          </div>
+        </Modal>
+
+        <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-4 bg-gradient-to-t from-black/5 via-black/5 to-transparent z-40 pointer-events-none flex justify-center">
+          <nav className={`${isChild ? 'bg-white rounded-[2rem] px-2 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.1)] border-4 border-white/50' : 'bg-white/90 backdrop-blur-2xl px-2 py-2 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] rounded-full ring-1 ring-slate-900/5'} flex justify-between items-center overflow-x-auto no-scrollbar w-full max-w-md pointer-events-auto transition-all duration-500`}>
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              const activeColor = isChild ? 'text-sky-500' : 'text-indigo-600';
+              const activeBg = isChild ? 'bg-sky-50' : 'bg-indigo-50/80';
+              return (
+                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`relative flex flex-col items-center justify-center gap-1 transition-all duration-300 flex-1 min-w-[50px] ${isChild ? 'py-2' : 'py-2'} ${isActive ? `${activeColor} scale-105` : 'text-slate-400 hover:text-slate-600 hover:scale-105 active:scale-95'}`}>
+                  {isActive && <div className={`absolute inset-0 ${activeBg} ${isChild ? 'rounded-2xl' : 'rounded-full'} -z-10`}></div>}
+                  <Icon className={`${isChild ? 'w-6 h-6' : 'w-5 h-5'} transition-all duration-300 ${isActive ? 'fill-current opacity-20' : ''}`} />
+                  <span className={`tracking-wide transition-all mt-0.5 ${isChild ? 'text-[10px] font-bold' : 'text-[9px] font-bold'}`}>{item.label}</span>
+                </button>
+              )
+            })}
+          </nav>
+        </div>
       </div>
-      <span className="font-semibold text-sm text-slate-700">{label}</span>
-    </div>
-    <div className="flex items-center gap-2">
-      {value && <span className="text-sm font-medium text-slate-500">{value}</span>}
-      {!hideArrow && <ChevronRight className="w-4 h-4 text-slate-400" />}
-    </div>
-  </div>
-);
+    </ThemeContext.Provider>
+  );
+}
