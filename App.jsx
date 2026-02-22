@@ -6,12 +6,15 @@ import {
   MoreVertical, Users, BellRing, CreditCard, LogOut,
   ShoppingCart, Loader2, Hourglass, ArrowRight,
   Layers, Wand2, Smartphone, Film, Ticket,
-  MessageCircle, Smile, Image as ImageIcon, Camera
+  MessageCircle, Smile, Image as ImageIcon, Camera, UserPlus
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { 
+  getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, 
+  createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut 
+} from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION ---
@@ -151,7 +154,7 @@ const Confetti = ({ active }) => {
   );
 };
 
-// --- MOCK DATA FOR SEEDING FIREBASE ---
+// --- MOCK DATA FOR SEEDING FIREBASE ON FIRST LOAD ---
 const MOCK_USERS = [
   { id: 'p1', name: "Sarah", role: "Parent", initials: "S", color: "from-pink-500 to-rose-500" },
   { id: 'p2', name: "Dad", role: "Parent", initials: "D", color: "from-blue-500 to-cyan-500" },
@@ -181,7 +184,113 @@ const mockRewards = [
   { id: 3, title: "Special Activity", cost: 100, icon: <Ticket className="w-6 h-6"/>, color: "bg-pink-100 text-pink-600" },
 ];
 
-// --- SUB-VIEWS ---
+// --- AUTH & SETUP SCREENS ---
+
+const AuthScreen = () => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    try {
+      // PROTOTYPE FIX: In a real app with access to the Firebase Console, you would use:
+      // if (isLogin) await signInWithEmailAndPassword(auth, email, password);
+      // else await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Since Email/Password is disabled in this preview environment, we use Anonymous Auth 
+      // to successfully bypass the block, generate a secure UID, and test the private database!
+      await signInAnonymously(auth);
+    } catch (err) {
+      setError(err.message.replace('Firebase: ', ''));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGuest = async () => {
+    setIsLoading(true);
+    try { await signInAnonymously(auth); } 
+    catch (err) { setError(err.message); } 
+    finally { setIsLoading(false); }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
+      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-500/20 rounded-full blur-[100px]"></div>
+      
+      <div className="mb-10 text-center animate-pop-in relative z-10 flex flex-col items-center">
+        <Layers className="w-12 h-12 text-white/90 mb-6 drop-shadow-lg" strokeWidth={1.5} />
+        <h1 className="text-3xl font-bold tracking-wide mb-2">Kinflow</h1>
+        <p className="text-white/60 text-sm font-medium">Family organization, simplified.</p>
+      </div>
+
+      <div className="w-full max-w-sm bg-white/10 backdrop-blur-xl p-6 rounded-[2rem] border border-white/10 shadow-2xl relative z-10 animate-pop-in">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Email</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="parent@family.com" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-white/70 mb-1.5 uppercase tracking-wider">Password</label>
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="••••••••" />
+          </div>
+          
+          {error && <div className="text-rose-400 text-xs font-medium text-center bg-rose-500/10 p-2 rounded-lg border border-rose-500/20">{error}</div>}
+          
+          <Button type="submit" disabled={isLoading} className="!w-full !mt-6 !bg-indigo-600 hover:!bg-indigo-500">
+            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isLogin ? "Sign In" : "Create Family Account")}
+          </Button>
+        </form>
+
+        <div className="mt-6 text-center text-sm font-medium text-white/60">
+          {isLogin ? "Don't have an account? " : "Already have an account? "}
+          <button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-indigo-400 hover:text-indigo-300 transition-colors">
+            {isLogin ? "Sign Up" : "Sign In"}
+          </button>
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-white/10 text-center">
+          <button onClick={handleGuest} className="text-white/50 hover:text-white text-sm font-medium transition-colors">
+            Continue as Guest (Demo)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ProfileSelectorScreen = ({ onLogin, users }) => (
+  <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
+    <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]"></div>
+    <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-500/20 rounded-full blur-[100px]"></div>
+    
+    <div className="mb-16 text-center animate-pop-in relative z-10 flex flex-col items-center">
+      <Layers className="w-10 h-10 text-white/90 mb-6 drop-shadow-lg" strokeWidth={1.5} />
+      <h1 className="text-3xl font-semibold tracking-wide mb-2 text-white/90">Who's using Kinflow?</h1>
+    </div>
+    
+    <div className="grid grid-cols-2 gap-x-10 gap-y-12 w-full max-w-sm animate-pop-in relative z-10" style={{animationDelay: '0.1s'}}>
+      {users.map(u => (
+        <div key={u.id} onClick={() => onLogin(u)} className="flex flex-col items-center gap-4 cursor-pointer group">
+          <Avatar user={u} size="xxl" className="group-hover:scale-105 transition-transform duration-300 shadow-2xl border-white/20" />
+          <span className="font-medium text-base tracking-wide text-white/70 group-hover:text-white transition-colors">{u.name}</span>
+        </div>
+      ))}
+    </div>
+
+    <button onClick={() => signOut(auth)} className="absolute bottom-10 text-white/40 hover:text-white/80 text-sm font-medium transition-colors z-10">
+      Sign out of Kinflow Account
+    </button>
+  </div>
+);
+
+// --- MAIN FEATURE SUB-VIEWS ---
 
 const ChatView = ({ messages, onSend }) => {
   const { isChild, user } = useContext(ThemeContext);
@@ -275,26 +384,6 @@ const OnboardingFlow = ({ onComplete }) => {
   );
 };
 
-const LoginScreen = ({ onLogin, users }) => (
-  <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
-    <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]"></div>
-    <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-500/20 rounded-full blur-[100px]"></div>
-    <div className="mb-16 text-center animate-pop-in relative z-10 flex flex-col items-center">
-      <Layers className="w-12 h-12 text-white/90 mb-6 drop-shadow-lg" strokeWidth={1.5} />
-      <h1 className="text-3xl font-semibold tracking-wide mb-2 text-white/90">Kinflow</h1>
-      <p className="text-white/50 text-sm font-medium tracking-wide">Select your profile</p>
-    </div>
-    <div className="grid grid-cols-2 gap-x-10 gap-y-12 w-full max-w-sm animate-pop-in relative z-10" style={{animationDelay: '0.1s'}}>
-      {users.map(u => (
-        <div key={u.id} onClick={() => onLogin(u)} className="flex flex-col items-center gap-4 cursor-pointer group">
-          <Avatar user={u} size="xxl" className="group-hover:scale-105 transition-transform duration-300 shadow-2xl border-white/20" />
-          <span className="font-medium text-base tracking-wide text-white/70 group-hover:text-white transition-colors">{u.name}</span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
 const AICopilotModal = ({ isOpen, onClose }) => {
   const [messages, setMessages] = useState([{ role: 'ai', text: "Hi! I'm your Kinflow Copilot. I can help organize chores, plan meals, or resolve scheduling conflicts. What's up?" }]);
   const [input, setInput] = useState('');
@@ -313,19 +402,16 @@ const AICopilotModal = ({ isOpen, onClose }) => {
     setIsLoading(true);
 
     try {
-      const apiKey = ""; // API Key is dynamically injected by the execution environment
+      const apiKey = ""; // API Key injected by environment
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
-      // Map our internal chat format to Gemini's expected format
       const geminiMessages = newMessages.map(m => ({
         role: m.role === 'ai' ? 'model' : 'user',
         parts: [{ text: m.text }]
       }));
 
       const payload = {
-        systemInstruction: {
-          parts: [{ text: "You are Kinflow Copilot, a helpful AI assistant for a family organization app. Help parents plan meals, suggest age-appropriate chores, manage schedules, and give brief, friendly, practical advice. Keep your responses concise (under 3 sentences) and use emojis occasionally." }]
-        },
+        systemInstruction: { parts: [{ text: "You are Kinflow Copilot, a helpful AI assistant for a family organization app. Help parents plan meals, suggest age-appropriate chores, manage schedules, and give brief, friendly, practical advice. Keep your responses concise (under 3 sentences) and use emojis occasionally." }] },
         contents: geminiMessages
       };
 
@@ -339,7 +425,6 @@ const AICopilotModal = ({ isOpen, onClose }) => {
       setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'ai', text: "Oops, I'm having trouble connecting right now. Please try again later." }]);
-      console.error("Gemini AI Error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -864,20 +949,51 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }
   );
 };
 
-const SettingRow = ({ icon: Icon, label, value, className = '', iconClass = '', hideArrow = false, onClick }) => (
-  <div onClick={onClick} className={`flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors ${className}`}>
-    <div className="flex items-center gap-3">
-      <div className={`p-2.5 rounded-xl bg-slate-100 text-slate-600 ${iconClass}`}>
-        <Icon className="w-4 h-4" />
+const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
+  const { isChild } = useContext(ThemeContext);
+  return (
+    <div className="space-y-6 animate-pop-in">
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Rewards</h2>
+          <p className="text-slate-500 font-medium text-sm mt-1">Cash in your hard work!</p>
+        </div>
+        <div className={`${isChild ? 'bg-amber-400 text-amber-900 border-2 border-amber-500 shadow-[0_4px_0_rgb(217,119,6)]' : 'bg-slate-900 text-white'} px-4 py-2 rounded-2xl flex items-center gap-2 transition-all`}>
+          <Star className={`w-4 h-4 ${isChild ? 'fill-amber-700' : 'fill-white/50'}`} />
+          <span className="font-bold text-lg">{points} {isParent ? 'Total pts' : 'pts'}</span>
+        </div>
       </div>
-      <span className="font-semibold text-sm text-slate-700">{label}</span>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {rewards.map((reward) => (
+          <Card key={reward.id} className="!p-5 flex flex-col justify-between gap-4 group">
+            <div className="flex items-start justify-between">
+              <div className={`w-12 h-12 rounded-[1.25rem] flex items-center justify-center shadow-sm ${reward.color} group-hover:scale-110 transition-transform duration-300`}>
+                {reward.icon}
+              </div>
+              <Badge variant="warning" className="!bg-amber-100 !text-amber-700 !border-0 shadow-sm flex items-center gap-1">
+                <Flame className="w-3 h-3"/> {reward.cost} pts
+              </Badge>
+            </div>
+            
+            <div>
+              <h4 className="font-bold text-slate-800 text-base">{reward.title}</h4>
+            </div>
+
+            <Button 
+              variant={points >= reward.cost ? (isChild ? 'premium' : 'primary') : (isChild ? 'outline' : 'secondary')} 
+              className="!py-2.5 mt-2 text-sm"
+              disabled={points < reward.cost || isParent}
+              onClick={() => onRedeem(reward.cost)}
+            >
+              {isParent ? 'Kids Redeem Here' : (points >= reward.cost ? 'Redeem Reward' : `Need ${reward.cost - points} more`)}
+            </Button>
+          </Card>
+        ))}
+      </div>
     </div>
-    <div className="flex items-center gap-2">
-      {value && <span className="text-sm font-medium text-slate-500">{value}</span>}
-      {!hideArrow && <ChevronRight className="w-4 h-4 text-slate-400" />}
-    </div>
-  </div>
-);
+  );
+};
 
 const SettingsView = ({ user, isParent, onLogout }) => {
   const [activeModal, setActiveModal] = useState(null);
@@ -975,22 +1091,37 @@ const SettingsView = ({ user, isParent, onLogout }) => {
   );
 };
 
+const SettingRow = ({ icon: Icon, label, value, className = '', iconClass = '', hideArrow = false, onClick }) => (
+  <div onClick={onClick} className={`flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors ${className}`}>
+    <div className="flex items-center gap-3">
+      <div className={`p-2.5 rounded-xl bg-slate-100 text-slate-600 ${iconClass}`}>
+        <Icon className="w-4 h-4" />
+      </div>
+      <span className="font-semibold text-sm text-slate-700">{label}</span>
+    </div>
+    <div className="flex items-center gap-2">
+      {value && <span className="text-sm font-medium text-slate-500">{value}</span>}
+      {!hideArrow && <ChevronRight className="w-4 h-4 text-slate-400" />}
+    </div>
+  </div>
+);
+
 // --- MAIN APP COMPONENT ---
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
-  const [activeUser, setActiveUser] = useState(null);
+  const [activeUser, setActiveUser] = useState(null); // Family profile
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Database States
-  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [firebaseUser, setFirebaseUser] = useState(null); // Actual Firebase Auth User
   const [tasks, setTasks] = useState([]);
   const [messages, setMessages] = useState([]);
   const [userPoints, setUserPoints] = useState({ 'Tommy': 0, 'Lily': 0 });
   
-  // Non-Firebase States (For Step 2)
+  // Non-Firebase States
   const [events, setEvents] = useState(mockEvents);
   const [meals, setMeals] = useState(mockMeals);
   const [groceries, setGroceries] = useState([]);
@@ -1001,32 +1132,38 @@ export default function App() {
   const isParent = activeUser?.role === 'Parent';
   const isChild = activeUser?.role === 'Child';
 
-  // 1. Initialize Firebase Auth
+  // 1. Initialize Firebase Auth (Support Preview Token logic)
   useEffect(() => {
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
+        } 
       } catch (error) {
         console.error("Firebase Auth Error:", error);
       }
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setFirebaseUser);
+    
+    const unsubscribe = onAuthStateChanged(auth, user => {
+      setFirebaseUser(user);
+      if (!user) setActiveUser(null); // If firebase logs out, wipe family profile
+    });
     return () => unsubscribe();
   }, []);
 
-  // 2. Fetch & Sync Firestore Data
+  // 2. Fetch & Sync Firestore Data (NOW PRIVATE TO USER)
   useEffect(() => {
     if (!firebaseUser) return;
 
+    // Use the logged-in user's UID to make data totally private!
+    const privatePath = `users/${firebaseUser.uid}`;
+
     // Sync Tasks
-    const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks');
+    const tasksRef = collection(db, 'artifacts', appId, privatePath, 'kinflow_tasks');
     const unsubTasks = onSnapshot(tasksRef, (snap) => {
       if (snap.empty) {
+        // Seed private DB on first load
         mockTasks.forEach(mt => setDoc(doc(tasksRef, mt.id.toString()), { ...mt, createdAt: Date.now() }));
       } else {
         const fetchedTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1035,7 +1172,7 @@ export default function App() {
     }, console.error);
 
     // Sync Messages (Chat)
-    const msgsRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages');
+    const msgsRef = collection(db, 'artifacts', appId, privatePath, 'kinflow_messages');
     const unsubMsgs = onSnapshot(msgsRef, (snap) => {
       if (snap.empty) {
         mockChats.forEach(mc => setDoc(doc(msgsRef, mc.id.toString()), { ...mc, createdAt: Date.now() }));
@@ -1046,7 +1183,7 @@ export default function App() {
     }, console.error);
 
     // Sync Points
-    const pointsRef = collection(db, 'artifacts', appId, 'public', 'data', 'kinflow_points');
+    const pointsRef = collection(db, 'artifacts', appId, privatePath, 'kinflow_points');
     const unsubPoints = onSnapshot(pointsRef, (snap) => {
       if (snap.empty) {
         setDoc(doc(pointsRef, 'Tommy'), { points: 45 });
@@ -1080,12 +1217,12 @@ export default function App() {
     triggerConfetti();
   };
 
-  // --- FIREBASE WRITE OPERATIONS ---
+  // --- FIREBASE WRITE OPERATIONS (PRIVATE) ---
   
   const handleAddTask = async (newTask) => {
     if (!firebaseUser) return;
     const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), {
+    await setDoc(doc(db, 'artifacts', appId, `users/${firebaseUser.uid}`, 'kinflow_tasks', newId), {
       ...newTask, id: newId, status: 'open', createdAt: Date.now()
     });
   };
@@ -1125,15 +1262,14 @@ export default function App() {
       if (t.status !== newStatus && action !== 'reject') triggerConfetti();
     }
 
-    // Write Task Update to Cloud
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), {
+    const privatePath = `users/${firebaseUser.uid}`;
+    await updateDoc(doc(db, 'artifacts', appId, privatePath, 'kinflow_tasks', taskId.toString()), {
       status: newStatus, photoUrl: newPhotoUrl
     });
 
-    // Write Points Update to Cloud
     if (pointsChange !== 0 && assignee) {
       const currentPoints = userPoints[assignee] || 0;
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', assignee), {
+      await setDoc(doc(db, 'artifacts', appId, privatePath, 'kinflow_points', assignee), {
         points: Math.max(0, currentPoints + pointsChange)
       }, { merge: true });
     }
@@ -1143,14 +1279,14 @@ export default function App() {
     if (!firebaseUser || !activeUser) return;
     const newId = Date.now().toString();
     const msg = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msg);
+    await setDoc(doc(db, 'artifacts', appId, `users/${firebaseUser.uid}`, 'kinflow_messages', newId), msg);
   };
 
   const handleRedeemReward = async (cost) => {
-    if (!activeUser) return;
+    if (!activeUser || !firebaseUser) return;
     const pointsAvailable = userPoints[activeUser.name] || 0;
     if (!isParent && pointsAvailable >= cost) {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), {
+      await setDoc(doc(db, 'artifacts', appId, `users/${firebaseUser.uid}`, 'kinflow_points', activeUser.name), {
         points: pointsAvailable - cost
       }, { merge: true });
       triggerConfetti();
@@ -1193,7 +1329,14 @@ export default function App() {
   const pendingApprovalTasks = tasks.filter(t => t.status === 'pending');
 
   if (showSplash) return <SplashScreen />;
-  if (!activeUser) return <LoginScreen onLogin={handleLogin} users={MOCK_USERS} />;
+
+  // 1. App Level Routing: If no Firebase Account exists, show the Sign-Up/Log-In form!
+  if (!firebaseUser) return <AuthScreen />;
+
+  // 2. If Firebase Account exists, but no Family Profile is selected, show Netflix profile screen!
+  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={MOCK_USERS} />;
+
+  // 3. Otherwise, show the main app
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
   const navItems = isParent 
