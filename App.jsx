@@ -6,13 +6,13 @@ import {
   MoreVertical, Users, BellRing, CreditCard, LogOut,
   ShoppingCart, Loader2, Hourglass, ArrowRight,
   Layers, Wand2, Smartphone, Film, Ticket,
-  MessageCircle, Smile, Image as ImageIcon, Camera
+  MessageCircle, Smile, Image as ImageIcon, Camera, Trash2
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION ---
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
@@ -192,7 +192,6 @@ const AuthScreen = ({ onComplete }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     setIsLoading(true);
-    // Fake login delay for the prototype to transition smoothly
     setTimeout(() => {
       setIsLoading(false);
       onComplete();
@@ -264,10 +263,11 @@ const ProfileSelectorScreen = ({ onLogin, users, onLogout }) => (
 
 // --- MAIN FEATURE SUB-VIEWS ---
 
-const ChatView = ({ messages, onSend }) => {
+const ChatView = ({ messages, onSend, onDelete }) => {
   const { isChild, user } = useContext(ThemeContext);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
+  const isParent = user?.role === 'Parent';
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -292,8 +292,25 @@ const ChatView = ({ messages, onSend }) => {
                 {!isMe && <Avatar user={sender} size="sm" className="shrink-0 mt-1" />}
                 <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
                   {!isMe && <span className="text-[10px] font-bold text-slate-400 ml-1 mb-0.5">{sender?.name}</span>}
-                  <div className={`p-3 text-sm font-medium leading-relaxed shadow-sm ${isMe ? (isChild ? 'bg-sky-500 text-white rounded-2xl rounded-br-sm' : 'bg-slate-800 text-white rounded-2xl rounded-br-sm') : 'bg-slate-100 text-slate-800 rounded-2xl rounded-bl-sm ring-1 ring-slate-900/5'}`}>{msg.text}</div>
-                  <span className="text-[9px] font-bold text-slate-300 mt-1">{msg.time}</span>
+                  
+                  <div className={`p-3 text-sm font-medium leading-relaxed shadow-sm ${isMe ? (isChild ? 'bg-sky-500 text-white rounded-2xl rounded-br-sm' : 'bg-slate-800 text-white rounded-2xl rounded-br-sm') : 'bg-slate-100 text-slate-800 rounded-2xl rounded-bl-sm ring-1 ring-slate-900/5'}`}>
+                    {msg.text}
+                  </div>
+                  
+                  <div className={`flex items-center gap-2 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    {isMe && (
+                      <button onClick={() => onDelete(msg.id)} className="text-slate-300 hover:text-rose-500 p-0.5 rounded transition-colors">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                    <span className="text-[9px] font-bold text-slate-300">{msg.time}</span>
+                    {!isMe && isParent && (
+                      <button onClick={() => onDelete(msg.id)} className="text-slate-300 hover:text-rose-500 p-0.5 rounded transition-colors">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
                 </div>
               </div>
             );
@@ -508,7 +525,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
   );
 };
 
-const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
+const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState('Tommy');
@@ -521,7 +538,6 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
   const [mockPhotoCaptured, setMockPhotoCaptured] = useState(null);
   const [activeTaskForReview, setActiveTaskForReview] = useState(null); 
   
-  // New States & Refs for the Real Camera!
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -566,8 +582,6 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
 
     setIsUploading(true);
     
-    // Smart Compression: We read the file, draw it to a smaller canvas, 
-    // and convert it to a lightweight Base64 string to safely store in Firestore!
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -594,7 +608,6 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
         
-        // Convert to a compressed JPEG string (60% quality)
         const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
         setMockPhotoCaptured(dataUrl);
         setIsUploading(false);
@@ -658,11 +671,16 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 justify-end sm:justify-start">
+              <div className="flex items-center gap-2 sm:gap-3 justify-end sm:justify-start">
                 {isPending && isParent && (
                     <Badge variant="warning" className="!bg-amber-500 !text-white !border-amber-600 animate-pulse !py-1.5 px-3">Tap to Review</Badge>
                 )}
                 <Badge variant={isApproved ? 'default' : isPending ? 'warning' : 'premium'}>+{task.points} pt</Badge>
+                {isParent && (
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(task.id); }} className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors ml-1">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </Card>
           )
@@ -716,7 +734,6 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
         </form>
       </Modal>
 
-      {/* Child View: Snap a Photo Modal */}
       <Modal isOpen={!!activeTaskForPhoto} onClose={() => setActiveTaskForPhoto(null)} title="Submit Proof">
         {!mockPhotoCaptured ? (
           <div className="space-y-4">
@@ -725,7 +742,6 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
               <p className="font-bold text-sm text-slate-500">Frame your work clearly!</p>
             </div>
             
-            {/* Hidden actual file input that triggers the native device camera */}
             <input 
               type="file" 
               accept="image/*" 
@@ -755,7 +771,6 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
         )}
       </Modal>
 
-      {/* Parent View: Review Submitted Photo Modal */}
       <Modal isOpen={!!activeTaskForReview} onClose={() => setActiveTaskForReview(null)} title="Review Work">
         {activeTaskForReview && (
           <div className="space-y-4">
@@ -772,12 +787,11 @@ const TasksView = ({ tasks, onAction, onAdd, activeUser, isParent }) => {
           </div>
         )}
       </Modal>
-
     </div>
   );
 };
 
-const CalendarView = ({ events, onAdd, isParent }) => {
+const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
@@ -822,8 +836,13 @@ const CalendarView = ({ events, onAdd, isParent }) => {
               <Clock className="w-4 h-4 currentColor" />
             </div>
             <Card className="w-[calc(100%-3rem)] md:w-[calc(50%-2.5rem)] !p-4 !rounded-[1.5rem]">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center justify-between mb-1">
                 <Badge variant="default" className="!bg-slate-50">{event.time}</Badge>
+                {isParent && (
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(event.id); }} className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
               <p className="font-semibold text-slate-800 text-base">{event.title}</p>
               <p className="text-xs font-medium text-slate-500 flex items-center gap-1 mt-2">
@@ -857,7 +876,7 @@ const CalendarView = ({ events, onAdd, isParent }) => {
   );
 };
 
-const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }) => {
+const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setGroceries }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -942,7 +961,17 @@ const MealsView = ({ meals, onAdd, onUpdate, isParent, groceries, setGroceries }
             <div className="flex gap-2"><Badge variant="premium">{selectedMeal.day}</Badge><Badge variant="default">{selectedMeal.prepTime}</Badge></div>
             <div className="bg-slate-50 p-4 rounded-2xl ring-1 ring-slate-900/5"><h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><Utensils className="w-4 h-4"/> Ingredients</h4><ul className="list-disc pl-5 text-sm text-slate-600 space-y-1">{(selectedMeal.ingredients || "").split('\n').map((item, i) => <li key={i}>{item}</li>)}</ul></div>
             <div className="bg-slate-50 p-4 rounded-2xl ring-1 ring-slate-900/5"><h4 className="font-bold text-slate-800 mb-2">Instructions</h4><ol className="list-decimal pl-5 text-sm text-slate-600 space-y-2">{(selectedMeal.instructions || "").split('\n').map((item, i) => <li key={i}>{item}</li>)}</ol></div>
-            <div className="flex gap-3"><Button onClick={closeMealModal} variant="secondary" className="flex-1">Close</Button>{isParent && <Button onClick={handleEditClick} className="flex-1">Edit Plan</Button>}</div>
+            <div className="flex gap-3">
+              <Button onClick={closeMealModal} variant="secondary" className="flex-1">Close</Button>
+              {isParent && (
+                <>
+                  <Button onClick={handleEditClick} className="flex-1">Edit Plan</Button>
+                  <Button onClick={() => { closeMealModal(); onDelete(selectedMeal.id); }} variant="secondary" className="!w-auto !px-4 !bg-rose-50 !text-rose-500 !border-rose-200 hover:!bg-rose-100">
+                    <Trash2 className="w-5 h-5" />
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         )}
         {selectedMeal && isEditing && (
@@ -1150,6 +1179,9 @@ export default function App() {
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Controls fake auth gate
+  
+  // Generic Confirmation Modal State
+  const [confirmActionState, setConfirmActionState] = useState(null);
 
   // Database States
   const [firebaseUser, setFirebaseUser] = useState(null); // Actual Firebase Auth User
@@ -1168,7 +1200,7 @@ export default function App() {
   const isParent = activeUser?.role === 'Parent';
   const isChild = activeUser?.role === 'Child';
 
-  // 1. Initialize Firebase Auth (Support Preview Token logic)
+  // 1. Initialize Firebase Auth
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -1189,20 +1221,16 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Fetch & Sync Firestore Data (USING PUBLIC SO MULTIPLE INCOGNITO WINDOWS SYNC MAGICALLY)
+  // 2. Fetch & Sync Firestore Data
   useEffect(() => {
     if (!firebaseUser) return;
 
-    // We use the "public/data" paths so that when you test in incognito mode (which creates a new UID), 
-    // the data still syncs seamlessly across the screens for testing purposes!
     const dataPath = 'public';
     const collPath = 'data';
 
-    // Sync Tasks
     const tasksRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_tasks');
     const unsubTasks = onSnapshot(tasksRef, (snap) => {
       if (snap.empty) {
-        // Seed private DB on first load
         mockTasks.forEach(mt => setDoc(doc(tasksRef, mt.id.toString()), { ...mt, createdAt: Date.now() }));
       } else {
         const fetchedTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1210,7 +1238,6 @@ export default function App() {
       }
     }, console.error);
 
-    // Sync Messages (Chat)
     const msgsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_messages');
     const unsubMsgs = onSnapshot(msgsRef, (snap) => {
       if (snap.empty) {
@@ -1221,7 +1248,6 @@ export default function App() {
       }
     }, console.error);
 
-    // Sync Points
     const pointsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_points');
     const unsubPoints = onSnapshot(pointsRef, (snap) => {
       if (snap.empty) {
@@ -1234,7 +1260,6 @@ export default function App() {
       }
     }, console.error);
 
-    // Sync Events
     const eventsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_events');
     const unsubEvents = onSnapshot(eventsRef, (snap) => {
       if (snap.empty) {
@@ -1245,7 +1270,6 @@ export default function App() {
       }
     }, console.error);
 
-    // Sync Meals
     const mealsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_meals');
     const unsubMeals = onSnapshot(mealsRef, (snap) => {
       if (snap.empty) {
@@ -1278,13 +1302,24 @@ export default function App() {
     triggerConfetti();
   };
 
-  // --- FIREBASE WRITE OPERATIONS ---
+  // --- FIREBASE WRITE & DELETE OPERATIONS ---
   
   const handleAddTask = async (newTask) => {
     if (!firebaseUser) return;
     const newId = Date.now().toString();
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), {
       ...newTask, id: newId, status: 'open', createdAt: Date.now()
+    });
+  };
+
+  const requestDeleteTask = (id) => {
+    setConfirmActionState({
+      title: 'Delete Task',
+      message: 'Are you sure you want to permanently remove this chore?',
+      onConfirm: async () => {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()));
+        setConfirmActionState(null);
+      }
     });
   };
 
@@ -1342,6 +1377,17 @@ export default function App() {
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msg);
   };
 
+  const requestDeleteMessage = (id) => {
+    setConfirmActionState({
+      title: 'Delete Message',
+      message: 'Remove this message for everyone in the family?',
+      onConfirm: async () => {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', id.toString()));
+        setConfirmActionState(null);
+      }
+    });
+  };
+
   const handleRedeemReward = async (cost) => {
     if (!activeUser || !firebaseUser) return;
     const pointsAvailable = userPoints[activeUser.name] || 0;
@@ -1363,6 +1409,17 @@ export default function App() {
     });
   };
 
+  const requestDeleteEvent = (id) => {
+    setConfirmActionState({
+      title: 'Delete Event',
+      message: 'Are you sure you want to remove this event from the calendar?',
+      onConfirm: async () => {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()));
+        setConfirmActionState(null);
+      }
+    });
+  };
+
   const handleAddMeal = async (newMeal) => {
     if (!firebaseUser) return;
     const newId = Date.now().toString();
@@ -1374,6 +1431,17 @@ export default function App() {
   const handleUpdateMeal = async (updatedMeal) => {
     if (!firebaseUser) return;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', updatedMeal.id.toString()), updatedMeal);
+  };
+
+  const requestDeleteMeal = (id) => {
+    setConfirmActionState({
+      title: 'Delete Recipe',
+      message: 'Are you sure you want to permanently delete this recipe?',
+      onConfirm: async () => {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()));
+        setConfirmActionState(null);
+      }
+    });
   };
 
   const triggerConfetti = () => {
@@ -1388,15 +1456,15 @@ export default function App() {
       case 'home':
         return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
       case 'tasks':
-        return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} activeUser={activeUser} isParent={isParent} />;
+        return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
       case 'calendar':
-        return <CalendarView events={events} onAdd={handleAddEvent} isParent={isParent} />;
+        return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} />;
       case 'meals':
-        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
+        return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
       case 'rewards':
         return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
       case 'chat':
-        return <ChatView messages={messages} onSend={handleSendMessage} />;
+        return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} />;
       case 'settings':
         return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); }} />;
       default:
@@ -1464,6 +1532,17 @@ export default function App() {
 
           {renderContent()}
         </main>
+
+        {/* Global Confirmation Modal */}
+        <Modal isOpen={!!confirmActionState} onClose={() => setConfirmActionState(null)} title={confirmActionState?.title || "Confirm"}>
+          <div className="space-y-4">
+            <p className="text-slate-600 font-medium">{confirmActionState?.message}</p>
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={() => setConfirmActionState(null)} className="flex-1">Cancel</Button>
+              <Button variant="primary" onClick={confirmActionState?.onConfirm} className="flex-1 !bg-rose-500 hover:!bg-rose-600 !shadow-none !border-rose-600">Delete</Button>
+            </div>
+          </div>
+        </Modal>
 
         {isParent && (
           <button onClick={() => setIsCopilotOpen(true)} className="fixed bottom-24 right-4 sm:right-8 z-40 bg-white/95 backdrop-blur-xl text-indigo-600 p-3.5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] ring-1 ring-slate-900/5 hover:scale-105 active:scale-95 transition-all group flex items-center justify-center">
