@@ -1,10 +1,12 @@
-import React, { useContext } from 'react';
-import { Star, Gift, Flame } from 'lucide-react';
+import React, { useContext, useState } from 'react';
+import { Star, Gift, Flame, Trash2 } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
-import { Card, Button, Badge, RevealCard } from '../components/shared/Primitives';
+import { Card, Button, Badge, RevealCard, Modal } from '../components/shared/Primitives';
 
-export const RewardsView = ({ rewards, points, onRedeem, isParent, lastRedeemed }) => {
+export const RewardsView = ({ rewards, setRewards, points, onRedeem, isParent, lastRedeemed }) => {
   const { isChild } = useContext(ThemeContext);
+  const [selectedReward, setSelectedReward] = useState(null);
+  const [editReward, setEditReward] = useState(null);
   const nextReward = rewards?.filter(r => r.cost > points).sort((a,b) => a.cost - b.cost)[0];
   const progress = nextReward ? Math.min(100, (points / nextReward.cost) * 100) : 100;
 
@@ -54,7 +56,7 @@ export const RewardsView = ({ rewards, points, onRedeem, isParent, lastRedeemed 
           const canAfford = points >= reward.cost;
           return (
             <RevealCard key={reward.id} delay={idx * 60}>
-              <div className={`bg-white rounded-3xl p-5 shadow-sm ring-1 transition-all ${canAfford && !isParent ? 'ring-amber-300 shadow-amber-100' : 'ring-black/5'}`}>
+              <div onClick={() => { setSelectedReward(reward); setEditReward({ ...reward }); }} className={`bg-white rounded-3xl p-5 shadow-sm ring-1 transition-all cursor-pointer ${canAfford && !isParent ? 'ring-amber-300 shadow-amber-100' : 'ring-black/5'}`}>
                 <div className="flex items-center gap-4">
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${reward.color} ${canAfford ? 'shadow-lg' : ''}`}>
                     {reward.icon}
@@ -69,7 +71,7 @@ export const RewardsView = ({ rewards, points, onRedeem, isParent, lastRedeemed 
                   </div>
                   <button
                     disabled={points < reward.cost || isParent}
-                    onClick={() => onRedeem(reward.cost, reward.title)}
+                    onClick={(e) => { e.stopPropagation(); onRedeem(reward.cost, reward.title); }}
                     className={`spring-press shrink-0 px-4 py-2.5 rounded-2xl font-bold text-sm transition-all ${
                       isParent ? 'bg-slate-100 text-slate-400 cursor-not-allowed' :
                       canAfford ? 'bg-amber-400 text-amber-900 shadow-md shadow-amber-400/30 hover:bg-amber-300' :
@@ -84,6 +86,28 @@ export const RewardsView = ({ rewards, points, onRedeem, isParent, lastRedeemed 
           );
         })}
       </div>
+      <Modal isOpen={!!selectedReward} onClose={() => setSelectedReward(null)} title="Reward Details">
+        {selectedReward && (
+          <div className="space-y-3">
+            <div className="bg-slate-50 p-4 rounded-2xl ring-1 ring-slate-200">
+              <p className="font-bold text-slate-900">{selectedReward.title}</p>
+              <p className="text-xs text-slate-500 font-semibold mt-1">Cost: {selectedReward.cost} points</p>
+            </div>
+            {isParent ? (
+              <div className="space-y-2">
+                <input value={editReward.title} onChange={(e) => setEditReward({ ...editReward, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+                <input type="number" value={editReward.cost} onChange={(e) => setEditReward({ ...editReward, cost: parseInt(e.target.value || '0', 10) })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+                <div className="flex gap-2">
+                  <Button className="flex-1" onClick={() => { setRewards(rewards.map(r => r.id === editReward.id ? editReward : r)); setSelectedReward(editReward); }}>Save</Button>
+                  <Button variant="secondary" className="!bg-rose-50 !text-rose-600 !border-rose-200" onClick={() => { setRewards(rewards.filter(r => r.id !== selectedReward.id)); setSelectedReward(null); }}><Trash2 className="w-4 h-4" /></Button>
+                </div>
+              </div>
+            ) : (
+              <Button onClick={() => setSelectedReward(null)}>Close</Button>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
