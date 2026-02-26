@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { CheckSquare, Calendar as CalendarIcon, Star, ChefHat, ArrowRight, Clock, MapPin } from 'lucide-react';
+import { CheckSquare, Calendar as CalendarIcon, Star, ChefHat, ArrowRight, Clock, MapPin, Bell, Gift, ChevronRight, MessageCircle } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
 import { Card, Badge, Avatar, RevealCard } from '../components/shared/Primitives';
 
@@ -128,4 +128,3 @@ export const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavig
     </div>
   );
 };
-
