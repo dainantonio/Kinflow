@@ -2,17 +2,17 @@ import React from 'react';
 import { Smartphone, Film, Ticket } from 'lucide-react';
 
 export const MOCK_USERS = [
-  { id: 'p1', name: "Sarah", role: "Parent", initials: "S", color: "from-pink-500 to-rose-500" },
-  { id: 'p2', name: "Dad", role: "Parent", initials: "D", color: "from-blue-500 to-cyan-500" },
-  { id: 'c1', name: "Tommy", role: "Child", initials: "T", color: "from-emerald-400 to-teal-500" },
-  { id: 'c2', name: "Lily", role: "Child", initials: "L", color: "from-purple-500 to-indigo-500" }
+  { id: 'p1', name: "Mom", role: "Parent", initials: "M", color: "from-pink-500 to-rose-500", avatar: "👩🏾" },
+  { id: 'p2', name: "Dad", role: "Parent", initials: "D", color: "from-blue-500 to-cyan-500", avatar: "👨🏾" },
+  { id: 'c1', name: "Jayden", role: "Child", initials: "J", color: "from-emerald-400 to-teal-500", avatar: "👦🏾" },
+  { id: 'c2', name: "Zara", role: "Child", initials: "Z", color: "from-purple-500 to-indigo-500", avatar: "👧🏾" }
 ];
 
 export const mockTasks = [
-  { id: 1, title: "Empty Dishwasher", assignee: "Tommy", points: 10, status: 'open', requiresPhoto: false },
-  { id: 4, title: "Clean Bedroom", assignee: "Tommy", points: 25, status: 'open', requiresPhoto: true },
-  { id: 2, title: "Walk the Dog", assignee: "Sarah", points: 20, status: 'approved', requiresPhoto: false },
-  { id: 3, title: "Finish Math Homework", assignee: "Lily", points: 15, status: 'pending', requiresPhoto: true, photoUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=400&q=80" },
+  { id: 1, title: "Empty Dishwasher", assignee: "Jayden", points: 10, status: 'open', requiresPhoto: false },
+  { id: 4, title: "Clean Bedroom", assignee: "Jayden", points: 25, status: 'open', requiresPhoto: true },
+  { id: 2, title: "Walk the Dog", assignee: "Mom", points: 20, status: 'approved', requiresPhoto: false },
+  { id: 3, title: "Finish Math Homework", assignee: "Zara", points: 15, status: 'pending', requiresPhoto: true, photoUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=400&q=80" },
 ];
 
 export const mockChats = [
@@ -21,7 +21,7 @@ export const mockChats = [
 ];
 
 export const mockEvents = [
-  { id: 1, title: "Tommy's Soccer Practice", time: "4:00 PM - 5:30 PM", location: "City Park", color: "bg-emerald-500" },
+  { id: 1, title: "Jayden's Soccer Practice", time: "4:00 PM - 5:30 PM", location: "City Park", color: "bg-emerald-500" },
   { id: 2, title: "Family Dinner", time: "6:30 PM", location: "Home", color: "bg-indigo-500" }
 ];
 

@@ -78,8 +78,12 @@ export const CustomStyles = () => (
       .spring-press:active { transform: scale(0.93); }
 
       .scroll-reveal { opacity: 1; transform: translateY(0); transition: opacity 0.4s ease, transform 0.4s ease; }
-      .scroll-reveal.animate-in { opacity: 0; transform: translateY(16px); }
+      .scroll-reveal.animate-in { opacity: 0; transform: translateY(8px); }
       .scroll-reveal.animate-in.revealed { opacity: 1; transform: translateY(0); }
+      /* Ensure content always appears even if JS is delayed */
+      @media (prefers-reduced-motion: reduce) {
+        .scroll-reveal, .scroll-reveal.animate-in { opacity: 1 !important; transform: none !important; transition: none !important; }
+      }
 
       .pb-safe { padding-bottom: max(env(safe-area-inset-bottom, 16px), 16px); }
       .pt-safe { padding-top: max(env(safe-area-inset-top, 0px), 0px); }

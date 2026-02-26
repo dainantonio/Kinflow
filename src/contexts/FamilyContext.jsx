@@ -6,6 +6,22 @@ import {
 } from '../utils/firebase';
 import { mockTasks, mockChats, mockEvents, mockMeals, MOCK_USERS } from '../utils/demoData';
 
+export const AVATAR_OPTIONS = {
+  parent_female: ['👩🏾', '👩🏿', '👩🏽', '👩🏼', '👩🏻', '👩'],
+  parent_male: ['👨🏾', '👨🏿', '👨🏽', '👨🏼', '👨🏻', '👨'],
+  child_girl: ['👧🏾', '👧🏿', '👧🏽', '👧🏼', '👧🏻', '👧'],
+  child_boy: ['👦🏾', '👦🏿', '👦🏽', '👦🏼', '👦🏻', '👦'],
+};
+
+export const ALL_AVATARS = [
+  '👩🏾', '👨🏾', '👧🏾', '👦🏾',
+  '👩🏿', '👨🏿', '👧🏿', '👦🏿',
+  '👩🏽', '👨🏽', '👧🏽', '👦🏽',
+  '👩🏼', '👨🏼', '👧🏼', '👦🏼',
+  '👩🏻', '👨🏻', '👧🏻', '👦🏻',
+  '🧑🏾', '🧒🏾', '👸🏾', '🤴🏾',
+];
+
 // --- THEME CONTEXT ---
 export const ThemeContext = createContext({ isChild: false, user: null });
 
@@ -45,7 +61,7 @@ export const FamilyProvider = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [userPoints, setUserPoints] = useState({ 'Tommy': 0, 'Lily': 0 });
+  const [userPoints, setUserPoints] = useState({});
   const [events, setEvents] = useState([]);
   const [meals, setMeals] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -108,7 +124,11 @@ export const FamilyProvider = ({ children }) => {
     if (DEMO_MODE) {
       setTasks(mockTasks.map(t => ({...t, id: t.id.toString(), createdAt: Date.now()})));
       setMessages(mockChats.map(c => ({...c, id: c.id.toString(), createdAt: Date.now()})));
-      setUserPoints({'Tommy': 45, 'Lily': 30});
+      const initPoints = {};
+      familyMembers.forEach(m => {
+        initPoints[m.name] = m.role === 'Child' ? (m.name === familyMembers.find(x => x.role === 'Child')?.name ? 45 : 30) : 0;
+      });
+      setUserPoints(initPoints);
       setEvents(mockEvents.map(e => ({...e, id: e.id.toString(), createdAt: Date.now()})));
       setMeals(mockMeals.map(m => ({...m, id: m.id.toString(), createdAt: Date.now()})));
       // familyMembers already initialized from localStorage or MOCK_USERS
@@ -132,10 +152,11 @@ export const FamilyProvider = ({ children }) => {
     const pointsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_points');
     const unsubPoints = onSnapshot(pointsRef, (snap) => {
       if (snap.empty) {
-        setDoc(doc(pointsRef, 'Tommy'), { points: 45 });
-        setDoc(doc(pointsRef, 'Lily'), { points: 30 });
+        familyMembers.filter(m => m.role === 'Child').forEach((m, i) => {
+          setDoc(doc(pointsRef, m.name), { points: i === 0 ? 45 : 30 });
+        });
       } else {
-        let p = { 'Tommy': 0, 'Lily': 0 };
+        let p = {};
         snap.docs.forEach(d => { p[d.id] = d.data().points; });
         setUserPoints(p);
       }

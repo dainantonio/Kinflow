@@ -80,9 +80,10 @@ export const Badge = ({ children, variant = 'default', className = '' }) => {
 export const Avatar = ({ user, size = 'md', className = '' }) => {
   if (!user) return null;
   const sizes = { sm: 'w-8 h-8 text-sm', md: 'w-10 h-10 text-base', lg: 'w-14 h-14 text-2xl', xl: 'w-20 h-20 text-4xl', xxl: 'w-24 h-24 text-4xl' };
+  const emojiSizes = { sm: 'text-lg', md: 'text-xl', lg: 'text-3xl', xl: 'text-5xl', xxl: 'text-6xl' };
   return (
-    <div className={`flex items-center justify-center rounded-full bg-gradient-to-br ${user.color} text-white font-bold shadow-inner ring-2 ring-white/20 ${sizes[size]} ${className}`}>
-      {user.initials}
+    <div className={`flex items-center justify-center rounded-full bg-gradient-to-br ${user.color || 'from-slate-400 to-slate-500'} text-white font-bold shadow-inner ring-2 ring-white/20 ${sizes[size]} ${className}`}>
+      {user.avatar ? <span className={emojiSizes[size]}>{user.avatar}</span> : user.initials}
     </div>
   );
 };
@@ -152,11 +153,11 @@ export const NavItem = ({ icon: Icon, label, isActive, isChild, onClick }) => {
 };
 
 const SETTING_ROW_COLORS = ['bg-indigo-100 text-indigo-600', 'bg-emerald-100 text-emerald-600', 'bg-amber-100 text-amber-600', 'bg-rose-100 text-rose-600', 'bg-blue-100 text-blue-600', 'bg-violet-100 text-violet-600'];
-let _settingRowIndex = 0;
 
 export const SettingRow = ({ icon: Icon, label, value, className = '', iconClass = '', hideArrow = false, onClick }) => {
-  const colorClass = SETTING_ROW_COLORS[_settingRowIndex % SETTING_ROW_COLORS.length];
-  _settingRowIndex++;
+  // Deterministic color based on label to avoid mutable global counter
+  const hash = (label || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const colorClass = SETTING_ROW_COLORS[hash % SETTING_ROW_COLORS.length];
   return (
     <div onClick={onClick} className={`spring-press flex items-center justify-between p-3.5 hover:bg-slate-50 cursor-pointer transition-colors ${className}`}>
       <div className="flex items-center gap-3">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Layers, Plus } from 'lucide-react';
 import { Avatar } from '../components/shared/Primitives';
+import { ALL_AVATARS } from '../contexts/FamilyContext';
 
 const COLOR_OPTIONS = [
   'from-pink-500 to-rose-500',
@@ -16,10 +17,11 @@ export const ProfileSelectorScreen = ({ onLogin, users, onLogout, onAddMember })
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState('Child');
   const [newColor, setNewColor] = useState(COLOR_OPTIONS[0]);
+  const [newAvatar, setNewAvatar] = useState('👦🏾');
 
   const handleAddMember = () => {
     if (onAddMember && newName.trim()) {
-      onAddMember({ name: newName.trim(), role: newRole, color: newColor });
+      onAddMember({ name: newName.trim(), role: newRole, color: newColor, avatar: newAvatar });
       setNewName('');
       setNewRole('Child');
       setNewColor(COLOR_OPTIONS[0]);
@@ -84,6 +86,20 @@ export const ProfileSelectorScreen = ({ onLogin, users, onLogout, onAddMember })
             <option value="Parent">Parent</option>
             <option value="Child">Child</option>
           </select>
+          <div>
+            <p className="text-white/50 text-xs font-semibold mb-2">Choose Avatar</p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {ALL_AVATARS.slice(0, 12).map(emoji => (
+                <button
+                  key={emoji}
+                  onClick={() => setNewAvatar(emoji)}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-2xl transition-all ${newAvatar === emoji ? 'bg-white/20 ring-2 ring-white scale-110' : 'bg-white/5 hover:bg-white/10'}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex gap-2 justify-center">
             {COLOR_OPTIONS.map(color => (
               <button
