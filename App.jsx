@@ -166,26 +166,6 @@ const CustomStyles = () => (
   </style>
 );
 
-// --- SCROLL REVEAL HOOK ---
-const useScrollReveal = () => {
-  const ref = useRef(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { el.classList.add('revealed'); observer.disconnect(); } },
-      { threshold: 0.1, rootMargin: '0px 0px -30px 0px' }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  return ref;
-};
-
-const RevealCard = ({ children, delay = 0 }) => {
-  const ref = useScrollReveal();
-  return <div ref={ref} className="scroll-reveal" style={{transitionDelay:`${delay}ms`}}>{children}</div>;
-};
 
 // --- REUSABLE UI PRIMITIVES ---
 const Card = ({ children, className = '', onClick }) => {
