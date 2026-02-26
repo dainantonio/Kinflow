@@ -6,7 +6,7 @@ import {
   MoreVertical, Users, BellRing, CreditCard, LogOut,
   ShoppingCart, Loader2, Hourglass, ArrowRight,
   Layers, Wand2, Smartphone, Film, Ticket,
-  MessageCircle, Smile, Image as ImageIcon, Camera, Trash2, ChevronLeft
+  MessageCircle, Smile, Image as ImageIcon, Camera, Trash2, ChevronLeft, UserCircle
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -56,7 +56,7 @@ const useScrollReveal = () => {
     el.classList.add('revealed');
     const observer = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) { el.classList.add('revealed'); observer.disconnect(); } },
-      { threshold: 0.05, rootMargin: '60px 0px 0px 0px' }
+      { threshold: 0, rootMargin: '0px 0px -30px 0px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -66,7 +66,7 @@ const useScrollReveal = () => {
 
 const RevealCard = ({ children, delay = 0 }) => {
   const ref = useScrollReveal();
-  return <div ref={ref} className="scroll-reveal" style={{transitionDelay:`${delay}ms`}}>{children}</div>;
+  return <div ref={ref} className="scroll-reveal animate-in" style={{transitionDelay:`${delay}ms`}}>{children}</div>;
 };
 
 // --- CUSTOM STYLES & KEYFRAMES ---
@@ -147,15 +147,9 @@ const CustomStyles = () => (
       }
       .spring-press:active { transform: scale(0.93); }
 
-      .scroll-reveal {
-        opacity: 0;
-        transform: translateY(16px);
-        transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      .scroll-reveal.revealed {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      .scroll-reveal { opacity: 1; transform: translateY(0); transition: opacity 0.4s ease, transform 0.4s ease; }
+      .scroll-reveal.animate-in { opacity: 0; transform: translateY(16px); }
+      .scroll-reveal.animate-in.revealed { opacity: 1; transform: translateY(0); }
 
       .pb-safe { padding-bottom: max(env(safe-area-inset-bottom, 16px), 16px); }
 
@@ -164,20 +158,6 @@ const CustomStyles = () => (
         -webkit-overflow-scrolling: touch;
         overscroll-behavior-y: contain;
         scroll-behavior: smooth;
-      }
-      
-      /* Ensure revealed state by default (animation bonus, not gating) */
-      .scroll-reveal {
-        opacity: 1 !important;
-        transform: translateY(0) !important;
-      }
-      .scroll-reveal.animate-on-scroll {
-        opacity: 0;
-        transform: translateY(16px);
-      }
-      .scroll-reveal.animate-on-scroll.revealed {
-        opacity: 1;
-        transform: translateY(0);
       }
 
       .shimmer-bg {
@@ -257,9 +237,9 @@ const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
   const { isChild } = useContext(ThemeContext);
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-900/50 backdrop-blur-md" onClick={onClose} style={{WebkitBackdropFilter:'blur(8px)'}}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-900/75" onClick={onClose} style={{backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
       <div
-        className={`${isChild ? 'bg-white rounded-t-[2rem] sm:rounded-[2rem] border-t-8 border-white/50' : 'bg-white/98 backdrop-blur-3xl rounded-t-[2rem] sm:rounded-[2rem]'} w-full max-w-md max-h-[92vh] flex flex-col shadow-2xl ring-1 ring-black/5 relative animate-slide-up cursor-default overflow-hidden`}
+        className={`${isChild ? 'bg-white rounded-t-[2rem] sm:rounded-[2rem] border-t-8 border-indigo-100' : 'bg-white rounded-t-[2rem] sm:rounded-[2rem]'} w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl ring-1 ring-black/8 relative animate-slide-up cursor-default overflow-hidden`}
         style={{transformOrigin:'bottom center'}}
         onClick={e => e.stopPropagation()}
       >
@@ -273,7 +253,7 @@ const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
           </div>
         </div>
 
-        <div className={`px-5 pb-6 overflow-y-auto no-scrollbar relative ${fullHeight ? 'flex-1 h-[60vh]' : ''}`}>
+        <div className={`px-5 pb-6 overflow-y-auto relative ${fullHeight ? 'flex-1 h-[60vh]' : ''}`}>
           {children}
         </div>
       </div>
@@ -1288,7 +1268,7 @@ const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setG
         )}
         {meals.map((meal, idx) => (
           <RevealCard key={meal.id} delay={idx * 60}>
-            <div onClick={() => setSelectedMeal(meal)} className="spring-press bg-white rounded-3xl overflow-hidden shadow-sm ring-1 ring-black/5 cursor-pointer group">
+            <div onClick={() => setSelectedMeal(meal)} className="spring-press bg-white rounded-3xl overflow-hidden shadow-md ring-1 ring-slate-900/6 cursor-pointer group transition-all active:scale-[0.98]">
               {/* Gradient banner */}
               <div className="h-20 relative flex items-center justify-center" style={{background:'linear-gradient(135deg, #f97316 0%, #ea580c 50%, #dc2626 100%)'}}>
                 <div className="absolute inset-0 opacity-10" style={{backgroundImage:'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize:'16px 16px'}} />
@@ -1900,13 +1880,13 @@ const NavItem = ({ icon: Icon, label, isActive, isChild, onClick }) => {
   return (
     <button
       onClick={handleTap}
-      className="flex flex-col items-center justify-center flex-1 py-3 gap-0.5 relative spring-press group"
+      className={`flex flex-col items-center justify-center flex-1 ${isChild ? 'px-3' : 'px-2'} py-2 gap-0.5 relative spring-press group`}
       style={{WebkitTapHighlightColor:'transparent'}}
     >
       <div className={`${bouncing ? 'animate-nav-bounce' : ''} ${isActive ? activeColor : 'text-slate-400'} transition-colors duration-200`}>
         <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
       </div>
-      <span className={`text-[9px] font-bold tracking-wide ${isActive ? activeColor : 'text-slate-400'} transition-colors`}>{label}</span>
+      <span className={`${isChild ? 'text-[10px]' : 'text-[9px]'} font-bold tracking-wide ${isActive ? activeColor : 'text-slate-400'} transition-colors`}>{label}</span>
       {isActive && <div className={`absolute bottom-1.5 w-1 h-1 ${dotColor} rounded-full`} />}
     </button>
   );
@@ -2258,14 +2238,14 @@ export default function App() {
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
   const navItems = isParent 
-    ? [{ id: 'home', icon: Home, label: 'Today' }, { id: 'tasks', icon: CheckSquare, label: 'Tasks' }, { id: 'calendar', icon: CalendarIcon, label: 'Plan' }, { id: 'meals', icon: ChefHat, label: 'Meals' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }]
-    : [{ id: 'home', icon: Home, label: 'Home' }, { id: 'tasks', icon: CheckSquare, label: 'Chores' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }];
+    ? [{ id: 'home', icon: Home, label: 'Today' }, { id: 'tasks', icon: CheckSquare, label: 'Tasks' }, { id: 'calendar', icon: CalendarIcon, label: 'Plan' }, { id: 'meals', icon: ChefHat, label: 'Meals' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }]
+    : [{ id: 'home', icon: Home, label: 'Home' }, { id: 'tasks', icon: CheckSquare, label: 'Chores' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }];
 
   const appBgClass = isChild ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' : 'bg-slate-50 text-slate-800';
 
   return (
     <ThemeContext.Provider value={{ isChild, user: activeUser }}>
-      <div className={`min-h-screen font-sans flex flex-col relative overflow-hidden transition-colors duration-500 ${appBgClass}`}>
+      <div className={`min-h-screen font-sans flex flex-col relative transition-colors duration-500 ${appBgClass}`}>
         <CustomStyles />
         <Confetti active={showConfetti} />
 
@@ -2312,7 +2292,7 @@ export default function App() {
         </div>
 
         {/* SCROLLABLE CONTENT */}
-        <div className="flex-1 overflow-y-auto no-scrollbar" style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain'}}>
+        <div className="flex-1 overflow-y-auto" style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', minHeight:0}}>
           <div className="px-4 pt-3 pb-36 max-w-lg mx-auto w-full">
             {renderContent()}
           </div>
