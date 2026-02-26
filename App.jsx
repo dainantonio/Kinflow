@@ -814,12 +814,15 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
   const [assignee, setAssignee] = useState('Tommy');
   const [taskPoints, setTaskPoints] = useState(10);
   const [requiresPhoto, setRequiresPhoto] = useState(false);
+  const [dueDate, setDueDate] = useState('');
 
   const { isChild } = useContext(ThemeContext);
 
   const [activeTaskForPhoto, setActiveTaskForPhoto] = useState(null); 
   const [mockPhotoCaptured, setMockPhotoCaptured] = useState(null);
-  const [activeTaskForReview, setActiveTaskForReview] = useState(null); 
+  const [activeTaskForReview, setActiveTaskForReview] = useState(null);
+  const [rejectFeedback, setRejectFeedback] = useState('');
+  const [showRejectModal, setShowRejectModal] = useState(null); 
   
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -829,9 +832,10 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
   const handleSubmitNewTask = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd({ title, assignee, points: parseInt(taskPoints), requiresPhoto });
+    onAdd({ title, assignee, points: parseInt(taskPoints), requiresPhoto, dueDate: dueDate || null });
     setTitle('');
     setRequiresPhoto(false);
+    setDueDate('');
     setIsModalOpen(false);
   };
 
@@ -839,7 +843,7 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
     if (isParent) {
       if (task.status === 'pending') {
         if (task.requiresPhoto && task.photoUrl) setActiveTaskForReview(task);
-        else onAction(task.id, 'approve');
+        else setActiveTaskForReview(task);  // Show review modal for all pending tasks
       } else {
         onAction(task.id, 'toggle_simple');
       }
@@ -924,14 +928,48 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
         </div>
       </RevealCard>
 
+      {/* APPROVAL QUEUE (parents only) */}
+      {isParent && visibleTasks.filter(t => t.status === 'pending').length > 0 && (
+        <RevealCard delay={40}>
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 bg-amber-400 rounded-xl flex items-center justify-center">
+                <Hourglass className="w-3.5 h-3.5 text-white" />
+              </div>
+              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Needs Your Approval</h3>
+              <span className="ml-auto text-xs font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full">{visibleTasks.filter(t => t.status === 'pending').length}</span>
+            </div>
+            <div className="space-y-2">
+              {visibleTasks.filter(t => t.status === 'pending').map((task, idx) => {
+                return (
+                  <div key={task.id} onClick={() => handleTaskClick(task)} className="spring-press bg-amber-50 rounded-2xl p-4 ring-1 ring-amber-200 flex items-center gap-3 cursor-pointer transition-all hover:ring-amber-300">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-amber-400 border-2 border-amber-400">
+                      <Hourglass className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm leading-tight text-slate-800">{task.title}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><User className="w-3 h-3"/>{task.assignee}</span>
+                        {task.requiresPhoto && task.photoUrl && <span className="text-[9px] font-bold bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full flex items-center gap-1"><Camera className="w-3 h-3"/>Has Photo</span>}
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-bold bg-amber-400 text-white px-3 py-1.5 rounded-full shadow-sm">Review →</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </RevealCard>
+      )}
+
       <div className="space-y-3">
-        {visibleTasks.length === 0 && (
+        {visibleTasks.filter(t => isParent ? t.status !== 'pending' : true).length === 0 && (
           <div className="text-center py-12 bg-white rounded-3xl ring-1 ring-black/5">
             <div className="text-4xl mb-3">🎉</div>
-            <p className="text-slate-400 font-medium text-sm">No tasks right now!</p>
+            <p className="text-slate-400 font-medium text-sm">{isParent ? 'All tasks reviewed!' : 'No tasks right now!'}</p>
           </div>
         )}
-        {visibleTasks.map((task, idx) => {
+        {visibleTasks.filter(t => isParent ? t.status !== 'pending' : true).map((task, idx) => {
           const isApproved = task.status === 'approved';
           const isPending = task.status === 'pending';
 
@@ -957,8 +995,15 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
                   <p className={`font-bold text-sm leading-tight ${isApproved ? 'line-through text-slate-400' : 'text-slate-800'}`}>{task.title}</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><User className="w-3 h-3"/>{task.assignee}</span>
+                    {task.dueDate && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><Clock className="w-3 h-3"/>Due {task.dueDate}</span>}
                     {task.requiresPhoto && <span className="text-[9px] font-bold bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full flex items-center gap-1"><Camera className="w-3 h-3"/>Photo</span>}
                     {isPending && isChild && <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Pending...</span>}
+                    {task.feedback && !isApproved && !isPending && isChild && (
+                      <div className="w-full mt-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                        <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-0.5">Parent Feedback</p>
+                        <p className="text-xs text-rose-700 font-medium">{task.feedback}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -998,6 +1043,11 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
                 <option value="5">5 pts</option><option value="10">10 pts</option><option value="15">15 pts</option><option value="20">20 pts</option><option value="50">50 pts</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Due Date</label>
+            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium transition-all" />
           </div>
 
           <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100 mt-2">
@@ -1057,12 +1107,42 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
             <p className="font-medium text-sm text-slate-600 text-center">
               {activeTaskForReview.assignee} submitted proof for <span className="font-bold text-slate-900">"{activeTaskForReview.title}"</span>
             </p>
-            <div className="h-48 bg-slate-900 rounded-[1.5rem] overflow-hidden shadow-inner mx-auto w-full max-w-sm">
-              <img src={activeTaskForReview.photoUrl} className="w-full h-full object-cover" alt="Submitted proof" />
-            </div>
+            {activeTaskForReview.photoUrl ? (
+              <div className="h-48 bg-slate-900 rounded-[1.5rem] overflow-hidden shadow-inner mx-auto w-full max-w-sm">
+                <img src={activeTaskForReview.photoUrl} className="w-full h-full object-cover" alt="Submitted proof" />
+              </div>
+            ) : (
+              <div className="h-24 bg-slate-100 rounded-[1.5rem] flex items-center justify-center">
+                <p className="text-slate-400 text-sm font-medium">No photo submitted</p>
+              </div>
+            )}
             <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1 !border-rose-200 !text-rose-600 hover:!bg-rose-50" onClick={() => { onAction(activeTaskForReview.id, 'reject'); setActiveTaskForReview(null); }}>Needs Work</Button>
+              <Button variant="outline" className="flex-1 !border-rose-200 !text-rose-600 hover:!bg-rose-50" onClick={() => { setShowRejectModal(activeTaskForReview); setActiveTaskForReview(null); setRejectFeedback(''); }}>Needs Work</Button>
               <Button variant="primary" className="flex-1 !bg-emerald-500 hover:!bg-emerald-600 shadow-emerald-500/30" onClick={() => { onAction(activeTaskForReview.id, 'approve'); setActiveTaskForReview(null); }}>Approve</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={!!showRejectModal} onClose={() => setShowRejectModal(null)} title="Send Feedback">
+        {showRejectModal && (
+          <div className="space-y-4">
+            <p className="font-medium text-sm text-slate-600">
+              Tell <span className="font-bold text-slate-900">{showRejectModal.assignee}</span> what needs to be fixed on <span className="font-bold">"{showRejectModal.title}"</span>:
+            </p>
+            <textarea
+              value={rejectFeedback}
+              onChange={e => setRejectFeedback(e.target.value)}
+              placeholder="e.g., The dishes aren't fully dry yet — please dry and put away."
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-rose-400/50 text-slate-800 font-medium min-h-[100px] transition-all"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setShowRejectModal(null)}>Cancel</Button>
+              <Button variant="primary" className="flex-1 !bg-rose-500 hover:!bg-rose-600" onClick={() => {
+                onAction(showRejectModal.id, 'reject', { feedback: rejectFeedback });
+                setShowRejectModal(null);
+              }}>Send & Reject</Button>
             </div>
           </div>
         )}
@@ -1368,7 +1448,7 @@ const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setG
   );
 };
 
-const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
+const RewardsView = ({ rewards, points, onRedeem, isParent, lastRedeemed }) => {
   const { isChild } = useContext(ThemeContext);
   const nextReward = rewards.filter(r => r.cost > points).sort((a,b) => a.cost - b.cost)[0];
   const progress = nextReward ? Math.min(100, (points / nextReward.cost) * 100) : 100;
@@ -1399,6 +1479,19 @@ const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
         </div>
       </RevealCard>
 
+      {/* CELEBRATION MOMENT */}
+      {lastRedeemed && (
+        <div className="animate-bounce-in bg-gradient-to-br from-emerald-400 to-teal-500 rounded-3xl p-6 text-center shadow-xl shadow-emerald-500/30 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-10" style={{backgroundImage:'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize:'16px 16px'}} />
+          <div className="relative z-10">
+            <div className="text-5xl mb-3">🎉</div>
+            <h3 className="text-xl font-bold text-white mb-1">Reward Unlocked!</h3>
+            <p className="text-white/80 font-bold text-base">{lastRedeemed.title}</p>
+            <p className="text-white/60 text-sm font-medium mt-1">−{lastRedeemed.cost} points</p>
+          </div>
+        </div>
+      )}
+
       <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest px-1">Available Rewards</h3>
 
       <div className="grid grid-cols-1 gap-3">
@@ -1421,7 +1514,7 @@ const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
                   </div>
                   <button
                     disabled={points < reward.cost || isParent}
-                    onClick={() => onRedeem(reward.cost)}
+                    onClick={() => onRedeem(reward.cost, reward.title)}
                     className={`spring-press shrink-0 px-4 py-2.5 rounded-2xl font-bold text-sm transition-all ${
                       isParent ? 'bg-slate-100 text-slate-400 cursor-not-allowed' :
                       canAfford ? 'bg-amber-400 text-amber-900 shadow-md shadow-amber-400/30 hover:bg-amber-300' :
@@ -1896,11 +1989,19 @@ const NavItem = ({ icon: Icon, label, isActive, isChild, onClick }) => {
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
-  const [activeUser, setActiveUser] = useState(null); 
+  const [activeUser, setActiveUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kinflow_lastProfile');
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return null;
+  }); 
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false); 
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    try { return localStorage.getItem('kinflow_loggedIn') === 'true'; } catch(e) { return false; }
+  }); 
   
   const [confirmActionState, setConfirmActionState] = useState(null);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
@@ -1919,6 +2020,7 @@ export default function App() {
   const [groceries, setGroceries] = useState([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [lastRedeemed, setLastRedeemed] = useState(null);
 
   const prevNotifsLength = useRef(0);
 
@@ -2027,6 +2129,7 @@ export default function App() {
   const handleLogin = (user) => {
     setActiveUser(user);
     setActiveTab('home'); 
+    try { localStorage.setItem('kinflow_lastProfile', JSON.stringify(user)); } catch(e) {}
     if (user.role === 'Parent' && !hasOnboarded) setShowOnboarding(true);
   };
 
@@ -2104,7 +2207,8 @@ export default function App() {
     else if (action === 'reject') {
       newStatus = 'open';
       newPhotoUrl = null;
-      notifToSent = { title: "Needs Work", body: `Your parent asked you to redo "${t.title}".`, target: assignee };
+      const fb = extra.feedback ? ` Feedback: "${extra.feedback}"` : '';
+      notifToSent = { title: "Needs Work", body: `Your parent asked you to redo "${t.title}".${fb}`, target: assignee };
     }
 
     if (newStatus === 'pending' || newStatus === 'approved') {
@@ -2112,13 +2216,16 @@ export default function App() {
     }
 
     if (DEMO_MODE) {
-      setTasks(prev => prev.map(x => String(x.id) === String(taskId) ? { ...x, status: newStatus, photoUrl: newPhotoUrl } : x));
+      const feedbackText = (action === 'reject' && extra.feedback) ? extra.feedback : null;
+      setTasks(prev => prev.map(x => String(x.id) === String(taskId) ? { ...x, status: newStatus, photoUrl: newPhotoUrl, feedback: feedbackText || x.feedback } : x));
       if (pointsChange !== 0 && assignee) {
         setUserPoints(prev => ({ ...prev, [assignee]: Math.max(0, (prev[assignee] || 0) + pointsChange) }));
       }
       return;
     }
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), { status: newStatus, photoUrl: newPhotoUrl });
+    const updatePayload = { status: newStatus, photoUrl: newPhotoUrl };
+    if (action === 'reject' && extra.feedback) updatePayload.feedback = extra.feedback;
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), updatePayload);
 
     if (pointsChange !== 0 && assignee) {
       const currentPoints = userPoints[assignee] || 0;
@@ -2147,7 +2254,7 @@ export default function App() {
     }});
   };
 
-  const handleRedeemReward = async (cost) => {
+  const handleRedeemReward = async (cost, rewardTitle) => {
     if (!activeUser) return;
     const pointsAvailable = userPoints[activeUser.name] || 0;
     if (!isParent && pointsAvailable >= cost) {
@@ -2155,9 +2262,11 @@ export default function App() {
         setUserPoints(prev => ({ ...prev, [activeUser.name]: Math.max(0, (prev[activeUser.name] || 0) - cost) }));
       } else {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), { points: pointsAvailable - cost }, { merge: true });
-        sendNotification('Reward Redeemed', `${activeUser.name} just redeemed a reward for ${cost} pts!`, 'Parent');
+        sendNotification('Reward Redeemed', `${activeUser.name} just redeemed "${rewardTitle}" for ${cost} pts!`, 'Parent');
       }
+      setLastRedeemed({ title: rewardTitle, cost });
       triggerConfetti();
+      setTimeout(() => setLastRedeemed(null), 3500);
     } else if (isParent) triggerConfetti();
   };
 
@@ -2208,9 +2317,9 @@ export default function App() {
       case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
       case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} />;
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
-      case 'rewards': return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
+      case 'rewards': return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} lastRedeemed={lastRedeemed} />;
       case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} />;
-      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); }} allUsers={MOCK_USERS} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} />;
+      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} allUsers={MOCK_USERS} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} />;
       default: return null;
     }
   };
@@ -2233,8 +2342,8 @@ export default function App() {
   };
 
   if (showSplash) return <SplashScreen />;
-  if (!isLoggedIn) return <AuthScreen onComplete={() => setIsLoggedIn(true)} />;
-  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={MOCK_USERS} onLogout={() => setIsLoggedIn(false)} />;
+  if (!isLoggedIn) return <AuthScreen onComplete={() => { setIsLoggedIn(true); try { localStorage.setItem('kinflow_loggedIn', 'true'); } catch(e) {} }} />;
+  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={MOCK_USERS} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} />;
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
   const navItems = isParent 
@@ -2342,15 +2451,20 @@ export default function App() {
 
         <AICopilotModal isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} />
 
-        <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title="Switch Profile">
+        <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title={isChild ? "Switch Child" : "Switch Profile"}>
           <div className="space-y-3">
-            {MOCK_USERS.map(user => (
-              <div key={user.id} onClick={() => { setActiveUser(user); setIsUserSwitcherOpen(false); }} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser?.id === user.id ? 'bg-slate-100 ring-2 ring-slate-400' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}>
+            {MOCK_USERS.filter(u => isChild ? u.role === 'Child' : true).map(user => (
+              <div key={user.id} onClick={() => { setActiveUser(user); try { localStorage.setItem('kinflow_lastProfile', JSON.stringify(user)); } catch(e) {} setIsUserSwitcherOpen(false); }} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser?.id === user.id ? 'bg-slate-100 ring-2 ring-slate-400' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}>
                 <Avatar user={user} size="md" />
                 <div><h4 className="font-bold text-slate-800">{user.name}</h4><p className="text-xs font-medium text-slate-500">{user.role}</p></div>
                 {activeUser?.id === user.id && <Check className="w-5 h-5 text-slate-800 ml-auto" />}
               </div>
             ))}
+            {isChild && (
+              <button onClick={() => { setActiveUser(null); setIsUserSwitcherOpen(false); try { localStorage.removeItem('kinflow_lastProfile'); } catch(e) {} }} className="w-full py-3 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 text-sm font-semibold hover:border-slate-300 hover:text-slate-600 transition-colors mt-2">
+                Back to Profile Select
+              </button>
+            )}
           </div>
         </Modal>
 
