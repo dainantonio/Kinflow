@@ -50,6 +50,18 @@ export const FamilyProvider = ({ children }) => {
   const [meals, setMeals] = useState([]);
   const [notifications, setNotifications] = useState([]);
 
+  // Family Members State
+  const [familyMembers, setFamilyMembers] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kinflow_familyMembers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch(e) {}
+    return MOCK_USERS; // seed from demo data on first use
+  });
+
   // Non-Firebase States
   const [groceries, setGroceries] = useState([]);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -83,6 +95,13 @@ export const FamilyProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
+  // Persist familyMembers to localStorage in DEMO_MODE
+  useEffect(() => {
+    if (DEMO_MODE) {
+      try { localStorage.setItem('kinflow_familyMembers', JSON.stringify(familyMembers)); } catch(e) {}
+    }
+  }, [familyMembers]);
+
   // Sync DB
   useEffect(() => {
     if (!firebaseUser) return;
@@ -92,6 +111,7 @@ export const FamilyProvider = ({ children }) => {
       setUserPoints({'Tommy': 45, 'Lily': 30});
       setEvents(mockEvents.map(e => ({...e, id: e.id.toString(), createdAt: Date.now()})));
       setMeals(mockMeals.map(m => ({...m, id: m.id.toString(), createdAt: Date.now()})));
+      // familyMembers already initialized from localStorage or MOCK_USERS
       return;
     }
     const dataPath = 'public';
@@ -133,12 +153,23 @@ export const FamilyProvider = ({ children }) => {
       else setMeals(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
+    // Family members collection
+    const familyRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_family');
+    const unsubFamily = onSnapshot(familyRef, (snap) => {
+      if (snap.empty) {
+        // seed with MOCK_USERS on first load
+        MOCK_USERS.forEach(u => setDoc(doc(familyRef, u.id), { ...u, createdAt: Date.now() }));
+      } else {
+        setFamilyMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+    }, console.error);
+
     const notifRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_notifications');
     const unsubNotifs = onSnapshot(notifRef, (snap) => {
       setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, console.error);
 
-    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubNotifs(); };
+    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubFamily(); unsubNotifs(); };
   }, [firebaseUser]);
 
   useEffect(() => {
@@ -172,6 +203,60 @@ export const FamilyProvider = ({ children }) => {
     setShowOnboarding(false);
     setHasOnboarded(true);
     triggerConfetti();
+  };
+
+  // --- FAMILY MEMBER MANAGEMENT ---
+
+  const handleAddMember = async (member) => {
+    const newId = Date.now().toString();
+    const newMember = { id: newId, ...member, initials: member.name?.charAt(0)?.toUpperCase() || '?' };
+    if (DEMO_MODE) {
+      setFamilyMembers(prev => [...prev, newMember]);
+      // Initialize points to 0 for new member
+      setUserPoints(prev => ({ ...prev, [newMember.name]: 0 }));
+      return;
+    }
+    if (!firebaseUser) return;
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_family', newId), { ...newMember, createdAt: Date.now() });
+    // Initialize points to 0
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', newMember.name), { points: 0 });
+  };
+
+  const handleUpdateMember = async (updatedMember) => {
+    // Find the old member to check for name change
+    const oldMember = familyMembers.find(m => m.id === updatedMember.id);
+    const nameChanged = oldMember && oldMember.name !== updatedMember.name;
+
+    if (DEMO_MODE) {
+      setFamilyMembers(prev => prev.map(m => m.id === updatedMember.id ? { ...m, ...updatedMember } : m));
+      // Migrate points if name changed
+      if (nameChanged) {
+        setUserPoints(prev => {
+          const pts = prev[oldMember.name] || 0;
+          const next = { ...prev, [updatedMember.name]: pts };
+          delete next[oldMember.name];
+          return next;
+        });
+      }
+      return;
+    }
+    if (!firebaseUser) return;
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_family', updatedMember.id), updatedMember);
+    // Migrate points if name changed
+    if (nameChanged) {
+      const oldPoints = userPoints[oldMember.name] || 0;
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', updatedMember.name), { points: oldPoints });
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', oldMember.name));
+    }
+  };
+
+  const handleRemoveMember = async (memberId) => {
+    if (DEMO_MODE) {
+      setFamilyMembers(prev => prev.filter(m => m.id !== memberId));
+      return;
+    }
+    if (!firebaseUser) return;
+    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_family', memberId));
   };
 
   // --- NOTIFICATION DISPATCHER ---
@@ -346,6 +431,11 @@ export const FamilyProvider = ({ children }) => {
   const handleUpdateProfile = (updatedUser) => {
     setActiveUser(updatedUser);
     try { localStorage.setItem('kinflow_lastProfile', JSON.stringify(updatedUser)); } catch(e) {}
+    // Also update the member in familyMembers
+    const oldMember = familyMembers.find(m => m.id === updatedUser.id);
+    if (oldMember) {
+      handleUpdateMember({ ...oldMember, ...updatedUser, initials: updatedUser.name?.charAt(0)?.toUpperCase() || oldMember.initials });
+    }
     setLatestToast({ id: Date.now().toString(), title: 'Profile Updated', body: `Display name changed to "${updatedUser.name}"`, createdAt: Date.now() });
     setTimeout(() => setLatestToast(null), 3500);
   };
@@ -382,6 +472,7 @@ export const FamilyProvider = ({ children }) => {
     showConfetti, isCopilotOpen, setIsCopilotOpen,
     lastRedeemed,
     isParent, isChild, greeting,
+    familyMembers,
 
     // Actions
     handleLogin, completeOnboarding, triggerConfetti,
@@ -391,6 +482,7 @@ export const FamilyProvider = ({ children }) => {
     handleAddEvent, requestDeleteEvent,
     handleAddMeal, handleUpdateMeal, requestDeleteMeal,
     handleUpdateProfile,
+    handleAddMember, handleUpdateMember, handleRemoveMember,
     myNotifications, unreadNotifsCount, markNotifsAsRead,
   };
 
