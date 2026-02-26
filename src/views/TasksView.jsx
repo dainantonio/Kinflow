@@ -3,7 +3,7 @@ import { Plus, Check, Clock, Star, Hourglass, Trash2, Camera, ChevronRight, X, M
 import { ThemeContext, useFamilyContext } from '../contexts/FamilyContext';
 import { Card, Button, Badge, Avatar, Modal, RevealCard } from '../components/shared/Primitives';
 
-export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) => {
+export const TasksView = ({ tasks, onAction, onAdd, onUpdate, onDelete, activeUser, isParent }) => {
   const { familyMembers } = useFamilyContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -23,6 +23,8 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
   const [activeTaskForReview, setActiveTaskForReview] = useState(null);
   const [rejectFeedback, setRejectFeedback] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(null); 
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [taskForm, setTaskForm] = useState(null);
   
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -42,17 +44,17 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
   const handleTaskClick = (task) => {
     if (isParent) {
       if (task.status === 'pending') {
-        if (task.requiresPhoto && task.photoUrl) setActiveTaskForReview(task);
-        else setActiveTaskForReview(task);  // Show review modal for all pending tasks
+        setActiveTaskForReview(task);
       } else {
-        onAction(task.id, 'toggle_simple');
+        setSelectedTask(task);
+        setTaskForm({ ...task });
       }
     } else {
       if (task.status === 'open' && task.requiresPhoto) {
         setActiveTaskForPhoto(task);
         setMockPhotoCaptured(null);
       } else {
-        onAction(task.id, 'toggle_simple');
+        setSelectedTask(task);
       }
     }
   };
@@ -226,6 +228,34 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
           )
         })}
       </div>
+
+
+      <Modal isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title="Task Details">
+        {selectedTask && (
+          <div className="space-y-4">
+            <div className="bg-slate-50 rounded-2xl p-4 ring-1 ring-slate-200">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Task</p>
+              <p className="font-bold text-slate-900 text-lg">{selectedTask.title}</p>
+              <p className="text-xs text-slate-500 font-semibold mt-1">Assigned to {selectedTask.assignee} · +{selectedTask.points} pts</p>
+            </div>
+            {isParent ? (
+              <form onSubmit={(e) => { e.preventDefault(); onUpdate(taskForm); setSelectedTask(taskForm); }} className="space-y-3">
+                <input value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={taskForm.assignee || ''} onChange={(e) => setTaskForm({ ...taskForm, assignee: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                  <input type="number" value={taskForm.points || 0} onChange={(e) => setTaskForm({ ...taskForm, points: parseInt(e.target.value || '0', 10) })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" className="flex-1">Save</Button>
+                  <Button type="button" variant="secondary" className="!bg-rose-50 !text-rose-600 !border-rose-200" onClick={() => { onDelete(selectedTask.id); setSelectedTask(null); }}>Delete</Button>
+                </div>
+              </form>
+            ) : (
+              <Button onClick={() => { onAction(selectedTask.id, 'toggle_simple'); setSelectedTask(null); }} variant="primary">Mark Progress</Button>
+            )}
+          </div>
+        )}
+      </Modal>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Task">
         <form onSubmit={handleSubmitNewTask} className="space-y-4">
