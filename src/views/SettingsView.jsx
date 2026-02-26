@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { ChevronLeft, Camera, Bell, Settings, CreditCard, Users, HelpCircle, LogOut, ChevronRight, Check, Plus, Star, User, BellRing, Trash2, X } from 'lucide-react';
-import { ThemeContext } from '../contexts/FamilyContext';
+import { ThemeContext, ALL_AVATARS } from '../contexts/FamilyContext';
 import { Card, Avatar, Modal, SettingRow, Button } from '../components/shared/Primitives';
 
 const COLOR_OPTIONS = [
@@ -113,6 +113,7 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('Child');
   const [newMemberColor, setNewMemberColor] = useState(COLOR_OPTIONS[0]);
+  const [newMemberAvatar, setNewMemberAvatar] = useState('👦🏾');
   const [confirmRemoveMember, setConfirmRemoveMember] = useState(null);
 
   const handleModalClose = () => { setActiveModal(null); setProfileSaved(false); setEditingMemberId(null); setShowAddMemberForm(false); setConfirmRemoveMember(null); };
@@ -148,7 +149,7 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
 
   const handleAddNewMember = () => {
     if (onAddMember && newMemberName.trim()) {
-      onAddMember({ name: newMemberName.trim(), role: newMemberRole, color: newMemberColor });
+      onAddMember({ name: newMemberName.trim(), role: newMemberRole, color: newMemberColor, avatar: newMemberAvatar });
       setNewMemberName('');
       setNewMemberRole('Child');
       setNewMemberColor(COLOR_OPTIONS[0]);
@@ -426,6 +427,21 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
                       onClick={() => setNewMemberColor(color)}
                       className={`w-8 h-8 rounded-full bg-gradient-to-br ${color} transition-all ${newMemberColor === color ? 'ring-2 ring-offset-2 ring-indigo-500 scale-110' : 'opacity-70 hover:opacity-100'}`}
                     />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500 mb-2">Avatar</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {ALL_AVATARS.slice(0, 12).map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setNewMemberAvatar(emoji)}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xl transition-all ${newMemberAvatar === emoji ? 'bg-indigo-100 ring-2 ring-indigo-500 scale-110' : 'bg-slate-50 hover:bg-slate-100'}`}
+                    >
+                      {emoji}
+                    </button>
                   ))}
                 </div>
               </div>
