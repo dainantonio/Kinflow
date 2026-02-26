@@ -46,6 +46,7 @@ function AppInner() {
     handleRedeemReward,
     handleAddEvent, requestDeleteEvent,
     handleAddMeal, handleUpdateMeal, requestDeleteMeal,
+    handleUpdateProfile,
     myNotifications, unreadNotifsCount, markNotifsAsRead,
   } = ctx;
 
@@ -58,7 +59,7 @@ function AppInner() {
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
       case 'rewards': return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} lastRedeemed={lastRedeemed} />;
       case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} tasks={tasks} />;
-      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} allUsers={MOCK_USERS} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} />;
+      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} allUsers={MOCK_USERS} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} onUpdateProfile={handleUpdateProfile} />;
       default: return null;
     }
   };

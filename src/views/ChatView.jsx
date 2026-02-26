@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { Send, Smile, Image as ImageIcon, Trash2, Link2, ChevronLeft, Check, MoreVertical } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, Trash2, Link2, ChevronLeft, Check, MoreVertical, ChevronDown, X, MessageCircle, CheckSquare } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
 import { Card, Avatar, Modal } from '../components/shared/Primitives';
 import { MOCK_USERS } from '../utils/demoData';
@@ -105,7 +105,7 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
               <p className="text-slate-400 text-sm font-medium mt-1 text-center max-w-[220px]">Start the conversation with your family!</p>
             </div>
           )}
-          {messages.map((msg, idx) => {
+          {messages?.map((msg, idx) => {
             const isMe = msg.senderId === user.id;
             const sender = MOCK_USERS.find(u => u.id === msg.senderId);
             return (

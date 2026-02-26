@@ -119,7 +119,7 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {events.map((event, idx) => (
+                  {events?.map((event, idx) => (
                     <div key={event.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors group">
                       <div className={`w-1 h-10 rounded-full shrink-0 ${event.color}`} />
                       <div className="flex-1 min-w-0">
@@ -156,7 +156,7 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
               {isParent && <button onClick={() => setShowNewEvent(true)} className="mt-4 px-5 py-2.5 bg-violet-500 text-white text-xs font-bold rounded-xl hover:bg-violet-600 transition-colors">Add First Event</button>}
             </div>
           )}
-          {events.map((event, idx) => (
+          {events?.map((event, idx) => (
             <RevealCard key={event.id} delay={idx * 60}>
               <div className="bg-white rounded-3xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4">
                 <div className={`w-1 h-14 rounded-full shrink-0 ${event.color}`} />
