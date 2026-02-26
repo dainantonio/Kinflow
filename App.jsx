@@ -209,29 +209,160 @@ const SplashScreen = () => (
 
 const OnboardingFlow = ({ onComplete }) => {
   const [step, setStep] = useState(0);
-  const content = [
-    { icon: <Users className="w-10 h-10 text-indigo-500" strokeWidth={1.5} />, title: "Welcome to Kinflow", desc: "The smart operating system designed to keep your modern family organized, together." },
-    { icon: <Wand2 className="w-10 h-10 text-purple-500" strokeWidth={1.5} />, title: "Meet Your Copilot", desc: "Instantly generate meal plans, auto-create grocery lists, and resolve scheduling conflicts using AI." },
-    { icon: <Gift className="w-10 h-10 text-emerald-500" strokeWidth={1.5} />, title: "Gamify the Household", desc: "Kids earn points by completing assigned chores and can redeem them for real-life rewards." }
+  const [animating, setAnimating] = useState(false);
+
+  const advance = (next) => {
+    if (animating) return;
+    setAnimating(true);
+    setTimeout(() => {
+      if (next >= 3) { onComplete(); return; }
+      setStep(next);
+      setAnimating(false);
+    }, 220);
+  };
+
+  const slides = [
+    {
+      bg: 'bg-slate-900',
+      dark: true,
+      visual: (
+        <div className="relative flex items-center justify-center mb-10">
+          <div className="absolute w-48 h-48 bg-indigo-500/20 rounded-full blur-[60px]" />
+          <div className="absolute w-36 h-36 bg-purple-500/20 rounded-full blur-[40px]" />
+          <div className="relative w-28 h-28 bg-white/10 backdrop-blur-sm rounded-[2.5rem] ring-1 ring-white/15 shadow-2xl flex items-center justify-center">
+            <div className="w-20 h-20 bg-gradient-to-br from-indigo-400 to-purple-600 rounded-[2rem] flex items-center justify-center shadow-xl">
+              <Layers className="w-10 h-10 text-white" strokeWidth={1.5} />
+            </div>
+          </div>
+        </div>
+      ),
+      heading: (<>Welcome to<br/>Kinflow</>),
+      sub: "Your family's AI-powered command center. Organized, connected, and always in sync.",
+      cta: 'Get Started'
+    },
+    {
+      bg: 'bg-white',
+      dark: false,
+      visual: (
+        <div className="w-full max-w-xs mb-8">
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            {[
+              { icon: <CheckSquare className="w-5 h-5" />, label: 'Chores', sub: 'Earn points', color: 'bg-emerald-100 text-emerald-600' },
+              { icon: <CalendarIcon className="w-5 h-5" />, label: 'Schedule', sub: 'Stay ahead', color: 'bg-blue-100 text-blue-600' },
+              { icon: <ChefHat className="w-5 h-5" />, label: 'Meals', sub: 'Plan the week', color: 'bg-orange-100 text-orange-500' },
+            ].map(f => (
+              <div key={f.label} className="flex flex-col items-center gap-2 bg-slate-50 p-4 rounded-[1.5rem] ring-1 ring-slate-100 shadow-sm">
+                <div className={`p-2.5 rounded-xl ${f.color}`}>{f.icon}</div>
+                <span className="text-xs font-bold text-slate-700 leading-tight text-center">{f.label}</span>
+                <span className="text-[9px] font-semibold text-slate-400 text-center leading-tight">{f.sub}</span>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: <MessageCircle className="w-5 h-5" />, label: 'Family Chat', sub: 'Stay connected', color: 'bg-pink-100 text-pink-500' },
+              { icon: <Wand2 className="w-5 h-5" />, label: 'AI Copilot', sub: 'Smart assist', color: 'bg-purple-100 text-purple-600' },
+            ].map(f => (
+              <div key={f.label} className="flex items-center gap-3 bg-slate-50 p-4 rounded-[1.5rem] ring-1 ring-slate-100 shadow-sm">
+                <div className={`p-2.5 rounded-xl shrink-0 ${f.color}`}>{f.icon}</div>
+                <div>
+                  <span className="text-xs font-bold text-slate-700 block">{f.label}</span>
+                  <span className="text-[9px] font-semibold text-slate-400">{f.sub}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+      heading: (<>Built for<br/>the whole family</>),
+      sub: 'Parents manage, kids participate, AI assists. One app — everyone included.',
+      cta: 'Continue'
+    },
+    {
+      bg: 'bg-gradient-to-br from-indigo-50 via-white to-purple-50',
+      dark: false,
+      visual: (
+        <div className="flex flex-col items-center mb-8 w-full max-w-xs">
+          <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] flex items-center justify-center shadow-2xl shadow-indigo-500/30 mb-6">
+            <Gift className="w-12 h-12 text-white" strokeWidth={1.5} />
+          </div>
+          <div className="flex gap-3 w-full">
+            {[
+              { pts: '10 pts', label: 'Dishes', icon: '🍽️' },
+              { pts: '25 pts', label: 'Bedroom', icon: '🛏️' },
+              { pts: '50 pts', label: 'Lawn', icon: '🌿' },
+            ].map(item => (
+              <div key={item.label} className="flex-1 bg-white rounded-[1.5rem] p-4 text-center shadow-md shadow-slate-100 ring-1 ring-slate-100">
+                <div className="text-2xl mb-2">{item.icon}</div>
+                <div className="text-xs font-bold text-indigo-600 mb-0.5">{item.pts}</div>
+                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">{item.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+      heading: (<>Make chores<br/>rewarding</>),
+      sub: 'Kids earn points for every completed task and redeem them for rewards they actually want.',
+      cta: 'Meet My Family'
+    }
   ];
+
+  const s = slides[step];
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-pop-in max-w-md mx-auto w-full">
-        <div className="w-20 h-20 bg-white rounded-[1.5rem] shadow-xl shadow-slate-200/50 flex items-center justify-center mb-8 ring-1 ring-slate-900/5 transition-all">
-          {content[step].icon}
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">{content[step].title}</h2>
-        <p className="text-slate-500 text-base leading-relaxed font-medium">{content[step].desc}</p>
+    <div className={`min-h-screen flex flex-col transition-all duration-500 ${s.bg} relative overflow-hidden`}>
+      {step === 0 && (
+        <>
+          <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
+          <div className="absolute bottom-[-10%] right-[-5%] w-72 h-72 bg-purple-500/10 rounded-full blur-[80px] pointer-events-none" />
+          <div className="absolute inset-0 pointer-events-none" style={{backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0)', backgroundSize: '28px 28px'}} />
+        </>
+      )}
+
+      {step < 2 && (
+        <button onClick={onComplete} className={`absolute top-14 right-6 z-10 text-sm font-bold transition-colors ${s.dark ? 'text-white/35 hover:text-white/60' : 'text-slate-300 hover:text-slate-500'}`}>
+          Skip
+        </button>
+      )}
+
+      <div key={step} className={`flex-1 flex flex-col items-center justify-center px-8 pt-16 pb-4 max-w-md mx-auto w-full transition-opacity duration-200 ${animating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`} style={{transition: 'opacity 0.22s ease, transform 0.22s ease'}}>
+        {s.visual}
+        <h1 className={`text-4xl font-bold tracking-tight text-center leading-tight mb-4 ${s.dark ? 'text-white' : 'text-slate-900'}`}>
+          {s.heading}
+        </h1>
+        <p className={`text-center text-base leading-relaxed font-medium max-w-[280px] ${s.dark ? 'text-white/55' : 'text-slate-500'}`}>
+          {s.sub}
+        </p>
       </div>
-      <div className="bg-white px-6 pb-12 pt-8 rounded-t-[2.5rem] shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.03)] flex flex-col items-center max-w-md mx-auto w-full">
-        <div className="flex gap-2 mb-8">
-          {[0, 1, 2].map(idx => (<div key={idx} className={`h-1.5 rounded-full transition-all duration-300 ${step === idx ? 'w-6 bg-slate-800' : 'w-1.5 bg-slate-200'}`} />))}
+
+      <div className="px-6 pb-14 pt-4 max-w-md mx-auto w-full">
+        <div className="flex justify-center gap-2 mb-8">
+          {[0, 1, 2].map(i => (
+            <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${step === i ? (s.dark ? 'w-8 bg-white' : 'w-8 bg-slate-800') : (s.dark ? 'w-2 bg-white/20' : 'w-2 bg-slate-200')}`} />
+          ))}
         </div>
-        <Button onClick={() => { if (step < 2) setStep(step + 1); else onComplete(); }} className="w-full text-base">{step < 2 ? 'Continue' : 'Get Started'}</Button>
+        <button
+          onClick={() => advance(step + 1)}
+          className={`w-full py-4 rounded-[1.25rem] font-bold text-base transition-all active:scale-[0.97] shadow-lg ${
+            step === 0
+              ? 'bg-white text-slate-900 shadow-white/10 hover:bg-white/95'
+              : step === 2
+              ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:scale-[1.01]'
+              : 'bg-slate-900 text-white shadow-slate-900/15'
+          }`}
+        >
+          {s.cta}
+        </button>
+        {step > 0 && (
+          <button onClick={() => advance(step - 1)} className="w-full mt-3 py-2.5 text-sm font-semibold text-slate-400 hover:text-slate-600 transition-colors">
+            Back
+          </button>
+        )}
       </div>
     </div>
   );
 };
+
 
 const AuthScreen = ({ onComplete }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -1016,59 +1147,177 @@ const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
   );
 };
 
-const SettingsView = ({ user, isParent, onLogout }) => {
+const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, userPoints = {}, tasks = [], onBack }) => {
   const [activeModal, setActiveModal] = useState(null);
+  const [editName, setEditName] = useState(user?.name || '');
   const handleModalClose = () => setActiveModal(null);
 
+  const myPoints = userPoints[user?.name] || 0;
+  const totalPoints = Object.values(userPoints).reduce((a, b) => a + b, 0);
+  const completedTasks = tasks.filter(t => t.status === 'approved' && (!isParent || true)).length;
+  const pendingCount = tasks.filter(t => t.status === 'pending').length;
+  const myCompleted = tasks.filter(t => t.status === 'approved' && t.assignee === user?.name).length;
+
+  const stats = isParent
+    ? [
+        { label: 'Family Pts', value: totalPoints, emoji: '⭐' },
+        { label: 'Done', value: completedTasks, emoji: '✓' },
+        { label: 'Pending', value: pendingCount, emoji: '⏳' },
+      ]
+    : [
+        { label: 'My Points', value: myPoints, emoji: '⭐' },
+        { label: 'Completed', value: myCompleted, emoji: '✓' },
+        { label: 'Day Streak', value: '5', emoji: '🔥' },
+      ];
+
   return (
-    <div className="space-y-6 animate-pop-in">
-      <div className="flex justify-between items-end">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
-          <p className="text-slate-500 font-medium text-sm mt-1">Manage family preferences</p>
+    <div className="animate-pop-in -mx-4 sm:-mx-6 -mt-6">
+
+      {/* HERO BANNER */}
+      <div className="relative h-44 overflow-hidden" style={{background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%)'}}>
+        <div className="absolute top-[-20%] right-[-5%] w-64 h-64 bg-indigo-400/20 rounded-full blur-[80px]" />
+        <div className="absolute bottom-[-20%] left-[-5%] w-56 h-56 bg-purple-400/15 rounded-full blur-[60px]" />
+        <div className="absolute inset-0 opacity-[0.04]" style={{backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '20px 20px'}} />
+        {onBack && (
+          <button onClick={onBack} className="absolute top-5 left-4 w-9 h-9 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 transition-all z-10">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        )}
+        <div className="absolute top-5 right-4 z-10">
+          <span className="text-xs font-bold text-white/40 uppercase tracking-widest">Profile</span>
         </div>
       </div>
 
-      <div className="space-y-4">
-        <Card className="!p-0 overflow-hidden">
-          <div className="p-5 flex items-center gap-4 border-b border-slate-100">
-            <Avatar user={user} size="lg" className="ring-4 ring-white shadow-sm" />
-            <div>
-              <h3 className="text-lg font-bold text-slate-800 leading-tight">{user.name}</h3>
-              <p className="text-sm font-medium text-slate-500">{user.role}</p>
-            </div>
-            <Button onClick={() => setActiveModal('editProfile')} variant="secondary" className="!w-auto !py-2 !px-4 text-xs ml-auto">Edit</Button>
-          </div>
-          <div className="p-2">
-            {isParent && <SettingRow onClick={() => setActiveModal('family')} icon={Users} label="Family Members" value="4 Members" />}
-            <SettingRow onClick={() => setActiveModal('notifications')} icon={BellRing} label="Notifications" value="Enabled" />
-            {isParent && <SettingRow onClick={() => setActiveModal('subscription')} icon={CreditCard} label="Subscription" value="Premium" />}
-          </div>
-        </Card>
-
-        {isParent && (
-          <>
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest pl-2 mt-6 mb-2">App Settings</h3>
-            <Card className="!p-2">
-              <SettingRow onClick={() => setActiveModal('general')} icon={Settings} label="General Preferences" />
-              <SettingRow onClick={() => setActiveModal('logout')} icon={LogOut} label="Log Out" className="text-rose-600" iconClass="text-rose-500 bg-rose-50" hideArrow />
-            </Card>
-          </>
-        )}
-        
-        {!isParent && (
-            <Card className="!p-2 mt-6">
-                <SettingRow onClick={() => setActiveModal('logout')} icon={LogOut} label="Log Out" className="text-rose-600" iconClass="text-rose-500 bg-rose-50" hideArrow />
-            </Card>
-        )}
+      {/* AVATAR OVERLAP */}
+      <div className="flex flex-col items-center -mt-14 pb-5 px-4">
+        <div className="relative mb-4">
+          <Avatar user={user} size="xxl" className="ring-[5px] ring-white shadow-2xl shadow-slate-900/20" />
+          <button
+            onClick={() => setActiveModal('editProfile')}
+            className="absolute bottom-1 right-1 w-8 h-8 bg-slate-900 border-[2.5px] border-white rounded-full flex items-center justify-center shadow-lg hover:bg-slate-700 active:scale-90 transition-all"
+          >
+            <Camera className="w-3.5 h-3.5 text-white" />
+          </button>
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{user?.name}</h2>
+        <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
+          <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isParent ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
+            {user?.role}
+          </span>
+          <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-100 text-slate-500">Kinflow Family</span>
+        </div>
       </div>
 
-      {/* Settings Modals */}
+      <div className="px-4 sm:px-6 pb-32 space-y-5">
+
+        {/* STATS ROW */}
+        <div className="grid grid-cols-3 gap-3">
+          {stats.map(stat => (
+            <div key={stat.label} className="bg-white rounded-2xl p-4 text-center shadow-sm ring-1 ring-slate-900/5">
+              <div className="text-xl mb-1.5">{stat.emoji}</div>
+              <div className="text-2xl font-bold text-slate-900 leading-none">{stat.value}</div>
+              <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1.5 leading-tight">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* YOUR FAMILY */}
+        <div>
+          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Your Family</h3>
+          <div className="bg-white rounded-[1.75rem] ring-1 ring-slate-900/5 p-4 shadow-sm">
+            <div className="grid grid-cols-4 gap-2 mb-3">
+              {allUsers.map(u => (
+                <div
+                  key={u.id}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all ${u.id === user?.id ? 'bg-indigo-50 ring-2 ring-indigo-200' : 'hover:bg-slate-50'}`}
+                >
+                  <Avatar user={u} size="md" />
+                  <span className="text-[10px] font-bold text-slate-700 text-center leading-tight">{u.name}</span>
+                  <span className="text-[9px]">{u.role === 'Parent' ? '👑' : '⭐'}</span>
+                </div>
+              ))}
+            </div>
+            {isParent && (
+              <button
+                onClick={() => setActiveModal('family')}
+                className="w-full py-3 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 text-sm font-semibold hover:border-indigo-300 hover:text-indigo-500 transition-colors flex items-center justify-center gap-2 active:scale-[0.98]"
+              >
+                <Plus className="w-4 h-4" /> Manage Members
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ACCOUNT SETTINGS */}
+        <div>
+          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Account</h3>
+          <div className="bg-white rounded-[1.75rem] ring-1 ring-slate-900/5 overflow-hidden shadow-sm divide-y divide-slate-50">
+            <SettingRow onClick={() => setActiveModal('editProfile')} icon={User} label="Edit Profile" value={user?.name} />
+            <SettingRow onClick={() => setActiveModal('notifications')} icon={BellRing} label="Notifications" value="Enabled" />
+            {isParent && (
+              <SettingRow onClick={() => setActiveModal('subscription')} icon={CreditCard} label="Subscription" value={<span className="text-indigo-600 font-bold">Premium ✦</span>} />
+            )}
+          </div>
+        </div>
+
+        {/* SUBSCRIPTION CARD (parents only) */}
+        {isParent && (
+          <div className="relative overflow-hidden rounded-[1.75rem] p-5 shadow-lg" style={{background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)'}}>
+            <div className="absolute top-[-20%] right-[-5%] w-40 h-40 bg-white/10 rounded-full blur-[40px]" />
+            <div className="flex items-start justify-between relative z-10">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
+                  <span className="text-xs font-bold text-white/80 uppercase tracking-wider">Premium Plan</span>
+                </div>
+                <h4 className="text-xl font-bold text-white leading-tight mb-1">Kinflow Family</h4>
+                <p className="text-white/60 text-xs font-medium">All features unlocked · AI Copilot included</p>
+              </div>
+              <div className="bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                <span className="text-white text-xs font-bold">Active</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isParent && (
+          <div>
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Preferences</h3>
+            <div className="bg-white rounded-[1.75rem] ring-1 ring-slate-900/5 overflow-hidden shadow-sm divide-y divide-slate-50">
+              <SettingRow icon={Settings} label="App Preferences" onClick={() => {}} />
+            </div>
+          </div>
+        )}
+
+        {/* SIGN OUT */}
+        <button
+          onClick={() => setActiveModal('logout')}
+          className="w-full py-4 rounded-[1.25rem] bg-rose-50 text-rose-600 font-bold text-sm ring-1 ring-rose-100 hover:bg-rose-100 transition-colors flex items-center justify-center gap-2 active:scale-[0.98]"
+        >
+          <LogOut className="w-4 h-4" /> Sign Out
+        </button>
+
+      </div>
+
+      {/* MODALS */}
       <Modal isOpen={activeModal === 'editProfile'} onClose={handleModalClose} title="Edit Profile">
         <div className="space-y-4">
+          <div className="flex flex-col items-center mb-6">
+            <Avatar user={user} size="xl" className="ring-4 ring-white shadow-md mb-4" />
+            <p className="text-xs font-semibold text-slate-500">Tap avatar above to change photo</p>
+          </div>
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">Name</label>
-            <input type="text" defaultValue={user?.name || ""} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-slate-300" />
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">Display Name</label>
+            <input
+              type="text"
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 font-medium text-slate-800"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">Role</label>
+            <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-500 font-medium text-sm">{user?.role} (cannot change)</div>
           </div>
           <Button onClick={handleModalClose} className="mt-2">Save Changes</Button>
         </div>
@@ -1076,41 +1325,70 @@ const SettingsView = ({ user, isParent, onLogout }) => {
 
       <Modal isOpen={activeModal === 'family'} onClose={handleModalClose} title="Family Members">
         <div className="space-y-3">
-          {MOCK_USERS.map((member, i) => (
-            <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-[1.25rem] border border-slate-100">
+          {allUsers.map((member) => (
+            <div key={member.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-[1.25rem] ring-1 ring-slate-100">
               <div className="flex items-center gap-3">
                 <Avatar user={member} size="sm" />
-                <span className="font-semibold text-slate-700 text-sm">{member.name} <span className="text-slate-400 font-normal">({member.role})</span></span>
+                <div>
+                  <span className="font-bold text-slate-800 text-sm block">{member.name}</span>
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{member.role}</span>
+                </div>
               </div>
               <Button variant="secondary" className="!w-auto !py-1.5 !px-3 text-xs">Edit</Button>
             </div>
           ))}
-          <Button variant="outline" className="mt-2 w-full border-dashed"><Plus className="w-4 h-4"/> Add Member</Button>
+          <button className="w-full mt-2 py-3 rounded-[1.25rem] border-2 border-dashed border-slate-200 text-slate-500 text-sm font-semibold hover:border-indigo-300 hover:text-indigo-500 transition-colors flex items-center justify-center gap-2">
+            <Plus className="w-4 h-4" /> Add Member
+          </button>
         </div>
       </Modal>
 
       <Modal isOpen={activeModal === 'notifications'} onClose={handleModalClose} title="Notifications">
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="font-medium text-slate-700">Push Notifications</span>
-            <div className="w-12 h-6 bg-slate-800 rounded-full relative cursor-pointer"><div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 shadow-sm"></div></div>
-          </div>
+          {[
+            { label: 'Chore Reminders', sub: 'Get notified when tasks are assigned', on: true },
+            { label: 'Approvals', sub: 'Alert when a child submits proof', on: true },
+            { label: 'Chat Messages', sub: 'Family chat notifications', on: false },
+          ].map(item => (
+            <div key={item.label} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100">
+              <div>
+                <p className="font-bold text-sm text-slate-800">{item.label}</p>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">{item.sub}</p>
+              </div>
+              <div className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${item.on ? 'bg-indigo-500' : 'bg-slate-300'}`}>
+                <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-sm transition-all duration-300 ${item.on ? 'right-0.5' : 'left-0.5'}`} />
+              </div>
+            </div>
+          ))}
         </div>
-        <Button onClick={handleModalClose} className="mt-4">Done</Button>
+        <Button onClick={handleModalClose} className="mt-5">Done</Button>
       </Modal>
 
-      <Modal isOpen={activeModal === 'logout'} onClose={handleModalClose} title="Log Out">
+      <Modal isOpen={activeModal === 'subscription'} onClose={handleModalClose} title="Subscription">
         <div className="space-y-4">
-          <p className="text-slate-600 font-medium">Are you sure you want to log out of Kinflow?</p>
+          <div className="relative overflow-hidden rounded-[1.5rem] p-5" style={{background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)'}}>
+            <Star className="w-8 h-8 text-amber-300 fill-amber-300 mb-3" />
+            <h4 className="text-lg font-bold text-white mb-1">Premium Family Plan</h4>
+            <p className="text-white/60 text-sm">All features · AI Copilot · Unlimited members</p>
+          </div>
+          <Button onClick={handleModalClose} variant="secondary">Close</Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'logout'} onClose={handleModalClose} title="Sign Out">
+        <div className="space-y-4">
+          <p className="text-slate-600 font-medium">Are you sure you want to sign out of Kinflow?</p>
           <div className="flex gap-3 mt-4">
             <Button variant="secondary" onClick={handleModalClose} className="flex-1">Cancel</Button>
-            <Button variant="primary" onClick={() => { handleModalClose(); onLogout(); }} className="flex-1 !bg-rose-500 hover:!bg-rose-600 !shadow-none">Log Out</Button>
+            <Button onClick={() => { handleModalClose(); onLogout(); }} className="flex-1 !bg-rose-500 hover:!bg-rose-600 !shadow-none">Sign Out</Button>
           </div>
         </div>
       </Modal>
+
     </div>
   );
 };
+
 
 const SettingRow = ({ icon: Icon, label, value, className = '', iconClass = '', hideArrow = false, onClick }) => (
   <div onClick={onClick} className={`flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors ${className}`}>
@@ -1531,7 +1809,7 @@ export default function App() {
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
       case 'rewards': return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
       case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} />;
-      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); }} />;
+      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); }} allUsers={MOCK_USERS} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} />;
       default: return null;
     }
   };
