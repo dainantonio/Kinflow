@@ -15,11 +15,17 @@ import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged }
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const DEMO_MODE = typeof __firebase_config === 'undefined' || !__firebase_config;
+let _fbApp = null, auth = null, db = null;
+if (!DEMO_MODE) {
+  try {
+    const firebaseConfig = JSON.parse(__firebase_config);
+    _fbApp = initializeApp(firebaseConfig);
+    auth = getAuth(_fbApp);
+    db = getFirestore(_fbApp);
+  } catch (e) { console.warn('Firebase init failed, running in demo mode'); }
+}
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-kinflow';
 
 // --- GEMINI API HELPER ---
 const fetchWithRetry = async (url, options, retries = 5) => {
@@ -1245,6 +1251,7 @@ export default function App() {
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
 
   useEffect(() => {
+    if (DEMO_MODE) { setFirebaseUser({ uid: 'demo-user' }); return; }
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -1264,6 +1271,14 @@ export default function App() {
   // Sync DB
   useEffect(() => {
     if (!firebaseUser) return;
+    if (DEMO_MODE) {
+      setTasks(mockTasks.map(t => ({...t, id: t.id.toString(), createdAt: Date.now()})));
+      setMessages(mockChats.map(c => ({...c, id: c.id.toString(), createdAt: Date.now()})));
+      setUserPoints({'Tommy': 45, 'Lily': 30});
+      setEvents(mockEvents.map(e => ({...e, id: e.id.toString(), createdAt: Date.now()})));
+      setMeals(mockMeals.map(m => ({...m, id: m.id.toString(), createdAt: Date.now()})));
+      return;
+    }
     const dataPath = 'public';
     const collPath = 'data';
 
@@ -1344,33 +1359,37 @@ export default function App() {
 
   // --- NOTIFICATION DISPATCHER ---
   const sendNotification = async (title, body, targetUserOrRole) => {
-    if (!firebaseUser) return;
     const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_notifications', newId), {
-      id: newId, title, body, target: targetUserOrRole, createdAt: Date.now(), read: false
-    });
+    const notifData = { id: newId, title, body, target: targetUserOrRole, createdAt: Date.now(), read: false };
+    if (DEMO_MODE) { setNotifications(prev => [...prev, notifData]); return; }
+    if (!firebaseUser) return;
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_notifications', newId), notifData);
   };
 
   // --- ACTIONS ---
   
   const handleAddTask = async (newTask) => {
-    if (!firebaseUser) return;
     const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), { ...newTask, id: newId, status: 'open', createdAt: Date.now() });
-    
-    // Trigger notification for the specific child
+    const taskData = { ...newTask, id: newId, status: 'open', createdAt: Date.now() };
+    if (DEMO_MODE) { setTasks(prev => [...prev, taskData]); return; }
+    if (!firebaseUser) return;
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), taskData);
     if (newTask.assignee && newTask.assignee !== 'Anyone') {
       sendNotification("New Chore", `You were assigned a new chore: "${newTask.title}"`, newTask.assignee);
     }
   };
 
   const requestDeleteTask = (id) => {
-    setConfirmActionState({ title: 'Delete Task', message: 'Are you sure you want to permanently remove this chore?', onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString())); setConfirmActionState(null); } });
+    setConfirmActionState({ title: 'Delete Task', message: 'Are you sure you want to permanently remove this chore?', onConfirm: async () => {
+      if (DEMO_MODE) { setTasks(prev => prev.filter(t => String(t.id) !== String(id))); }
+      else await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()));
+      setConfirmActionState(null);
+    }});
   };
 
   const handleTaskAction = async (taskId, action, extra = {}) => {
-    const t = tasks.find(x => x.id === taskId);
-    if (!t || !firebaseUser) return;
+    const t = tasks.find(x => x.id === taskId || String(x.id) === String(taskId));
+    if (!t || (!DEMO_MODE && !firebaseUser)) return;
 
     const assignee = t.assignee;
     let newStatus = t.status;
@@ -1413,6 +1432,13 @@ export default function App() {
       if (t.status !== newStatus && action !== 'reject') triggerConfetti();
     }
 
+    if (DEMO_MODE) {
+      setTasks(prev => prev.map(x => String(x.id) === String(taskId) ? { ...x, status: newStatus, photoUrl: newPhotoUrl } : x));
+      if (pointsChange !== 0 && assignee) {
+        setUserPoints(prev => ({ ...prev, [assignee]: Math.max(0, (prev[assignee] || 0) + pointsChange) }));
+      }
+      return;
+    }
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), { status: newStatus, photoUrl: newPhotoUrl });
 
     if (pointsChange !== 0 && assignee) {
@@ -1426,48 +1452,72 @@ export default function App() {
   };
 
   const handleSendMessage = async (text) => {
-    if (!firebaseUser || !activeUser) return;
+    if (!activeUser) return;
     const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() });
+    const msgData = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
+    if (DEMO_MODE) { setMessages(prev => [...prev, msgData]); return; }
+    if (!firebaseUser) return;
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msgData);
   };
 
   const requestDeleteMessage = (id) => {
-    setConfirmActionState({ title: 'Delete Message', message: 'Remove this message for everyone in the family?', onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', id.toString())); setConfirmActionState(null); } });
+    setConfirmActionState({ title: 'Delete Message', message: 'Remove this message for everyone in the family?', onConfirm: async () => {
+      if (DEMO_MODE) { setMessages(prev => prev.filter(m => String(m.id) !== String(id))); }
+      else await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', id.toString()));
+      setConfirmActionState(null);
+    }});
   };
 
   const handleRedeemReward = async (cost) => {
-    if (!activeUser || !firebaseUser) return;
+    if (!activeUser) return;
     const pointsAvailable = userPoints[activeUser.name] || 0;
     if (!isParent && pointsAvailable >= cost) {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), { points: pointsAvailable - cost }, { merge: true });
-      sendNotification('Reward Redeemed', `${activeUser.name} just redeemed a reward for ${cost} pts!`, 'Parent');
+      if (DEMO_MODE) {
+        setUserPoints(prev => ({ ...prev, [activeUser.name]: Math.max(0, (prev[activeUser.name] || 0) - cost) }));
+      } else {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), { points: pointsAvailable - cost }, { merge: true });
+        sendNotification('Reward Redeemed', `${activeUser.name} just redeemed a reward for ${cost} pts!`, 'Parent');
+      }
       triggerConfetti();
-    } else if (isParent) triggerConfetti(); 
+    } else if (isParent) triggerConfetti();
   };
 
   const handleAddEvent = async (newEvent) => {
-    if (!firebaseUser) return;
     const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', newId), { ...newEvent, id: newId, color: 'bg-indigo-500', createdAt: Date.now() });
+    const eventData = { ...newEvent, id: newId, color: 'bg-indigo-500', createdAt: Date.now() };
+    if (DEMO_MODE) { setEvents(prev => [...prev, eventData]); return; }
+    if (!firebaseUser) return;
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', newId), eventData);
   };
 
   const requestDeleteEvent = (id) => {
-    setConfirmActionState({ title: 'Delete Event', message: 'Are you sure you want to remove this event from the calendar?', onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString())); setConfirmActionState(null); } });
+    setConfirmActionState({ title: 'Delete Event', message: 'Are you sure you want to remove this event from the calendar?', onConfirm: async () => {
+      if (DEMO_MODE) { setEvents(prev => prev.filter(e => String(e.id) !== String(id))); }
+      else await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()));
+      setConfirmActionState(null);
+    }});
   };
 
   const handleAddMeal = async (newMeal) => {
-    if (!firebaseUser) return;
     const newId = Date.now().toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', newId), { ...newMeal, id: newId, tags: ['New Recipe'], createdAt: Date.now() });
+    const mealData = { ...newMeal, id: newId, tags: ['New Recipe'], createdAt: Date.now() };
+    if (DEMO_MODE) { setMeals(prev => [...prev, mealData]); return; }
+    if (!firebaseUser) return;
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', newId), mealData);
   };
 
   const handleUpdateMeal = async (updatedMeal) => {
+    if (DEMO_MODE) { setMeals(prev => prev.map(m => String(m.id) === String(updatedMeal.id) ? { ...m, ...updatedMeal } : m)); return; }
     if (!firebaseUser) return;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', updatedMeal.id.toString()), updatedMeal);
   };
 
   const requestDeleteMeal = (id) => {
-    setConfirmActionState({ title: 'Delete Recipe', message: 'Are you sure you want to permanently delete this recipe?', onConfirm: async () => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString())); setConfirmActionState(null); } });
+    setConfirmActionState({ title: 'Delete Recipe', message: 'Are you sure you want to permanently delete this recipe?', onConfirm: async () => {
+      if (DEMO_MODE) { setMeals(prev => prev.filter(m => String(m.id) !== String(id))); }
+      else await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()));
+      setConfirmActionState(null);
+    }});
   };
 
   const triggerConfetti = () => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 1500); };
@@ -1495,6 +1545,7 @@ export default function App() {
   const unreadNotifsCount = myNotifications.filter(n => !n.read).length;
 
   const markNotifsAsRead = () => {
+    if (DEMO_MODE) { setNotifications(prev => prev.map(n => ({ ...n, read: true }))); return; }
     myNotifications.forEach(async (n) => {
       if (!n.read && firebaseUser) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_notifications', n.id), { read: true });
