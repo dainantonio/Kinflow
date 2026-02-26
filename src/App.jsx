@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 import { ThemeContext, FamilyProvider, useFamilyContext } from './contexts/FamilyContext';
-import { MOCK_USERS, mockRewards } from './utils/demoData';
+import { mockRewards } from './utils/demoData';
 import { CustomStyles } from './components/shared/CustomStyles';
 import { Avatar, Modal, Confetti, NavItem } from './components/shared/Primitives';
 import { SplashScreen } from './components/onboarding/SplashScreen';
@@ -40,6 +40,7 @@ function AppInner() {
     showConfetti, isCopilotOpen, setIsCopilotOpen,
     lastRedeemed,
     isParent, isChild,
+    familyMembers,
     handleLogin, completeOnboarding,
     handleAddTask, requestDeleteTask, handleTaskAction,
     handleSendMessage, requestDeleteMessage,
@@ -47,11 +48,12 @@ function AppInner() {
     handleAddEvent, requestDeleteEvent,
     handleAddMeal, handleUpdateMeal, requestDeleteMeal,
     handleUpdateProfile,
+    handleAddMember, handleUpdateMember, handleRemoveMember,
     myNotifications, unreadNotifsCount, markNotifsAsRead,
   } = ctx;
 
   const renderContent = () => {
-    const displayPoints = isParent ? (userPoints['Tommy'] + userPoints['Lily']) : (userPoints[activeUser?.name] || 0);
+    const displayPoints = isParent ? Object.values(userPoints).reduce((a,b) => a+b, 0) : (userPoints[activeUser?.name] || 0);
     switch(activeTab) {
       case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
       case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
@@ -59,14 +61,14 @@ function AppInner() {
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
       case 'rewards': return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} lastRedeemed={lastRedeemed} />;
       case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} tasks={tasks} />;
-      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} allUsers={MOCK_USERS} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} onUpdateProfile={handleUpdateProfile} />;
+      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} allUsers={familyMembers} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} onUpdateProfile={handleUpdateProfile} onAddMember={handleAddMember} onUpdateMember={handleUpdateMember} onRemoveMember={handleRemoveMember} />;
       default: return null;
     }
   };
 
   if (showSplash) return <SplashScreen />;
   if (!isLoggedIn) return <AuthScreen onComplete={() => { setIsLoggedIn(true); try { localStorage.setItem('kinflow_loggedIn', 'true'); } catch(e) {} }} />;
-  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={MOCK_USERS} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} />;
+  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={familyMembers} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} onAddMember={handleAddMember} />;
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} userRole={activeUser?.role} />;
 
   const primaryNavItems = isParent
@@ -209,7 +211,7 @@ function AppInner() {
 
         <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title={isChild ? "Switch Child" : "Switch Profile"}>
           <div className="space-y-3">
-            {MOCK_USERS.filter(u => isChild ? u.role === 'Child' : true).map(user => (
+            {familyMembers.filter(u => isChild ? u.role === 'Child' : true).map(user => (
               <div key={user.id} onClick={() => { setActiveUser(user); try { localStorage.setItem('kinflow_lastProfile', JSON.stringify(user)); } catch(e) {} setIsUserSwitcherOpen(false); }} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser?.id === user.id ? 'bg-slate-100 ring-2 ring-slate-400' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}>
                 <Avatar user={user} size="md" />
                 <div><h4 className="font-bold text-slate-800">{user.name}</h4><p className="text-xs font-medium text-slate-500">{user.role}</p></div>

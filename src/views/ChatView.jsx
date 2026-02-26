@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Send, Smile, Image as ImageIcon, Trash2, Link2, ChevronLeft, Check, MoreVertical, ChevronDown, X, MessageCircle, CheckSquare } from 'lucide-react';
-import { ThemeContext } from '../contexts/FamilyContext';
+import { ThemeContext, useFamilyContext } from '../contexts/FamilyContext';
 import { Card, Avatar, Modal } from '../components/shared/Primitives';
-import { MOCK_USERS } from '../utils/demoData';
 
 export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
   const { isChild, user } = useContext(ThemeContext);
+  const { familyMembers } = useFamilyContext();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
   const isParent = user?.role === 'Parent';
@@ -17,8 +17,8 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
   const channels = [
     { id: 'family', label: 'Family Chat', icon: '👨‍👩‍👧‍👦', sub: 'Everyone in the family' },
     { id: 'parents', label: 'Parents Only', icon: '🔒', sub: 'Private parent channel', parentOnly: true },
-    ...(isParent ? MOCK_USERS.filter(u => u.role === 'Child').map(u => ({ id: `dm-${u.id}`, label: `Chat with ${u.name}`, icon: u.avatar, sub: 'Direct message' })) : []),
-    ...(!isParent ? MOCK_USERS.filter(u => u.role === 'Parent').map(u => ({ id: `dm-${u.id}`, label: `Chat with ${u.name}`, icon: u.avatar, sub: 'Direct message' })) : [])
+    ...(isParent ? familyMembers.filter(u => u.role === 'Child').map(u => ({ id: `dm-${u.id}`, label: `Chat with ${u.name}`, icon: u.avatar || '💬', sub: 'Direct message' })) : []),
+    ...(!isParent ? familyMembers.filter(u => u.role === 'Parent').map(u => ({ id: `dm-${u.id}`, label: `Chat with ${u.name}`, icon: u.avatar || '💬', sub: 'Direct message' })) : [])
   ].filter(c => !c.parentOnly || isParent);
 
   const activeChannel = channels.find(c => c.id === chatChannel) || channels[0];
@@ -71,14 +71,14 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
 
         {/* Participant chips */}
         <div className="flex items-center gap-1 mt-2">
-          {MOCK_USERS.filter(u => chatChannel === 'family' || (chatChannel === 'parents' && u.role === 'Parent') || chatChannel.startsWith('dm-')).slice(0,5).map((u,i) => (
+          {familyMembers.filter(u => chatChannel === 'family' || (chatChannel === 'parents' && u.role === 'Parent') || chatChannel.startsWith('dm-')).slice(0,5).map((u,i) => (
             <div key={u.id} className="relative" style={{marginLeft: i > 0 ? '-6px' : 0, zIndex: 5-i}}>
               <Avatar user={u} size="sm" className="ring-2 ring-white" />
               <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-1 ring-white" />
             </div>
           ))}
           <span className="text-[10px] font-bold text-slate-400 ml-2">
-            {chatChannel === 'family' ? `${MOCK_USERS.length} members` : chatChannel === 'parents' ? 'Parents only' : 'Direct message'}
+            {chatChannel === 'family' ? `${familyMembers.length} members` : chatChannel === 'parents' ? 'Parents only' : 'Direct message'}
           </span>
         </div>
 
@@ -107,7 +107,7 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
           )}
           {messages?.map((msg, idx) => {
             const isMe = msg.senderId === user.id;
-            const sender = MOCK_USERS.find(u => u.id === msg.senderId);
+            const sender = familyMembers.find(u => u.id === msg.senderId);
             return (
               <div key={msg.id} className={`flex gap-2 items-end ${isMe ? 'justify-end' : 'justify-start'}`}>
                 {!isMe && <Avatar user={sender} size="sm" className="shrink-0 mb-4 ring-2 ring-white shadow-sm" />}
@@ -193,4 +193,3 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
     </div>
   );
 };
-

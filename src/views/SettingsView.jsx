@@ -1,8 +1,16 @@
 import React, { useState, useContext } from 'react';
-import { ChevronLeft, Camera, Bell, Settings, CreditCard, Users, HelpCircle, LogOut, ChevronRight, Check, Plus, Star, User, BellRing } from 'lucide-react';
+import { ChevronLeft, Camera, Bell, Settings, CreditCard, Users, HelpCircle, LogOut, ChevronRight, Check, Plus, Star, User, BellRing, Trash2, X } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
 import { Card, Avatar, Modal, SettingRow, Button } from '../components/shared/Primitives';
-import { MOCK_USERS } from '../utils/demoData';
+
+const COLOR_OPTIONS = [
+  'from-pink-500 to-rose-500',
+  'from-blue-500 to-cyan-500',
+  'from-emerald-400 to-teal-500',
+  'from-purple-500 to-indigo-500',
+  'from-amber-400 to-orange-500',
+  'from-red-500 to-pink-500',
+];
 
 export const PreferencesPanel = ({ onClose }) => {
   const [prefs, setPrefs] = useState(() => {
@@ -89,7 +97,7 @@ export const PreferencesPanel = ({ onClose }) => {
   );
 };
 
-export const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, userPoints = {}, tasks = [], onBack, onUpdateProfile }) => {
+export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}, tasks = [], onBack, onUpdateProfile, onAddMember, onUpdateMember, onRemoveMember }) => {
   const [activeModal, setActiveModal] = useState(null);
   const [editName, setEditName] = useState(user?.name || '');
   const [profileSaved, setProfileSaved] = useState(false);
@@ -97,7 +105,17 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, 
     try { return JSON.parse(localStorage.getItem('kinflow_notifPrefs') || 'null') || { choreReminders: true, approvals: true, chatMessages: false }; }
     catch(e) { return { choreReminders: true, approvals: true, chatMessages: false }; }
   });
-  const handleModalClose = () => { setActiveModal(null); setProfileSaved(false); };
+
+  // Manage Members state
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [editingMemberName, setEditingMemberName] = useState('');
+  const [showAddMemberForm, setShowAddMemberForm] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('Child');
+  const [newMemberColor, setNewMemberColor] = useState(COLOR_OPTIONS[0]);
+  const [confirmRemoveMember, setConfirmRemoveMember] = useState(null);
+
+  const handleModalClose = () => { setActiveModal(null); setProfileSaved(false); setEditingMemberId(null); setShowAddMemberForm(false); setConfirmRemoveMember(null); };
 
   const handleSaveProfile = () => {
     if (onUpdateProfile) {
@@ -114,6 +132,35 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, 
       try { localStorage.setItem('kinflow_notifPrefs', JSON.stringify(updated)); } catch(e) {}
       return updated;
     });
+  };
+
+  const handleStartEditMember = (member) => {
+    setEditingMemberId(member.id);
+    setEditingMemberName(member.name);
+  };
+
+  const handleSaveMemberEdit = (member) => {
+    if (onUpdateMember && editingMemberName.trim()) {
+      onUpdateMember({ ...member, name: editingMemberName.trim(), initials: editingMemberName.trim().charAt(0).toUpperCase() });
+    }
+    setEditingMemberId(null);
+  };
+
+  const handleAddNewMember = () => {
+    if (onAddMember && newMemberName.trim()) {
+      onAddMember({ name: newMemberName.trim(), role: newMemberRole, color: newMemberColor });
+      setNewMemberName('');
+      setNewMemberRole('Child');
+      setNewMemberColor(COLOR_OPTIONS[0]);
+      setShowAddMemberForm(false);
+    }
+  };
+
+  const handleConfirmRemove = (memberId) => {
+    if (onRemoveMember) {
+      onRemoveMember(memberId);
+    }
+    setConfirmRemoveMember(null);
   };
 
   const myPoints = userPoints[user?.name] || 0;
@@ -304,20 +351,94 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, 
       <Modal isOpen={activeModal === 'family'} onClose={handleModalClose} title="Family Members">
         <div className="space-y-3">
           {allUsers.map((member) => (
-            <div key={member.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-[1.25rem] ring-1 ring-slate-100">
-              <div className="flex items-center gap-3">
-                <Avatar user={member} size="sm" />
-                <div>
-                  <span className="font-bold text-slate-800 text-sm block">{member.name}</span>
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{member.role}</span>
+            <div key={member.id} className="p-4 bg-slate-50 rounded-[1.25rem] ring-1 ring-slate-100">
+              {editingMemberId === member.id ? (
+                <div className="flex items-center gap-3">
+                  <Avatar user={member} size="sm" />
+                  <input
+                    type="text"
+                    value={editingMemberName}
+                    onChange={e => setEditingMemberName(e.target.value)}
+                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 font-medium text-slate-800 text-sm"
+                    autoFocus
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveMemberEdit(member); }}
+                  />
+                  <button onClick={() => handleSaveMemberEdit(member)} className="spring-press px-3 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl">Save</button>
+                  <button onClick={() => setEditingMemberId(null)} className="p-1.5 text-slate-400 hover:text-slate-600">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-              </div>
-              <Button variant="secondary" className="!w-auto !py-1.5 !px-3 text-xs">Edit</Button>
+              ) : (
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <Avatar user={member} size="sm" />
+                    <div>
+                      <span className="font-bold text-slate-800 text-sm block">{member.name}</span>
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{member.role}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="secondary" className="!w-auto !py-1.5 !px-3 text-xs" onClick={() => handleStartEditMember(member)}>Edit</Button>
+                    {member.id !== user?.id && (
+                      confirmRemoveMember === member.id ? (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => handleConfirmRemove(member.id)} className="spring-press px-2 py-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-lg">Remove</button>
+                          <button onClick={() => setConfirmRemoveMember(null)} className="px-2 py-1.5 text-slate-400 text-[10px] font-bold">Cancel</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmRemoveMember(member.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-xl transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
-          <button className="w-full mt-2 py-3 rounded-[1.25rem] border-2 border-dashed border-slate-200 text-slate-500 text-sm font-semibold hover:border-indigo-300 hover:text-indigo-500 transition-colors flex items-center justify-center gap-2">
-            <Plus className="w-4 h-4" /> Add Member
-          </button>
+
+          {showAddMemberForm ? (
+            <div className="p-4 bg-indigo-50 rounded-[1.25rem] ring-1 ring-indigo-200 space-y-3 animate-bounce-in">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Name</label>
+                <input
+                  type="text"
+                  value={newMemberName}
+                  onChange={e => setNewMemberName(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 font-medium text-slate-800 text-sm"
+                  placeholder="Enter name"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Role</label>
+                <select value={newMemberRole} onChange={e => setNewMemberRole(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 font-medium text-slate-800 text-sm">
+                  <option value="Parent">Parent</option>
+                  <option value="Child">Child</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Color</label>
+                <div className="flex gap-2">
+                  {COLOR_OPTIONS.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => setNewMemberColor(color)}
+                      className={`w-8 h-8 rounded-full bg-gradient-to-br ${color} transition-all ${newMemberColor === color ? 'ring-2 ring-offset-2 ring-indigo-500 scale-110' : 'opacity-70 hover:opacity-100'}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setShowAddMemberForm(false)} className="flex-1 py-2.5 rounded-xl font-bold text-sm border-2 border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+                <button onClick={handleAddNewMember} disabled={!newMemberName.trim()} className="spring-press flex-1 py-2.5 rounded-xl font-bold text-sm bg-slate-900 text-white shadow-md disabled:opacity-50">Add Member</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setShowAddMemberForm(true)} className="w-full mt-2 py-3 rounded-[1.25rem] border-2 border-dashed border-slate-200 text-slate-500 text-sm font-semibold hover:border-indigo-300 hover:text-indigo-500 transition-colors flex items-center justify-center gap-2">
+              <Plus className="w-4 h-4" /> Add Member
+            </button>
+          )}
         </div>
       </Modal>
 
@@ -420,5 +541,3 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, 
     </div>
   );
 };
-
-

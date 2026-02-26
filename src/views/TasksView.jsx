@@ -1,13 +1,17 @@
 import React, { useState, useContext, useRef } from 'react';
 import { Plus, Check, Clock, Star, Hourglass, Trash2, Camera, ChevronRight, X, MoreVertical, User, CheckSquare, Loader2 } from 'lucide-react';
-import { ThemeContext } from '../contexts/FamilyContext';
+import { ThemeContext, useFamilyContext } from '../contexts/FamilyContext';
 import { Card, Button, Badge, Avatar, Modal, RevealCard } from '../components/shared/Primitives';
-import { MOCK_USERS } from '../utils/demoData';
 
 export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) => {
+  const { familyMembers } = useFamilyContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
-  const [assignee, setAssignee] = useState('Tommy');
+  const [assignee, setAssignee] = useState(() => {
+    // Default to first child, or first member
+    const firstChild = familyMembers.find(u => u.role === 'Child');
+    return firstChild ? firstChild.name : (familyMembers[0]?.name || 'Anyone');
+  });
   const [taskPoints, setTaskPoints] = useState(10);
   const [requiresPhoto, setRequiresPhoto] = useState(false);
   const [dueDate, setDueDate] = useState('');
@@ -166,7 +170,7 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
             </div>
             <p className="text-slate-700 font-bold text-base">{isParent ? 'All caught up!' : 'No tasks right now!'}</p>
             <p className="text-slate-400 text-xs font-medium mt-1 max-w-[200px] mx-auto">{isParent ? 'All tasks have been reviewed. Nice work!' : 'Check back later for new chores to earn points!'}</p>
-            {isParent && <button onClick={() => setShowNewTask(true)} className="mt-4 px-5 py-2.5 bg-indigo-500 text-white text-xs font-bold rounded-xl hover:bg-indigo-600 transition-colors">Create Task</button>}
+            {isParent && <button onClick={() => setIsModalOpen(true)} className="mt-4 px-5 py-2.5 bg-indigo-500 text-white text-xs font-bold rounded-xl hover:bg-indigo-600 transition-colors">Create Task</button>}
           </div>
         )}
         {visibleTasks.filter(t => isParent ? t.status !== 'pending' : true).map((task, idx) => {
@@ -234,7 +238,10 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Assignee</label>
               <select value={assignee} onChange={e => setAssignee(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium">
-                <option>Tommy</option><option>Lily</option><option>Sarah</option><option>Dad</option><option>Anyone</option>
+                {familyMembers.map(u => (
+                  <option key={u.id} value={u.name}>{u.name}</option>
+                ))}
+                <option value="Anyone">Anyone</option>
               </select>
             </div>
             <div>
@@ -350,4 +357,3 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
     </div>
   );
 };
-
