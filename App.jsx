@@ -52,9 +52,11 @@ const useScrollReveal = () => {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Immediately reveal — scroll reveal is bonus, not gating
+    el.classList.add('revealed');
     const observer = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) { el.classList.add('revealed'); observer.disconnect(); } },
-      { threshold: 0.1, rootMargin: '0px 0px -30px 0px' }
+      { threshold: 0.05, rootMargin: '60px 0px 0px 0px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -156,6 +158,27 @@ const CustomStyles = () => (
       }
 
       .pb-safe { padding-bottom: max(env(safe-area-inset-bottom, 16px), 16px); }
+
+      /* Native-feel scroll */
+      .scroll-container {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
+        scroll-behavior: smooth;
+      }
+      
+      /* Ensure revealed state by default (animation bonus, not gating) */
+      .scroll-reveal {
+        opacity: 1 !important;
+        transform: translateY(0) !important;
+      }
+      .scroll-reveal.animate-on-scroll {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      .scroll-reveal.animate-on-scroll.revealed {
+        opacity: 1;
+        transform: translateY(0);
+      }
 
       .shimmer-bg {
         background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
@@ -1074,6 +1097,7 @@ const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
   const [time, setTime] = useState('');
   const [location, setLocation] = useState('');
   const [baseDate, setBaseDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState(new Date());
 
   const startOfWeek = new Date(baseDate);
   const day = startOfWeek.getDay();
@@ -1137,11 +1161,12 @@ const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
             const today = isToday(d);
             return (
               <div key={idx}
+                onClick={() => setSelectedDay(d)}
                 className="spring-press flex flex-col items-center justify-center min-w-[3.25rem] h-16 rounded-2xl transition-all cursor-pointer shrink-0"
-                style={{scrollSnapAlign:'start', background: today ? 'linear-gradient(135deg, #4f46e5, #7c3aed)' : 'white', boxShadow: today ? '0 4px 16px rgba(79,70,229,0.3)' : '0 1px 4px rgba(0,0,0,0.06)', border:'1px solid ' + (today ? 'transparent' : 'rgba(0,0,0,0.05)')}}
+                style={{scrollSnapAlign:'start', background: today ? 'linear-gradient(135deg, #4f46e5, #7c3aed)' : selectedDay && d.getDate()===selectedDay.getDate() && d.getMonth()===selectedDay.getMonth() ? 'linear-gradient(135deg, #e0e7ff, #ede9fe)' : 'white', boxShadow: today ? '0 4px 16px rgba(79,70,229,0.3)' : selectedDay && d.getDate()===selectedDay.getDate() ? '0 2px 8px rgba(79,70,229,0.15)' : '0 1px 4px rgba(0,0,0,0.06)', border:'1px solid ' + (today ? 'transparent' : selectedDay && d.getDate()===selectedDay.getDate() && d.getMonth()===selectedDay.getMonth() ? 'rgba(99,102,241,0.3)' : 'rgba(0,0,0,0.05)')}}
               >
-                <span className={`text-[9px] font-bold uppercase tracking-widest ${today ? 'text-white/70' : 'text-slate-400'}`}>{d.toLocaleString('en-US',{weekday:'short'})}</span>
-                <span className={`text-xl font-bold mt-0.5 ${today ? 'text-white' : 'text-slate-800'}`}>{d.getDate()}</span>
+                <span className={`text-[9px] font-bold uppercase tracking-widest ${today ? 'text-white/70' : selectedDay && d.getDate()===selectedDay.getDate() && d.getMonth()===selectedDay.getMonth() ? 'text-indigo-500' : 'text-slate-400'}`}>{d.toLocaleString('en-US',{weekday:'short'})}</span>
+                <span className={`text-xl font-bold mt-0.5 ${today ? 'text-white' : selectedDay && d.getDate()===selectedDay.getDate() && d.getMonth()===selectedDay.getMonth() ? 'text-indigo-600' : 'text-slate-800'}`}>{d.getDate()}</span>
               </div>
             );
           })}
@@ -1568,6 +1593,14 @@ const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, userPoi
           </div>
         )}
 
+        {/* APPEARANCE / THEMES */}
+        <div>
+          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Appearance</h3>
+          <div className="bg-white rounded-[1.75rem] ring-1 ring-slate-900/5 overflow-hidden shadow-sm divide-y divide-slate-50">
+            <SettingRow onClick={() => setActiveModal('themes')} icon={Settings} label="App Theme" value="Classic" />
+          </div>
+        </div>
+
         {isParent && (
           <div>
             <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Preferences</h3>
@@ -1660,6 +1693,56 @@ const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, userPoi
             <p className="text-white/60 text-sm">All features · AI Copilot · Unlimited members</p>
           </div>
           <Button onClick={handleModalClose} variant="secondary">Close</Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'themes'} onClose={handleModalClose} title="App Theme">
+        <div className="space-y-5">
+          <p className="text-sm font-medium text-slate-500">Choose a theme for your Kinflow experience. All themes stay fully legible.</p>
+
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Parent Themes</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { name: 'Classic', desc: 'Deep indigo & violet', gradient: 'from-indigo-600 to-violet-700', selected: true },
+                { name: 'Slate', desc: 'Professional dark slate', gradient: 'from-slate-700 to-slate-900', selected: false },
+                { name: 'Ocean', desc: 'Blue & teal tones', gradient: 'from-blue-600 to-teal-600', selected: false },
+                { name: 'Forest', desc: 'Calm greens & earth', gradient: 'from-emerald-600 to-green-800', selected: false },
+              ].map(t => (
+                <div key={t.name} className={`relative rounded-2xl overflow-hidden cursor-pointer ring-2 transition-all ${t.selected ? 'ring-indigo-500 shadow-lg shadow-indigo-200' : 'ring-transparent hover:ring-slate-200'}`}>
+                  <div className={`h-16 bg-gradient-to-br ${t.gradient}`} />
+                  <div className="bg-white p-2.5">
+                    <p className="font-bold text-sm text-slate-800">{t.name}</p>
+                    <p className="text-[10px] font-medium text-slate-400">{t.desc}</p>
+                  </div>
+                  {t.selected && <div className="absolute top-2 right-2 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-sm"><Check className="w-3 h-3 text-indigo-500" strokeWidth={3} /></div>}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Kids Themes (Fun & Bright)</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { name: 'Sky Kids', desc: 'Bright sky blue', gradient: 'from-sky-400 to-cyan-500', selected: false },
+                { name: 'Sunshine', desc: 'Warm amber & yellow', gradient: 'from-amber-400 to-yellow-400', selected: false },
+                { name: 'Berry', desc: 'Playful pink & purple', gradient: 'from-pink-500 to-purple-500', selected: false },
+                { name: 'Lime', desc: 'Fresh green & mint', gradient: 'from-lime-400 to-emerald-400', selected: false },
+              ].map(t => (
+                <div key={t.name} className="relative rounded-2xl overflow-hidden cursor-pointer ring-2 ring-transparent hover:ring-slate-200 transition-all">
+                  <div className={`h-16 bg-gradient-to-br ${t.gradient}`} />
+                  <div className="bg-white p-2.5">
+                    <p className="font-bold text-sm text-slate-800">{t.name}</p>
+                    <p className="text-[10px] font-medium text-slate-400">{t.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-[10px] font-medium text-slate-400 text-center">Theme switching coming in the next update ✨</p>
+          <Button onClick={handleModalClose} variant="secondary">Done</Button>
         </div>
       </Modal>
 
