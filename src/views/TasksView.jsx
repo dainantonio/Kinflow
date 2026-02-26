@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef } from 'react';
 import { Plus, Check, Clock, Star, Hourglass, Trash2, Camera, ChevronRight, X, MoreVertical, User, CheckSquare, Loader2 } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
 import { Card, Button, Badge, Avatar, Modal, RevealCard } from '../components/shared/Primitives';
