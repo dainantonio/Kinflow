@@ -7,7 +7,7 @@ import {
   ShoppingCart, Loader2, Hourglass, ArrowRight,
   Layers, Wand2, Smartphone, Film, Ticket,
   MessageCircle, Smile, Image as ImageIcon, Camera, Trash2, ChevronLeft, UserCircle
-} from 'lucide-react';
+, MoreHorizontal, ArrowLeftRight, HelpCircle } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
@@ -1237,34 +1237,91 @@ const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
         </div>
       </RevealCard>
 
-      {/* EVENTS LIST */}
-      <div className="space-y-3">
-        {events.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-3xl ring-1 ring-black/5">
-            <div className="text-4xl mb-3">📅</div>
-            <p className="text-slate-400 font-medium text-sm">No events scheduled</p>
-          </div>
-        )}
-        {events.map((event, idx) => (
-          <RevealCard key={event.id} delay={idx * 60}>
-            <div className="bg-white rounded-3xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4">
-              <div className={`w-1 h-14 rounded-full shrink-0 ${event.color}`} />
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-slate-800 text-sm">{event.title}</p>
-                <div className="flex items-center gap-3 mt-1 flex-wrap">
-                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {event.time}</span>
-                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3"/> {event.location}</span>
-                </div>
+      {/* DAY DRAWER - shows when a day is tapped */}
+      {selectedDay && (
+        <RevealCard delay={80}>
+          <div className="bg-white rounded-3xl ring-1 ring-black/5 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">
+                  {selectedDay.toLocaleDateString('en-US', { weekday: 'long' })}
+                </p>
+                <h3 className="text-lg font-bold text-slate-900 leading-tight mt-0.5">
+                  {selectedDay.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                </h3>
               </div>
               {isParent && (
-                <button onClick={() => onDelete(event.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-xl transition-colors shrink-0">
-                  <Trash2 className="w-4 h-4" />
+                <button onClick={() => setIsModalOpen(true)} className="spring-press flex items-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-colors">
+                  <Plus className="w-3.5 h-3.5" /> Add Event
                 </button>
               )}
             </div>
-          </RevealCard>
-        ))}
-      </div>
+            <div className="p-3">
+              {events.filter(e => {
+                /* show all events for now - real app would filter by date */
+                return true;
+              }).length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-3xl mb-2">🌤️</div>
+                  <p className="text-slate-400 font-medium text-sm">Nothing planned</p>
+                  {isParent && <p className="text-slate-300 text-xs font-medium mt-1">Tap + to add an event</p>}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {events.map((event, idx) => (
+                    <div key={event.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors group">
+                      <div className={`w-1 h-10 rounded-full shrink-0 ${event.color}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-800 text-sm">{event.title}</p>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {event.time}</span>
+                          <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3"/> {event.location}</span>
+                        </div>
+                      </div>
+                      {isParent && (
+                        <button onClick={() => onDelete(event.id)} className="p-1.5 text-slate-200 hover:text-rose-500 rounded-xl transition-colors shrink-0 opacity-0 group-hover:opacity-100">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </RevealCard>
+      )}
+
+      {/* ALL EVENTS (when no day selected) */}
+      {!selectedDay && (
+        <div className="space-y-3">
+          {events.length === 0 && (
+            <div className="text-center py-12 bg-white rounded-3xl ring-1 ring-black/5">
+              <div className="text-4xl mb-3">📅</div>
+              <p className="text-slate-400 font-medium text-sm">No events scheduled</p>
+            </div>
+          )}
+          {events.map((event, idx) => (
+            <RevealCard key={event.id} delay={idx * 60}>
+              <div className="bg-white rounded-3xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4">
+                <div className={`w-1 h-14 rounded-full shrink-0 ${event.color}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-800 text-sm">{event.title}</p>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {event.time}</span>
+                    <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3"/> {event.location}</span>
+                  </div>
+                </div>
+                {isParent && (
+                  <button onClick={() => onDelete(event.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-xl transition-colors shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </RevealCard>
+          ))}
+        </div>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Event">
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -1606,6 +1663,92 @@ const RewardsView = ({ rewards, points, onRedeem, isParent, lastRedeemed }) => {
   );
 };
 
+
+const PreferencesPanel = ({ onClose }) => {
+  const [prefs, setPrefs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kinflow_preferences') || 'null') || { weekStart: 'sunday', currency: 'USD', autoApprove: false, soundEffects: true, compactMode: false }; }
+    catch(e) { return { weekStart: 'sunday', currency: 'USD', autoApprove: false, soundEffects: true, compactMode: false }; }
+  });
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = () => {
+    setSaving(true);
+    setTimeout(() => {
+      try { localStorage.setItem('kinflow_preferences', JSON.stringify(prefs)); } catch(e) {}
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }, 400);
+  };
+
+  const togglePref = (key) => setPrefs(p => ({ ...p, [key]: !p[key] }));
+
+  return (
+    <div className="space-y-5">
+      {saved && (
+        <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-2xl ring-1 ring-emerald-200 animate-slide-up">
+          <Check className="w-4 h-4 text-emerald-600" />
+          <span className="text-sm font-bold text-emerald-700">Preferences saved!</span>
+        </div>
+      )}
+
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">General</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100">
+            <div>
+              <p className="font-bold text-sm text-slate-800">Week Starts On</p>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">Calendar & schedule layout</p>
+            </div>
+            <select value={prefs.weekStart} onChange={e => setPrefs(p => ({...p, weekStart: e.target.value}))} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+              <option value="sunday">Sunday</option>
+              <option value="monday">Monday</option>
+            </select>
+          </div>
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100">
+            <div>
+              <p className="font-bold text-sm text-slate-800">Currency</p>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">For reward values</p>
+            </div>
+            <select value={prefs.currency} onChange={e => setPrefs(p => ({...p, currency: e.target.value}))} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="GBP">GBP (£)</option>
+              <option value="points">Points only</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Behavior</p>
+        <div className="space-y-3">
+          {[
+            { key: 'autoApprove', label: 'Auto-Approve Tasks', sub: 'Skip approval step for simple chores' },
+            { key: 'soundEffects', label: 'Sound Effects', sub: 'Play sounds on points & rewards' },
+            { key: 'compactMode', label: 'Compact Mode', sub: 'Smaller cards, more content on screen' },
+          ].map(item => (
+            <div key={item.key} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100">
+              <div>
+                <p className="font-bold text-sm text-slate-800">{item.label}</p>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">{item.sub}</p>
+              </div>
+              <button onClick={() => togglePref(item.key)} className={`w-12 h-6 rounded-full relative transition-colors duration-300 ${prefs[item.key] ? 'bg-indigo-500' : 'bg-slate-300'}`}>
+                <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-sm transition-all duration-300 ${prefs[item.key] ? 'right-0.5' : 'left-0.5'}`} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={handleSave} disabled={saving} className={`spring-press w-full py-4 rounded-2xl font-bold text-base shadow-md mt-2 transition-all ${saving ? 'bg-slate-300 text-slate-500' : 'bg-slate-900 text-white shadow-slate-900/20'}`}>
+        {saving ? 'Saving...' : 'Save Preferences'}
+      </button>
+    </div>
+  );
+};
+
 const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, userPoints = {}, tasks = [], onBack }) => {
   const [activeModal, setActiveModal] = useState(null);
   const [editName, setEditName] = useState(user?.name || '');
@@ -1751,7 +1894,7 @@ const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, userPoi
           <div>
             <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Preferences</h3>
             <div className="bg-white rounded-[1.75rem] ring-1 ring-slate-900/5 overflow-hidden shadow-sm divide-y divide-slate-50">
-              <SettingRow icon={Settings} label="App Preferences" onClick={() => {}} />
+              <SettingRow icon={Settings} label="App Preferences" onClick={() => setActiveModal('preferences')} />
             </div>
           </div>
         )}
@@ -1890,6 +2033,10 @@ const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, userPoi
           <p className="text-[10px] font-medium text-slate-400 text-center">Theme switching coming in the next update ✨</p>
           <Button onClick={handleModalClose} variant="secondary">Done</Button>
         </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'preferences'} onClose={handleModalClose} title="App Preferences">
+        <PreferencesPanel onClose={handleModalClose} />
       </Modal>
 
       <Modal isOpen={activeModal === 'logout'} onClose={handleModalClose} title="Sign Out">
@@ -2062,6 +2209,8 @@ const NavItem = ({ icon: Icon, label, isActive, isChild, onClick }) => {
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [activeUser, setActiveUser] = useState(() => {
     try {
       const saved = localStorage.getItem('kinflow_lastProfile');
@@ -2419,9 +2568,13 @@ export default function App() {
   if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={MOCK_USERS} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} />;
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
-  const navItems = isParent 
-    ? [{ id: 'home', icon: Home, label: 'Today' }, { id: 'tasks', icon: CheckSquare, label: 'Tasks' }, { id: 'calendar', icon: CalendarIcon, label: 'Plan' }, { id: 'meals', icon: ChefHat, label: 'Meals' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }]
-    : [{ id: 'home', icon: Home, label: 'Home' }, { id: 'tasks', icon: CheckSquare, label: 'Chores' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }];
+  const primaryNavItems = isParent 
+    ? [{ id: 'home', icon: Home, label: 'Today' }, { id: 'tasks', icon: CheckSquare, label: 'Tasks' }, { id: 'meals', icon: ChefHat, label: 'Meals' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }]
+    : [{ id: 'home', icon: Home, label: 'Home' }, { id: 'tasks', icon: CheckSquare, label: 'Chores' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }];
+  const moreNavItems = isParent
+    ? [{ id: 'calendar', icon: CalendarIcon, label: 'Plan' }, { id: 'rewards', icon: Gift, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }]
+    : [];
+  const navItems = primaryNavItems;
 
   const appBgClass = isChild ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' : 'bg-slate-50 text-slate-800';
 
@@ -2466,10 +2619,41 @@ export default function App() {
               <Bell className="w-4 h-4 text-slate-700" strokeWidth={2} />
               {unreadNotifsCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">{unreadNotifsCount}</span>}
             </button>
-            {/* Avatar → user switcher */}
-            <button onClick={() => setIsUserSwitcherOpen(true)} className="spring-press">
-              <Avatar user={activeUser} size="sm" className="ring-2 ring-white shadow-md" />
-            </button>
+            {/* Profile dropdown */}
+            <div className="relative">
+              <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="spring-press">
+                <Avatar user={activeUser} size="sm" className="ring-2 ring-white shadow-md" />
+              </button>
+              {isProfileMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsProfileMenuOpen(false)} />
+                  <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-2xl ring-1 ring-black/10 p-2 z-50 min-w-[12rem] animate-slide-up">
+                    <div className="px-3 py-2 mb-1 border-b border-slate-100">
+                      <p className="font-bold text-sm text-slate-800">{activeUser?.name}</p>
+                      <p className="text-[10px] font-medium text-slate-400">{activeUser?.role}</p>
+                    </div>
+                    <button onClick={() => { setIsUserSwitcherOpen(true); setIsProfileMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-slate-600 hover:bg-slate-50 transition-colors">
+                      <ArrowLeftRight className="w-4 h-4" /><span className="text-sm font-semibold">Switch Profile</span>
+                    </button>
+                    <button onClick={() => { setActiveTab('settings'); setIsProfileMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-slate-600 hover:bg-slate-50 transition-colors">
+                      <Settings className="w-4 h-4" /><span className="text-sm font-semibold">Settings</span>
+                    </button>
+                    <button onClick={() => { setIsNotifModalOpen(true); markNotifsAsRead(); setIsProfileMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-slate-600 hover:bg-slate-50 transition-colors">
+                      <BellRing className="w-4 h-4" /><span className="text-sm font-semibold">Notifications</span>
+                      {unreadNotifsCount > 0 && <span className="ml-auto w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">{unreadNotifsCount}</span>}
+                    </button>
+                    <button onClick={() => { setIsProfileMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-slate-600 hover:bg-slate-50 transition-colors">
+                      <HelpCircle className="w-4 h-4" /><span className="text-sm font-semibold">Help</span>
+                    </button>
+                    <div className="border-t border-slate-100 mt-1 pt-1">
+                      <button onClick={() => { setIsProfileMenuOpen(false); setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-rose-500 hover:bg-rose-50 transition-colors">
+                        <LogOut className="w-4 h-4" /><span className="text-sm font-semibold">Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -2544,7 +2728,7 @@ export default function App() {
         {/* PREMIUM BOTTOM NAV */}
         <div className="fixed bottom-0 inset-x-0 z-40" style={{paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
           <div className="mx-4 mb-4">
-            <nav className={`${isChild ? 'bg-white ring-1 ring-black/5' : 'bg-white/95 backdrop-blur-2xl ring-1 ring-black/5'} rounded-[2rem] shadow-[0_-2px_40px_rgba(0,0,0,0.12)] flex items-center px-2 py-1`}>
+            <nav className={`${isChild ? 'bg-white ring-1 ring-black/5' : 'bg-white/95 backdrop-blur-2xl ring-1 ring-black/5'} rounded-[2rem] shadow-[0_-2px_40px_rgba(0,0,0,0.12)] flex items-center px-2 py-1 relative`}>
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -2555,10 +2739,42 @@ export default function App() {
                     label={item.label}
                     isActive={isActive}
                     isChild={isChild}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => { setActiveTab(item.id); setMoreMenuOpen(false); }}
                   />
                 );
               })}
+              {moreNavItems.length > 0 && (
+                <div className="relative flex-1 flex justify-center">
+                  <button
+                    onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+                    className={`spring-press flex flex-col items-center justify-center w-full py-2 rounded-2xl transition-all ${moreMenuOpen ? 'text-indigo-600' : 'text-slate-400'}`}
+                  >
+                    <MoreHorizontal className="w-5 h-5" />
+                    <span className="text-[9px] font-bold mt-0.5">More</span>
+                  </button>
+                  {moreMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setMoreMenuOpen(false)} />
+                      <div className="absolute bottom-full mb-3 right-0 bg-white rounded-2xl shadow-2xl ring-1 ring-black/10 p-2 z-50 min-w-[10rem] animate-slide-up">
+                        {moreNavItems.map((item) => {
+                          const MIcon = item.icon;
+                          const isActive = activeTab === item.id;
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => { setActiveTab(item.id); setMoreMenuOpen(false); }}
+                              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:bg-slate-50'}`}
+                            >
+                              <MIcon className="w-4 h-4" />
+                              <span className="text-sm font-semibold">{item.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </nav>
           </div>
         </div>
