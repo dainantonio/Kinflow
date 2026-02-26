@@ -1,11 +1,11 @@
 import React, { useContext } from 'react';
-import { Star, Gift } from 'lucide-react';
+import { Star, Gift, Flame } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
 import { Card, Button, Badge, RevealCard } from '../components/shared/Primitives';
 
 export const RewardsView = ({ rewards, points, onRedeem, isParent, lastRedeemed }) => {
   const { isChild } = useContext(ThemeContext);
-  const nextReward = rewards.filter(r => r.cost > points).sort((a,b) => a.cost - b.cost)[0];
+  const nextReward = rewards?.filter(r => r.cost > points).sort((a,b) => a.cost - b.cost)[0];
   const progress = nextReward ? Math.min(100, (points / nextReward.cost) * 100) : 100;
 
   return (
@@ -50,7 +50,7 @@ export const RewardsView = ({ rewards, points, onRedeem, isParent, lastRedeemed 
       <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest px-1">Available Rewards</h3>
 
       <div className="grid grid-cols-1 gap-3">
-        {rewards.map((reward, idx) => {
+        {rewards?.map((reward, idx) => {
           const canAfford = points >= reward.cost;
           return (
             <RevealCard key={reward.id} delay={idx * 60}>

@@ -343,6 +343,13 @@ export const FamilyProvider = ({ children }) => {
     }});
   };
 
+  const handleUpdateProfile = (updatedUser) => {
+    setActiveUser(updatedUser);
+    try { localStorage.setItem('kinflow_lastProfile', JSON.stringify(updatedUser)); } catch(e) {}
+    setLatestToast({ id: Date.now().toString(), title: 'Profile Updated', body: `Display name changed to "${updatedUser.name}"`, createdAt: Date.now() });
+    setTimeout(() => setLatestToast(null), 3500);
+  };
+
   // Filter My Notifications
   const myNotifications = notifications
     .filter(n => isParent ? n.target === 'Parent' : n.target === activeUser?.name)
@@ -383,6 +390,7 @@ export const FamilyProvider = ({ children }) => {
     handleRedeemReward,
     handleAddEvent, requestDeleteEvent,
     handleAddMeal, handleUpdateMeal, requestDeleteMeal,
+    handleUpdateProfile,
     myNotifications, unreadNotifsCount, markNotifsAsRead,
   };
 

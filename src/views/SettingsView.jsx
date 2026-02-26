@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
-import { ChevronLeft, Camera, Bell, Settings, CreditCard, Users, HelpCircle, LogOut, ChevronRight, Check } from 'lucide-react';
+import { ChevronLeft, Camera, Bell, Settings, CreditCard, Users, HelpCircle, LogOut, ChevronRight, Check, Plus, Star, User, BellRing } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
-import { Card, Avatar, Modal, SettingRow } from '../components/shared/Primitives';
+import { Card, Avatar, Modal, SettingRow, Button } from '../components/shared/Primitives';
 import { MOCK_USERS } from '../utils/demoData';
 
 export const PreferencesPanel = ({ onClose }) => {
@@ -89,10 +89,32 @@ export const PreferencesPanel = ({ onClose }) => {
   );
 };
 
-export const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, userPoints = {}, tasks = [], onBack }) => {
+export const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, userPoints = {}, tasks = [], onBack, onUpdateProfile }) => {
   const [activeModal, setActiveModal] = useState(null);
   const [editName, setEditName] = useState(user?.name || '');
-  const handleModalClose = () => setActiveModal(null);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [notifPrefs, setNotifPrefs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kinflow_notifPrefs') || 'null') || { choreReminders: true, approvals: true, chatMessages: false }; }
+    catch(e) { return { choreReminders: true, approvals: true, chatMessages: false }; }
+  });
+  const handleModalClose = () => { setActiveModal(null); setProfileSaved(false); };
+
+  const handleSaveProfile = () => {
+    if (onUpdateProfile) {
+      onUpdateProfile({ ...user, name: editName });
+    }
+    try { localStorage.setItem('kinflow_lastProfile', JSON.stringify({ ...user, name: editName })); } catch(e) {}
+    setProfileSaved(true);
+    setTimeout(() => { handleModalClose(); }, 1200);
+  };
+
+  const toggleNotif = (key) => {
+    setNotifPrefs(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem('kinflow_notifPrefs', JSON.stringify(updated)); } catch(e) {}
+      return updated;
+    });
+  };
 
   const myPoints = userPoints[user?.name] || 0;
   const totalPoints = Object.values(userPoints).reduce((a, b) => a + b, 0);
@@ -269,7 +291,13 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, 
             <label className="block text-sm font-bold text-slate-700 mb-1.5">Role</label>
             <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-500 font-medium text-sm">{user?.role} (cannot change)</div>
           </div>
-          <Button onClick={handleModalClose} className="mt-2">Save Changes</Button>
+          {profileSaved && (
+            <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-2xl ring-1 ring-emerald-200 animate-slide-up">
+              <Check className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-bold text-emerald-700">Saved!</span>
+            </div>
+          )}
+          <Button onClick={handleSaveProfile} className="mt-2">Save Changes</Button>
         </div>
       </Modal>
 
@@ -296,18 +324,18 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, 
       <Modal isOpen={activeModal === 'notifications'} onClose={handleModalClose} title="Notifications">
         <div className="space-y-4">
           {[
-            { label: 'Chore Reminders', sub: 'Get notified when tasks are assigned', on: true },
-            { label: 'Approvals', sub: 'Alert when a child submits proof', on: true },
-            { label: 'Chat Messages', sub: 'Family chat notifications', on: false },
+            { key: 'choreReminders', label: 'Chore Reminders', sub: 'Get notified when tasks are assigned' },
+            { key: 'approvals', label: 'Approvals', sub: 'Alert when a child submits proof' },
+            { key: 'chatMessages', label: 'Chat Messages', sub: 'Family chat notifications' },
           ].map(item => (
-            <div key={item.label} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100">
+            <div key={item.key} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-100">
               <div>
                 <p className="font-bold text-sm text-slate-800">{item.label}</p>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">{item.sub}</p>
               </div>
-              <div className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${item.on ? 'bg-indigo-500' : 'bg-slate-300'}`}>
-                <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-sm transition-all duration-300 ${item.on ? 'right-0.5' : 'left-0.5'}`} />
-              </div>
+              <button onClick={() => toggleNotif(item.key)} className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${notifPrefs[item.key] ? 'bg-indigo-500' : 'bg-slate-300'}`}>
+                <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-sm transition-all duration-300 ${notifPrefs[item.key] ? 'right-0.5' : 'left-0.5'}`} />
+              </button>
             </div>
           ))}
         </div>

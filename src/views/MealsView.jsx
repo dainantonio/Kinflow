@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { Plus, ChefHat, Clock, Utensils, ShoppingCart, Trash2, Check, X, ChevronRight } from 'lucide-react';
+import { Plus, ChefHat, Clock, Utensils, ShoppingCart, Trash2, Check, X, ChevronRight, Loader2 } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
 import { Card, Button, Badge, Modal, RevealCard } from '../components/shared/Primitives';
 
@@ -72,7 +72,7 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
             {isParent && <button onClick={() => setShowNewRecipe(true)} className="mt-4 px-5 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors">Plan First Meal</button>}
           </div>
         )}
-        {meals.map((meal, idx) => (
+        {meals?.map((meal, idx) => (
           <RevealCard key={meal.id} delay={idx * 60}>
             <div onClick={() => setSelectedMeal(meal)} className="spring-press bg-white rounded-3xl overflow-hidden shadow-md ring-1 ring-slate-900/6 cursor-pointer group transition-all active:scale-[0.98]">
               {/* Gradient banner */}
