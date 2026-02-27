@@ -120,6 +120,7 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
                     {msg.text}
                   </div>
                   <div className={`flex items-center gap-1.5 mt-1 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    {isMe && <span className="text-[9px] font-bold text-slate-400">You · {user?.name}</span>}
                     {isMe && (
                       <button onClick={() => onDelete(msg.id)} className="text-slate-300 hover:text-rose-500 p-0.5 rounded transition-colors">
                         <Trash2 className="w-3 h-3" />
