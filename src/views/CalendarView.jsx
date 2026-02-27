@@ -1,15 +1,20 @@
 import React, { useState, useContext } from 'react';
-import { Plus, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, Calendar as CalendarIcon, Rows3, CalendarDays } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
-import { Card, Button, Modal, RevealCard } from '../components/shared/Primitives';
+import { Card, Button, Modal, RevealCard, DetailActions } from '../components/shared/Primitives';
 
-export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
+export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
   const [location, setLocation] = useState('');
   const [baseDate, setBaseDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [editEvent, setEditEvent] = useState(null);
+  const [viewMode, setViewMode] = useState('calendar');
+  const [swipedEventId, setSwipedEventId] = useState(null);
+  const [deletedEvent, setDeletedEvent] = useState(null);
 
   const startOfWeek = new Date(baseDate);
   const day = startOfWeek.getDay();
@@ -46,8 +51,34 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
     setIsModalOpen(false);
   };
 
+  const openEvent = (event) => { setSelectedEvent(event); setEditEvent({ ...event }); };
+
+  const handleTouchStart = (e, eventId) => {
+    e.currentTarget.dataset.touchStartX = String(e.changedTouches[0].clientX);
+    e.currentTarget.dataset.eventId = String(eventId);
+  };
+
+  const handleTouchEnd = (e) => {
+    const delta = Number(e.currentTarget.dataset.touchStartX || 0) - e.changedTouches[0].clientX;
+    if (delta > 40 && isParent) setSwipedEventId(Number(e.currentTarget.dataset.eventId));
+    if (delta < -35) setSwipedEventId(null);
+  };
+
+  const deleteWithUndo = (event) => {
+    onDelete(event.id);
+    setDeletedEvent(event);
+    setSwipedEventId(null);
+    setTimeout(() => setDeletedEvent(null), 4500);
+  };
+
+  const undoDelete = () => {
+    if (!deletedEvent) return;
+    onAdd({ title: deletedEvent.title, time: deletedEvent.time, location: deletedEvent.location });
+    setDeletedEvent(null);
+  };
+
   return (
-    <div className="space-y-5 animate-bounce-in">
+    <div className="space-y-5 animate-bounce-in" onClick={() => setSwipedEventId(null)}>
       <RevealCard delay={0}>
         <div className="flex justify-between items-center">
           <div>
@@ -58,14 +89,21 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
               <button onClick={() => moveWeek(1)} className="spring-press p-1.5 text-slate-400 hover:text-slate-700 bg-white rounded-xl shadow-sm ring-1 ring-black/5 transition-colors"><ChevronRight className="w-3.5 h-3.5" /></button>
             </div>
           </div>
-          {isParent && (
-            <button onClick={() => setIsModalOpen(true)} className="spring-press w-10 h-10 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-md shadow-slate-900/20">
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="bg-white rounded-2xl p-1 ring-1 ring-black/5 flex">
+              <button onClick={() => setViewMode('calendar')} className={`px-2 py-1 rounded-xl text-xs font-bold flex items-center gap-1 ${viewMode === 'calendar' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}><CalendarDays className="w-3.5 h-3.5"/>Cal</button>
+              <button onClick={() => setViewMode('list')} className={`px-2 py-1 rounded-xl text-xs font-bold flex items-center gap-1 ${viewMode === 'list' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}><Rows3 className="w-3.5 h-3.5"/>List</button>
+            </div>
+            {isParent && (
+              <button onClick={() => setIsModalOpen(true)} className="spring-press w-10 h-10 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-md shadow-slate-900/20">
+                <Plus className="w-4 h-4" strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
         </div>
       </RevealCard>
 
+      {viewMode === 'calendar' && (<>
       {/* WEEK STRIP */}
       <RevealCard delay={60}>
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1" style={{scrollSnapType:'x mandatory'}}>
@@ -88,7 +126,7 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
       {/* DAY DRAWER - shows when a day is tapped */}
       {selectedDay && (
         <RevealCard delay={80}>
-          <div className="bg-white rounded-3xl ring-1 ring-black/5 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-[1.75rem] ring-1 ring-black/5 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">
@@ -110,17 +148,17 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
                 return true;
               }).length === 0 ? (
                 <div className="text-center py-10">
-                  <div className="w-14 h-14 bg-sky-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                  <div className="w-14 h-14 bg-sky-100 rounded-[1.75rem] flex items-center justify-center mx-auto mb-4">
                     <CalendarIcon className="w-7 h-7 text-sky-400" />
                   </div>
                   <p className="text-slate-700 font-bold text-base">Nothing planned</p>
                   <p className="text-slate-400 text-xs font-medium mt-1">This day is wide open 🌤️</p>
-                  {isParent && <button onClick={() => setShowNewEvent(true)} className="mt-4 px-5 py-2.5 bg-sky-500 text-white text-xs font-bold rounded-xl hover:bg-sky-600 transition-colors">Add Event</button>}
+                  {isParent && <button onClick={() => setIsModalOpen(true)} className="mt-4 px-5 py-2.5 bg-sky-500 text-white text-xs font-bold rounded-xl hover:bg-sky-600 transition-colors">Add Event</button>}
                 </div>
               ) : (
                 <div className="space-y-2">
                   {events?.map((event, idx) => (
-                    <div key={event.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors group">
+                    <div key={event.id} onClick={() => openEvent(event)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors group cursor-pointer">
                       <div className={`w-1 h-10 rounded-full shrink-0 ${event.color}`} />
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-slate-800 text-sm">{event.title}</p>
@@ -143,22 +181,24 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
         </RevealCard>
       )}
 
+      </>)}
+
       {/* ALL EVENTS (when no day selected) */}
-      {!selectedDay && (
+      {viewMode === 'list' && (
         <div className="space-y-3">
           {events.length === 0 && (
-            <div className="text-center py-12 bg-white rounded-3xl ring-1 ring-black/5">
-              <div className="w-14 h-14 bg-violet-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
+            <div className="text-center py-12 bg-white rounded-[1.75rem] ring-1 ring-black/5">
+              <div className="w-14 h-14 bg-violet-100 rounded-[1.75rem] flex items-center justify-center mx-auto mb-4">
                 <CalendarIcon className="w-7 h-7 text-violet-400" />
               </div>
               <p className="text-slate-700 font-bold text-base">No events yet</p>
               <p className="text-slate-400 text-xs font-medium mt-1 max-w-[200px] mx-auto">Add your family's events to keep everyone in sync</p>
-              {isParent && <button onClick={() => setShowNewEvent(true)} className="mt-4 px-5 py-2.5 bg-violet-500 text-white text-xs font-bold rounded-xl hover:bg-violet-600 transition-colors">Add First Event</button>}
+              {isParent && <button onClick={() => setIsModalOpen(true)} className="mt-4 px-5 py-2.5 bg-violet-500 text-white text-xs font-bold rounded-xl hover:bg-violet-600 transition-colors">Add First Event</button>}
             </div>
           )}
           {events?.map((event, idx) => (
             <RevealCard key={event.id} delay={idx * 60}>
-              <div className="bg-white rounded-3xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4">
+              <div onClick={() => openEvent(event)} onTouchStart={(e) => handleTouchStart(e, event.id)} onTouchEnd={handleTouchEnd} className="bg-white rounded-[1.75rem] p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4 cursor-pointer">
                 <div className={`w-1 h-14 rounded-full shrink-0 ${event.color}`} />
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-slate-800 text-sm">{event.title}</p>
@@ -167,8 +207,8 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
                     <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3"/> {event.location}</span>
                   </div>
                 </div>
-                {isParent && (
-                  <button onClick={() => onDelete(event.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-xl transition-colors shrink-0">
+                {isParent && swipedEventId === event.id && (
+                  <button onClick={() => deleteWithUndo(event)} className="p-1.5 text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors shrink-0">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
@@ -177,6 +217,42 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
           ))}
         </div>
       )}
+
+
+      {deletedEvent && (
+        <div className="fixed left-4 right-4 bottom-28 z-40 bg-slate-900 text-white rounded-2xl px-4 py-3 flex items-center justify-between gap-3 shadow-2xl">
+          <span className="text-sm font-semibold truncate">Event deleted</span>
+          <button onClick={undoDelete} className="text-xs font-bold bg-white text-slate-900 px-3 py-1.5 rounded-xl">Undo</button>
+        </div>
+      )}
+
+      <Modal isOpen={!!selectedEvent} onClose={() => setSelectedEvent(null)} title="Event Details">
+        {selectedEvent && (
+          <div className="space-y-4">
+            <div className="bg-slate-50 rounded-2xl p-4 ring-1 ring-slate-200">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Event</p>
+              <p className="font-bold text-slate-900 text-lg">{selectedEvent.title}</p>
+              <p className="text-xs text-slate-500 font-semibold mt-2">{selectedEvent.time} · {selectedEvent.location}</p>
+            </div>
+            {isParent ? (
+              <form onSubmit={(e) => { e.preventDefault(); onUpdate(editEvent); setSelectedEvent(editEvent); }} className="space-y-3">
+                <input value={editEvent.title} onChange={(e) => setEditEvent({ ...editEvent, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={editEvent.time || ''} onChange={(e) => setEditEvent({ ...editEvent, time: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                  <input value={editEvent.location || ''} onChange={(e) => setEditEvent({ ...editEvent, location: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                </div>
+                <DetailActions
+                  onClose={() => setSelectedEvent(null)}
+                  onSave={() => { onUpdate(editEvent); setSelectedEvent(editEvent); }}
+                  onDelete={() => { onDelete(selectedEvent.id); setSelectedEvent(null); }}
+                />
+              </form>
+            ) : (
+              <Button onClick={() => setSelectedEvent(null)}>Close</Button>
+            )}
+          </div>
+        )}
+      </Modal>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Event">
         <form onSubmit={handleSubmit} className="space-y-4">

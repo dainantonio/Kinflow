@@ -76,7 +76,7 @@ export const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavig
           </div>
           <div className="space-y-2">
             {events.slice(0,2).map((event, i) => (
-              <div key={event.id} className="spring-press bg-white rounded-2xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4" style={{animationDelay:`${i*80}ms`}}>
+              <div key={event.id} onClick={() => onNavigate('calendar')} className="spring-press bg-white rounded-2xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4 cursor-pointer" style={{animationDelay:`${i*80}ms`}}>
                 <div className={`w-1 h-10 rounded-full shrink-0 ${event.color}`} />
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-slate-800 text-sm truncate">{event.title}</p>
