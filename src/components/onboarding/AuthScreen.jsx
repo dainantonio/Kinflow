@@ -58,17 +58,33 @@ export const AuthScreen = ({ onComplete }) => {
       const provider = providerKey === 'google'
         ? new GoogleAuthProvider()
         : new OAuthProvider('apple.com');
+
+      if (providerKey === 'google') {
+        provider.setCustomParameters({ prompt: 'select_account' });
+      }
+
       const useRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
       if (useRedirect) {
         await signInWithRedirect(auth, provider);
         return;
       }
-      await signInWithPopup(auth, provider);
-      onComplete();
+
+      try {
+        await signInWithPopup(auth, provider);
+        onComplete();
+      } catch (popupErr) {
+        const popupMsg = popupErr?.message?.toLowerCase?.() || '';
+        const shouldFallbackToRedirect = popupMsg.includes('popup') || popupMsg.includes('opener') || popupMsg.includes('cross-origin');
+        if (shouldFallbackToRedirect) {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupErr;
+      }
     } catch (err) {
       const msg = err?.message?.replace('Firebase: ', '') || 'Social sign-in failed. Please try again.';
       if (msg.toLowerCase().includes('unauthorized-domain')) {
-        setAuthError('This domain is not allowlisted in Firebase Auth. Add it under Authentication → Settings → Authorized domains.');
+        setAuthError(`Domain not allowlisted in Firebase Auth. Add ${window.location.hostname} under Authentication → Settings → Authorized domains.`);
       } else {
         setAuthError(msg);
       }
@@ -141,6 +157,10 @@ export const AuthScreen = ({ onComplete }) => {
         {authError && (
           <p className="mt-4 text-center text-xs font-semibold text-rose-300">{authError}</p>
         )}
+        {!DEMO_MODE && (
+          <p className="mt-2 text-center text-[11px] text-white/55">If Google fails, verify this host is authorized in Firebase Auth and OAuth consent is published.</p>
+        )}
+
         {DEMO_MODE && (
           <p className="mt-4 text-center text-[10px] font-bold text-white/25 uppercase tracking-widest">Demo Mode · No login required</p>
         )}
