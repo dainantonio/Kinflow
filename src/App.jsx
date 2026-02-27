@@ -42,26 +42,29 @@ function AppInner() {
     isParent, isChild,
     familyMembers,
     handleLogin, completeOnboarding,
-    handleAddTask, requestDeleteTask, handleTaskAction,
+    handleAddTask, handleUpdateTask, requestDeleteTask, handleTaskAction,
     handleSendMessage, requestDeleteMessage,
     handleRedeemReward,
-    handleAddEvent, requestDeleteEvent,
+    handleAddEvent, handleUpdateEvent, requestDeleteEvent,
     handleAddMeal, handleUpdateMeal, requestDeleteMeal,
     handleUpdateProfile,
     handleAddMember, handleUpdateMember, handleRemoveMember,
     myNotifications, unreadNotifsCount, markNotifsAsRead,
+    theme, setTheme,
   } = ctx;
+
+  const [rewards, setRewards] = useState(mockRewards);
 
   const renderContent = () => {
     const displayPoints = isParent ? Object.values(userPoints).reduce((a,b) => a+b, 0) : (userPoints[activeUser?.name] || 0);
     switch(activeTab) {
       case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
-      case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
-      case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} />;
+      case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onUpdate={handleUpdateTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
+      case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onUpdate={handleUpdateEvent} onDelete={requestDeleteEvent} isParent={isParent} />;
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
-      case 'rewards': return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} lastRedeemed={lastRedeemed} />;
+      case 'rewards': return <RewardsView rewards={rewards} setRewards={setRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} lastRedeemed={lastRedeemed} />;
       case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} tasks={tasks} />;
-      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} allUsers={familyMembers} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} onUpdateProfile={handleUpdateProfile} onAddMember={handleAddMember} onUpdateMember={handleUpdateMember} onRemoveMember={handleRemoveMember} />;
+      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); try { localStorage.removeItem('kinflow_lastProfile'); localStorage.removeItem('kinflow_loggedIn'); } catch(e) {} }} allUsers={familyMembers} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} onUpdateProfile={handleUpdateProfile} onAddMember={handleAddMember} onUpdateMember={handleUpdateMember} onRemoveMember={handleRemoveMember} theme={theme} onThemeChange={setTheme} />;
       default: return null;
     }
   };
@@ -79,10 +82,17 @@ function AppInner() {
     : [];
   const navItems = primaryNavItems;
 
-  const appBgClass = isChild ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' : 'bg-slate-50 text-slate-800';
+  const themeClasses = {
+    indigo: isChild ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' : 'bg-slate-50 text-slate-800',
+    ocean: isChild ? 'bg-gradient-to-br from-cyan-100 via-sky-50 to-blue-100 text-slate-800' : 'bg-gradient-to-br from-sky-50 via-cyan-50 to-teal-50 text-slate-800',
+    sunset: isChild ? 'bg-gradient-to-br from-amber-100 via-orange-50 to-rose-100 text-slate-800' : 'bg-gradient-to-br from-rose-50 via-orange-50 to-amber-50 text-slate-800',
+    forest: isChild ? 'bg-gradient-to-br from-lime-100 via-emerald-50 to-teal-100 text-slate-800' : 'bg-gradient-to-br from-emerald-50 via-lime-50 to-teal-50 text-slate-800',
+    grape: isChild ? 'bg-gradient-to-br from-fuchsia-100 via-purple-50 to-indigo-100 text-slate-800' : 'bg-gradient-to-br from-violet-50 via-fuchsia-50 to-purple-50 text-slate-800',
+  };
+  const appBgClass = themeClasses[theme] || themeClasses.indigo;
 
   return (
-    <ThemeContext.Provider value={{ isChild, user: activeUser }}>
+    <ThemeContext.Provider value={{ isChild, user: activeUser, theme }}>
       <div className={`h-full font-sans flex flex-col relative transition-colors duration-500 ${appBgClass}`} style={{minHeight:'100dvh', maxHeight:'100dvh', overflow:'hidden'}}>
         <CustomStyles />
         <Confetti active={showConfetti} />
@@ -103,25 +113,8 @@ function AppInner() {
         )}
 
         {/* TOP APP BAR */}
-        <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-30" style={{background:'rgba(248,250,252,0.95)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', paddingTop:'max(env(safe-area-inset-top, 12px), 12px)'}}>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{
-              {home:'Today', tasks:'Tasks', calendar:'Schedule', meals:'Meals', chat:'Family', rewards:'Rewards', settings:'Profile'}[activeTab] || 'Kinflow'
-            }</p>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Kinflow</h1>
-          </div>
+        <div className="flex items-center justify-end px-4 py-1 z-30" style={{paddingTop:'max(env(safe-area-inset-top, 8px), 8px)'}}>
           <div className="flex items-center gap-2">
-            {/* AI Copilot button (parents) */}
-            {isParent && (
-              <button onClick={() => setIsCopilotOpen(true)} className="spring-press w-9 h-9 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                <Wand2 className="w-4 h-4 text-white" strokeWidth={2} />
-              </button>
-            )}
-            {/* Notifications bell */}
-            <button onClick={() => { setIsNotifModalOpen(true); markNotifsAsRead(); }} className="spring-press relative w-9 h-9 bg-white rounded-2xl flex items-center justify-center shadow-sm ring-1 ring-black/5">
-              <Bell className="w-4 h-4 text-slate-700" strokeWidth={2} />
-              {unreadNotifsCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">{unreadNotifsCount}</span>}
-            </button>
             {/* Profile dropdown */}
             <div className="relative">
               <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="spring-press">
@@ -162,7 +155,7 @@ function AppInner() {
 
         {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto scroll-container" style={{minHeight:0}}>
-          <div className="px-4 pt-3 pb-36 max-w-lg mx-auto w-full">
+          <div className="px-4 pt-2 pb-36 max-w-lg mx-auto w-full">
             {renderContent()}
           </div>
         </div>
@@ -226,7 +219,19 @@ function AppInner() {
           </div>
         </Modal>
 
+
+        {isParent && (
+          <button
+            onClick={() => setIsCopilotOpen(true)}
+            className="fixed right-4 bottom-28 z-40 spring-press w-12 h-12 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-indigo-500/35"
+            aria-label="Open Orbit AI Copilot"
+          >
+            <Wand2 className="w-5 h-5" strokeWidth={2.2} />
+          </button>
+        )}
+
         {/* PREMIUM BOTTOM NAV */}
+
         <div className="fixed bottom-0 inset-x-0 z-40" style={{paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
           <div className="mx-4 mb-4">
             <nav className={`${isChild ? 'bg-white ring-1 ring-black/5' : 'bg-white/95 backdrop-blur-2xl ring-1 ring-black/5'} rounded-[2rem] shadow-[0_-2px_40px_rgba(0,0,0,0.12)] flex items-center px-2 py-1 relative`}>
