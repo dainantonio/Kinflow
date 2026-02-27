@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { Layers, Loader2, CheckCircle2 } from 'lucide-react';
-import { DEMO_MODE, auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from '../../utils/firebase';
+import {
+  DEMO_MODE, auth,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signInWithPopup, GoogleAuthProvider, OAuthProvider,
+} from '../../utils/firebase';
 
 export const AuthScreen = ({ onComplete }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [providerLoading, setProviderLoading] = useState('');
   const [authError, setAuthError] = useState('');
 
   const handleSubmit = async (e) => {
@@ -25,6 +30,27 @@ export const AuthScreen = ({ onComplete }) => {
       setAuthError(err?.message?.replace('Firebase: ', '') || 'Unable to authenticate. Please try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+
+  const handleProviderLogin = async (providerKey) => {
+    setAuthError('');
+    setProviderLoading(providerKey);
+    try {
+      if (DEMO_MODE || !auth) {
+        setTimeout(() => onComplete(), 350);
+        return;
+      }
+      const provider = providerKey === 'google'
+        ? new GoogleAuthProvider()
+        : new OAuthProvider('apple.com');
+      await signInWithPopup(auth, provider);
+      onComplete();
+    } catch (err) {
+      setAuthError(err?.message?.replace('Firebase: ', '') || 'Social sign-in failed. Please try again.');
+    } finally {
+      setProviderLoading('');
     }
   };
 
@@ -63,6 +89,25 @@ export const AuthScreen = ({ onComplete }) => {
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isLogin ? "Sign In" : "Create Family Account")}
           </button>
         </form>
+
+        <div className="mt-4 space-y-2">
+          <button
+            type="button"
+            onClick={() => handleProviderLogin('google')}
+            disabled={isLoading || providerLoading !== ''}
+            className="w-full py-3 rounded-2xl border border-white/25 bg-white/10 hover:bg-white/15 transition-colors font-bold text-sm text-white disabled:opacity-50"
+          >
+            {providerLoading === 'google' ? 'Connecting Google…' : 'Continue with Google'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleProviderLogin('apple')}
+            disabled={isLoading || providerLoading !== ''}
+            className="w-full py-3 rounded-2xl border border-white/25 bg-white/10 hover:bg-white/15 transition-colors font-bold text-sm text-white disabled:opacity-50"
+          >
+            {providerLoading === 'apple' ? 'Connecting Apple…' : 'Continue with Apple'}
+          </button>
+        </div>
 
         <div className="mt-6 text-center text-sm font-medium text-white/50">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
