@@ -4,7 +4,6 @@ import {
   signInWithCustomToken, signInAnonymously, onAuthStateChanged,
   collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc
 } from '../utils/firebase';
-import { mockTasks, mockChats, mockEvents, mockMeals, MOCK_USERS } from '../utils/demoData';
 
 export const AVATAR_OPTIONS = {
   parent_female: ['👩🏾', '👩🏿', '👩🏽', '👩🏼', '👩🏻', '👩'],
@@ -75,7 +74,7 @@ export const FamilyProvider = ({ children }) => {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch(e) {}
-    return MOCK_USERS; // seed from demo data on first use
+    return [];
   });
 
   // Non-Firebase States
@@ -125,16 +124,11 @@ export const FamilyProvider = ({ children }) => {
   useEffect(() => {
     if (!firebaseUser) return;
     if (DEMO_MODE) {
-      setTasks(mockTasks.map(t => ({...t, id: t.id.toString(), createdAt: Date.now()})));
-      setMessages(mockChats.map(c => ({...c, id: c.id.toString(), createdAt: Date.now()})));
-      const initPoints = {};
-      familyMembers.forEach(m => {
-        initPoints[m.name] = m.role === 'Child' ? (m.name === familyMembers.find(x => x.role === 'Child')?.name ? 45 : 30) : 0;
-      });
-      setUserPoints(initPoints);
-      setEvents(mockEvents.map(e => ({...e, id: e.id.toString(), createdAt: Date.now()})));
-      setMeals(mockMeals.map(m => ({...m, id: m.id.toString(), createdAt: Date.now()})));
-      // familyMembers already initialized from localStorage or MOCK_USERS
+      setTasks([]);
+      setMessages([]);
+      setUserPoints({});
+      setEvents([]);
+      setMeals([]);
       return;
     }
     const dataPath = 'public';
@@ -142,22 +136,20 @@ export const FamilyProvider = ({ children }) => {
 
     const tasksRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_tasks');
     const unsubTasks = onSnapshot(tasksRef, (snap) => {
-      if (snap.empty) mockTasks.forEach(mt => setDoc(doc(tasksRef, mt.id.toString()), { ...mt, createdAt: Date.now() }));
+      if (snap.empty) setTasks([]);
       else setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
     const msgsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_messages');
     const unsubMsgs = onSnapshot(msgsRef, (snap) => {
-      if (snap.empty) mockChats.forEach(mc => setDoc(doc(msgsRef, mc.id.toString()), { ...mc, createdAt: Date.now() }));
+      if (snap.empty) setMessages([]);
       else setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
     const pointsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_points');
     const unsubPoints = onSnapshot(pointsRef, (snap) => {
       if (snap.empty) {
-        familyMembers.filter(m => m.role === 'Child').forEach((m, i) => {
-          setDoc(doc(pointsRef, m.name), { points: i === 0 ? 45 : 30 });
-        });
+        setUserPoints({});
       } else {
         let p = {};
         snap.docs.forEach(d => { p[d.id] = d.data().points; });
@@ -167,13 +159,13 @@ export const FamilyProvider = ({ children }) => {
 
     const eventsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_events');
     const unsubEvents = onSnapshot(eventsRef, (snap) => {
-      if (snap.empty) mockEvents.forEach(me => setDoc(doc(eventsRef, me.id.toString()), { ...me, createdAt: Date.now() }));
+      if (snap.empty) setEvents([]);
       else setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
     const mealsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_meals');
     const unsubMeals = onSnapshot(mealsRef, (snap) => {
-      if (snap.empty) mockMeals.forEach(mm => setDoc(doc(mealsRef, mm.id.toString()), { ...mm, createdAt: Date.now() }));
+      if (snap.empty) setMeals([]);
       else setMeals(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
@@ -181,8 +173,7 @@ export const FamilyProvider = ({ children }) => {
     const familyRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_family');
     const unsubFamily = onSnapshot(familyRef, (snap) => {
       if (snap.empty) {
-        // seed with MOCK_USERS on first load
-        MOCK_USERS.forEach(u => setDoc(doc(familyRef, u.id), { ...u, createdAt: Date.now() }));
+        setFamilyMembers([]);
       } else {
         setFamilyMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }

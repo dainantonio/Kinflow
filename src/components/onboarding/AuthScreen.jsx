@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Layers, Loader2, CheckCircle2 } from 'lucide-react';
 import {
   DEMO_MODE, auth,
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signInWithPopup, GoogleAuthProvider, OAuthProvider,
+  signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider,
 } from '../../utils/firebase';
 
 export const AuthScreen = ({ onComplete }) => {
@@ -13,6 +13,19 @@ export const AuthScreen = ({ onComplete }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [providerLoading, setProviderLoading] = useState('');
   const [authError, setAuthError] = useState('');
+
+  useEffect(() => {
+    const checkRedirect = async () => {
+      if (DEMO_MODE || !auth) return;
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) onComplete();
+      } catch (err) {
+        setAuthError(err?.message?.replace('Firebase: ', '') || 'Sign-in redirect failed.');
+      }
+    };
+    checkRedirect();
+  }, [onComplete]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,10 +58,20 @@ export const AuthScreen = ({ onComplete }) => {
       const provider = providerKey === 'google'
         ? new GoogleAuthProvider()
         : new OAuthProvider('apple.com');
+      const useRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
+      if (useRedirect) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
       await signInWithPopup(auth, provider);
       onComplete();
     } catch (err) {
-      setAuthError(err?.message?.replace('Firebase: ', '') || 'Social sign-in failed. Please try again.');
+      const msg = err?.message?.replace('Firebase: ', '') || 'Social sign-in failed. Please try again.';
+      if (msg.toLowerCase().includes('unauthorized-domain')) {
+        setAuthError('This domain is not allowlisted in Firebase Auth. Add it under Authentication → Settings → Authorized domains.');
+      } else {
+        setAuthError(msg);
+      }
     } finally {
       setProviderLoading('');
     }
@@ -61,12 +84,12 @@ export const AuthScreen = ({ onComplete }) => {
   ];
 
   return (
-    <div className="min-h-[100dvh] bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
+    <div className="min-h-[100dvh] bg-slate-900 flex flex-col items-center justify-start p-6 pt-8 text-white relative overflow-y-auto">
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-violet-500/15 rounded-full blur-[100px]" />
       <div className="absolute inset-0 opacity-[0.03]" style={{backgroundImage:'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize:'28px 28px'}} />
 
-      <div className="mb-10 text-center animate-bounce-in relative z-10 flex flex-col items-center">
+      <div className="mb-7 text-center animate-bounce-in relative z-10 flex flex-col items-center w-full">
         <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[1.5rem] flex items-center justify-center shadow-[0_16px_48px_rgba(99,102,241,0.45)] mb-6 ring-1 ring-white/10">
           <Layers className="w-8 h-8 text-white" strokeWidth={1.5} />
         </div>
