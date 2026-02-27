@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Plus, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, Calendar as CalendarIcon } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
-import { Card, Button, Modal, RevealCard } from '../components/shared/Primitives';
+import { Card, Button, Modal, RevealCard, DetailActions } from '../components/shared/Primitives';
 
 export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -92,7 +92,7 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
       {/* DAY DRAWER - shows when a day is tapped */}
       {selectedDay && (
         <RevealCard delay={80}>
-          <div className="bg-white rounded-3xl ring-1 ring-black/5 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-[1.75rem] ring-1 ring-black/5 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">
@@ -114,7 +114,7 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
                 return true;
               }).length === 0 ? (
                 <div className="text-center py-10">
-                  <div className="w-14 h-14 bg-sky-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                  <div className="w-14 h-14 bg-sky-100 rounded-[1.75rem] flex items-center justify-center mx-auto mb-4">
                     <CalendarIcon className="w-7 h-7 text-sky-400" />
                   </div>
                   <p className="text-slate-700 font-bold text-base">Nothing planned</p>
@@ -151,8 +151,8 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
       {!selectedDay && (
         <div className="space-y-3">
           {events.length === 0 && (
-            <div className="text-center py-12 bg-white rounded-3xl ring-1 ring-black/5">
-              <div className="w-14 h-14 bg-violet-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
+            <div className="text-center py-12 bg-white rounded-[1.75rem] ring-1 ring-black/5">
+              <div className="w-14 h-14 bg-violet-100 rounded-[1.75rem] flex items-center justify-center mx-auto mb-4">
                 <CalendarIcon className="w-7 h-7 text-violet-400" />
               </div>
               <p className="text-slate-700 font-bold text-base">No events yet</p>
@@ -162,7 +162,7 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
           )}
           {events?.map((event, idx) => (
             <RevealCard key={event.id} delay={idx * 60}>
-              <div onClick={() => openEvent(event)} className="bg-white rounded-3xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4 cursor-pointer">
+              <div onClick={() => openEvent(event)} className="bg-white rounded-[1.75rem] p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4 cursor-pointer">
                 <div className={`w-1 h-14 rounded-full shrink-0 ${event.color}`} />
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-slate-800 text-sm">{event.title}</p>
@@ -198,10 +198,11 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
                   <input value={editEvent.time || ''} onChange={(e) => setEditEvent({ ...editEvent, time: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
                   <input value={editEvent.location || ''} onChange={(e) => setEditEvent({ ...editEvent, location: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
                 </div>
-                <div className="flex gap-2">
-                  <Button type="submit" className="flex-1">Save</Button>
-                  <Button type="button" variant="secondary" className="!bg-rose-50 !text-rose-600 !border-rose-200" onClick={() => { onDelete(selectedEvent.id); setSelectedEvent(null); }}>Delete</Button>
-                </div>
+                <DetailActions
+                  onClose={() => setSelectedEvent(null)}
+                  onSave={() => { onUpdate(editEvent); setSelectedEvent(editEvent); }}
+                  onDelete={() => { onDelete(selectedEvent.id); setSelectedEvent(null); }}
+                />
               </form>
             ) : (
               <Button onClick={() => setSelectedEvent(null)}>Close</Button>

@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Plus, ChefHat, Clock, Utensils, ShoppingCart, Trash2, Check, X, ChevronRight, Loader2 } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
-import { Card, Button, Badge, Modal, RevealCard } from '../components/shared/Primitives';
+import { Card, Button, Badge, Modal, RevealCard, DetailActions } from '../components/shared/Primitives';
 
 export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setGroceries }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,6 +24,20 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
   const handleEditClick = () => { setEditForm({ ...selectedMeal }); setIsEditing(true); };
   const handleEditSubmit = (e) => { e.preventDefault(); if (!editForm.meal.trim()) return; onUpdate(editForm); setSelectedMeal(editForm); setIsEditing(false); };
   const closeMealModal = () => { setSelectedMeal(null); setIsEditing(false); setSelectedIngredients([]); setAddedConfirm(null); setServings(4); };
+
+  const parseIngredientLine = (line) => {
+    const cleaned = line.trim().replace(/^[-•]\s*/, '');
+    const match = cleaned.match(/^((?:\d+[\/\d\.]*)(?:\s*[a-zA-Z]+)?)\s+(.+)$/);
+    if (!match) return { quantity: '', name: cleaned.toLowerCase() };
+    return { quantity: match[1].trim(), name: match[2].trim().toLowerCase() };
+  };
+
+  const scaleQuantity = (qty, fromServings, toServings) => {
+    if (!qty) return '';
+    const num = parseFloat(qty);
+    if (Number.isNaN(num)) return qty;
+    return `${(num * (toServings / fromServings)).toFixed(2).replace(/\.00$/, '')}`;
+  };
 
   const generateGroceries = () => {
     setIsGenerating(true);
@@ -64,8 +78,8 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
 
       <div className="space-y-3">
         {meals.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-3xl ring-1 ring-black/5">
-            <div className="w-14 h-14 bg-orange-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
+          <div className="text-center py-12 bg-white rounded-[1.75rem] ring-1 ring-black/5">
+            <div className="w-14 h-14 bg-orange-100 rounded-[1.75rem] flex items-center justify-center mx-auto mb-4">
               <ChefHat className="w-7 h-7 text-orange-400" />
             </div>
             <p className="text-slate-700 font-bold text-base">No meals planned</p>
@@ -75,7 +89,7 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
         )}
         {meals?.map((meal, idx) => (
           <RevealCard key={meal.id} delay={idx * 60}>
-            <div onClick={() => setSelectedMeal(meal)} className="spring-press bg-white rounded-3xl overflow-hidden shadow-md ring-1 ring-slate-900/6 cursor-pointer group transition-all active:scale-[0.98]">
+            <div onClick={() => setSelectedMeal(meal)} className="spring-press bg-white rounded-[1.75rem] overflow-hidden shadow-md ring-1 ring-slate-900/6 cursor-pointer group transition-all active:scale-[0.98]">
               {/* Gradient banner */}
               <div className="h-20 relative flex items-center justify-center" style={{background:'linear-gradient(135deg, #f97316 0%, #ea580c 50%, #dc2626 100%)'}}>
                 <div className="absolute inset-0 opacity-10" style={{backgroundImage:'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize:'16px 16px'}} />
@@ -135,16 +149,19 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
               <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Utensils className="w-4 h-4"/> Ingredients</h4>
               <div className="space-y-2">
                 {(selectedMeal.ingredients || "").split('\n').filter(i => i.trim()).map((item, i) => {
-                  const isSelected = selectedIngredients.includes(item.trim());
+                  const parsed = parseIngredientLine(item);
+                  const scaledQty = scaleQuantity(parsed.quantity, 4, servings);
+                  const ingredientLabel = `${scaledQty ? `${scaledQty} ` : ''}${parsed.name}`.trim();
+                  const isSelected = selectedIngredients.includes(parsed.name);
                   return (
                     <div key={i} className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 hover:border-slate-300'}`} onClick={() => {
-                      const trimmed = item.trim();
+                      const trimmed = parsed.name;
                       setSelectedIngredients(prev => prev.includes(trimmed) ? prev.filter(x => x !== trimmed) : [...prev, trimmed]);
                     }}>
                       <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors shrink-0 ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
                         {isSelected && <Check className="w-3 h-3 text-white" />}
                       </div>
-                      <span className="text-sm text-slate-700 font-medium flex-1">{item.trim()}</span>
+                      <span className="text-sm text-slate-700 font-medium flex-1">{ingredientLabel}</span>
                       <ShoppingCart className={`w-3.5 h-3.5 transition-colors ${isSelected ? 'text-emerald-500' : 'text-slate-300'}`} />
                     </div>
                   );
@@ -153,22 +170,23 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
               {(selectedMeal.ingredients || "").split('\n').filter(i => i.trim()).length > 0 && (
                 <div className="mt-3 flex gap-2">
                   <button onClick={() => {
-                    const allItems = (selectedMeal.ingredients || "").split('\n').filter(i => i.trim()).map(i => i.trim());
+                    const allItems = (selectedMeal.ingredients || "").split('\n').filter(i => i.trim()).map(i => parseIngredientLine(i).name);
                     setSelectedIngredients(prev => prev.length === allItems.length ? [] : allItems);
                   }} className="text-xs font-bold text-indigo-500 hover:text-indigo-700 transition-colors">
                     {selectedIngredients.length === (selectedMeal.ingredients || "").split('\n').filter(i => i.trim()).length ? 'Deselect All' : 'Select All'}
                   </button>
                   {selectedIngredients.length > 0 && (
                     <button onClick={() => {
-                      const newItems = selectedIngredients.map((item, i) => ({
-                        id: Date.now() + i,
-                        name: item,
-                        checked: false
-                      }));
-                      const existingNames = groceries.map(g => g.name.toLowerCase());
-                      const uniqueNew = newItems.filter(n => !existingNames.includes(n.name.toLowerCase()));
-                      setGroceries(prev => [...prev, ...uniqueNew]);
-                      const count = uniqueNew.length;
+                      const groceryMap = new Map(groceries.map(g => [g.name.toLowerCase(), g]));
+                      selectedIngredients.forEach((name, i) => {
+                        const key = name.toLowerCase();
+                        if (!groceryMap.has(key)) {
+                          groceryMap.set(key, { id: Date.now() + i, name, checked: false });
+                        }
+                      });
+                      const merged = Array.from(groceryMap.values());
+                      setGroceries(merged);
+                      const count = merged.length - groceries.length;
                       setAddedConfirm(count > 0 ? `${count} item${count > 1 ? 's' : ''} added` : 'Already in list');
                       setSelectedIngredients([]);
                       setTimeout(() => setAddedConfirm(null), 2500);
@@ -193,17 +211,16 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
               </div>
             </div>
             <div className="bg-slate-50 p-4 rounded-2xl ring-1 ring-slate-900/5"><h4 className="font-bold text-slate-800 mb-2">Instructions</h4><ol className="list-decimal pl-5 text-sm text-slate-600 space-y-2">{(selectedMeal.instructions || "").split('\n').map((item, i) => <li key={i}>{item}</li>)}</ol></div>
-            <div className="flex gap-3">
+            {isParent ? (
+              <DetailActions
+                onClose={closeMealModal}
+                onSave={handleEditClick}
+                saveLabel="Edit"
+                onDelete={() => { closeMealModal(); onDelete(selectedMeal.id); }}
+              />
+            ) : (
               <Button onClick={closeMealModal} variant="secondary" className="flex-1">Close</Button>
-              {isParent && (
-                <>
-                  <Button onClick={handleEditClick} className="flex-1">Edit Plan</Button>
-                  <Button onClick={() => { closeMealModal(); onDelete(selectedMeal.id); }} variant="secondary" className="!w-auto !px-4 !bg-rose-50 !text-rose-500 !border-rose-200 hover:!bg-rose-100">
-                    <Trash2 className="w-5 h-5" />
-                  </Button>
-                </>
-              )}
-            </div>
+            )}
           </div>
         )}
         {selectedMeal && isEditing && (

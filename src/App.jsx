@@ -113,25 +113,8 @@ function AppInner() {
         )}
 
         {/* TOP APP BAR */}
-        <div className="flex items-center justify-end px-4 py-1.5 sticky top-0 z-30" style={{background:'rgba(248,250,252,0.95)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', paddingTop:'max(env(safe-area-inset-top, 12px), 12px)'}}>
-          <div className="hidden">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{
-              {home:'Today', tasks:'Tasks', calendar:'Schedule', meals:'Meals', chat:'Family', rewards:'Rewards', settings:'Profile'}[activeTab] || 'Orbit'
-            }</p>
-            <h1 className="text-sm font-bold text-slate-900 tracking-tight leading-tight">Orbit</h1>
-          </div>
+        <div className="flex items-center justify-end px-4 py-1 z-30" style={{paddingTop:'max(env(safe-area-inset-top, 8px), 8px)'}}>
           <div className="flex items-center gap-2">
-            {/* AI Copilot button (parents) */}
-            {isParent && (
-              <button onClick={() => setIsCopilotOpen(true)} className="spring-press w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                <Wand2 className="w-4 h-4 text-white" strokeWidth={2} />
-              </button>
-            )}
-            {/* Notifications bell */}
-            <button onClick={() => { setIsNotifModalOpen(true); markNotifsAsRead(); }} className="spring-press relative w-8 h-8 bg-white rounded-2xl flex items-center justify-center shadow-sm ring-1 ring-black/5">
-              <Bell className="w-4 h-4 text-slate-700" strokeWidth={2} />
-              {unreadNotifsCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">{unreadNotifsCount}</span>}
-            </button>
             {/* Profile dropdown */}
             <div className="relative">
               <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="spring-press">
@@ -172,7 +155,7 @@ function AppInner() {
 
         {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto scroll-container" style={{minHeight:0}}>
-          <div className="px-4 pt-1 pb-36 max-w-lg mx-auto w-full">
+          <div className="px-4 pt-2 pb-36 max-w-lg mx-auto w-full">
             {renderContent()}
           </div>
         </div>
@@ -236,7 +219,19 @@ function AppInner() {
           </div>
         </Modal>
 
+
+        {isParent && (
+          <button
+            onClick={() => setIsCopilotOpen(true)}
+            className="fixed right-4 bottom-28 z-40 spring-press w-12 h-12 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-indigo-500/35"
+            aria-label="Open Orbit AI Copilot"
+          >
+            <Wand2 className="w-5 h-5" strokeWidth={2.2} />
+          </button>
+        )}
+
         {/* PREMIUM BOTTOM NAV */}
+
         <div className="fixed bottom-0 inset-x-0 z-40" style={{paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
           <div className="mx-4 mb-4">
             <nav className={`${isChild ? 'bg-white ring-1 ring-black/5' : 'bg-white/95 backdrop-blur-2xl ring-1 ring-black/5'} rounded-[2rem] shadow-[0_-2px_40px_rgba(0,0,0,0.12)] flex items-center px-2 py-1 relative`}>

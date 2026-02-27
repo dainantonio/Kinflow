@@ -183,7 +183,7 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
       ];
 
   return (
-    <div className="animate-bounce-in -mx-4 sm:-mx-6 -mt-6">
+    <div className="animate-bounce-in -mx-4 sm:-mx-6">
 
       {/* HERO BANNER */}
       <div className="relative h-44 overflow-hidden" style={{background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)'}}>

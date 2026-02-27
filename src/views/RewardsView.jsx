@@ -1,7 +1,7 @@
 import React, { useContext, useState } from 'react';
-import { Star, Gift, Flame, Trash2 } from 'lucide-react';
+import { Star, Flame } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
-import { Card, Button, Badge, RevealCard, Modal } from '../components/shared/Primitives';
+import { Card, Button, Badge, RevealCard, Modal, DetailActions } from '../components/shared/Primitives';
 
 export const RewardsView = ({ rewards, setRewards, points, onRedeem, isParent, lastRedeemed }) => {
   const { isChild } = useContext(ThemeContext);
@@ -14,7 +14,7 @@ export const RewardsView = ({ rewards, setRewards, points, onRedeem, isParent, l
     <div className="space-y-5 animate-bounce-in">
       {/* HERO BALANCE */}
       <RevealCard delay={0}>
-        <div className="relative overflow-hidden rounded-3xl p-6 text-center" style={{background:'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)'}}>
+        <div className="relative overflow-hidden rounded-[1.75rem] p-6 text-center" style={{background:'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)'}}>
           <div className="absolute inset-0 opacity-10" style={{backgroundImage:'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize:'20px 20px'}} />
           <div className="relative z-10">
             <Star className="w-8 h-8 text-amber-900/30 fill-amber-900/20 mx-auto mb-3" />
@@ -38,7 +38,7 @@ export const RewardsView = ({ rewards, setRewards, points, onRedeem, isParent, l
 
       {/* CELEBRATION MOMENT */}
       {lastRedeemed && (
-        <div className="animate-bounce-in bg-gradient-to-br from-emerald-400 to-teal-500 rounded-3xl p-6 text-center shadow-xl shadow-emerald-500/30 relative overflow-hidden">
+        <div className="animate-bounce-in bg-gradient-to-br from-emerald-400 to-teal-500 rounded-[1.75rem] p-6 text-center shadow-xl shadow-emerald-500/30 relative overflow-hidden">
           <div className="absolute inset-0 opacity-10" style={{backgroundImage:'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize:'16px 16px'}} />
           <div className="relative z-10">
             <div className="text-5xl mb-3">🎉</div>
@@ -56,7 +56,7 @@ export const RewardsView = ({ rewards, setRewards, points, onRedeem, isParent, l
           const canAfford = points >= reward.cost;
           return (
             <RevealCard key={reward.id} delay={idx * 60}>
-              <div onClick={() => { setSelectedReward(reward); setEditReward({ ...reward }); }} className={`bg-white rounded-3xl p-5 shadow-sm ring-1 transition-all cursor-pointer ${canAfford && !isParent ? 'ring-amber-300 shadow-amber-100' : 'ring-black/5'}`}>
+              <div onClick={() => { setSelectedReward(reward); setEditReward({ ...reward }); }} className={`bg-white rounded-[1.75rem] p-5 shadow-sm ring-1 transition-all cursor-pointer ${canAfford && !isParent ? 'ring-amber-300 shadow-amber-100' : 'ring-black/5'}`}>
                 <div className="flex items-center gap-4">
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${reward.color} ${canAfford ? 'shadow-lg' : ''}`}>
                     {reward.icon}
@@ -97,10 +97,11 @@ export const RewardsView = ({ rewards, setRewards, points, onRedeem, isParent, l
               <div className="space-y-2">
                 <input value={editReward.title} onChange={(e) => setEditReward({ ...editReward, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
                 <input type="number" value={editReward.cost} onChange={(e) => setEditReward({ ...editReward, cost: parseInt(e.target.value || '0', 10) })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
-                <div className="flex gap-2">
-                  <Button className="flex-1" onClick={() => { setRewards(rewards.map(r => r.id === editReward.id ? editReward : r)); setSelectedReward(editReward); }}>Save</Button>
-                  <Button variant="secondary" className="!bg-rose-50 !text-rose-600 !border-rose-200" onClick={() => { setRewards(rewards.filter(r => r.id !== selectedReward.id)); setSelectedReward(null); }}><Trash2 className="w-4 h-4" /></Button>
-                </div>
+                <DetailActions
+                  onClose={() => setSelectedReward(null)}
+                  onSave={() => { setRewards(rewards.map(r => r.id === editReward.id ? editReward : r)); setSelectedReward(editReward); }}
+                  onDelete={() => { setRewards(rewards.filter(r => r.id !== selectedReward.id)); setSelectedReward(null); }}
+                />
               </div>
             ) : (
               <Button onClick={() => setSelectedReward(null)}>Close</Button>
