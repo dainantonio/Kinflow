@@ -1,33 +1,115 @@
-import React, { useState } from 'react';
-import { Layers, Loader2 } from 'lucide-react';
-import { DEMO_MODE } from '../../utils/firebase';
+import React, { useEffect, useState } from 'react';
+import { Layers, Loader2, CheckCircle2 } from 'lucide-react';
+import {
+  DEMO_MODE, auth,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider,
+} from '../../utils/firebase';
 
 export const AuthScreen = ({ onComplete }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [providerLoading, setProviderLoading] = useState('');
+  const [authError, setAuthError] = useState('');
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    const checkRedirect = async () => {
+      if (DEMO_MODE || !auth) return;
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) onComplete();
+      } catch (err) {
+        setAuthError(err?.message?.replace('Firebase: ', '') || 'Sign-in redirect failed.');
+      }
+    };
+    checkRedirect();
+  }, [onComplete]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    setAuthError('');
+    try {
+      if (DEMO_MODE || !auth) {
+        setTimeout(() => onComplete(), 450);
+        return;
+      }
+      if (isLogin) await signInWithEmailAndPassword(auth, email.trim(), password);
+      else await createUserWithEmailAndPassword(auth, email.trim(), password);
       onComplete();
-    }, 800);
+    } catch (err) {
+      setAuthError(err?.message?.replace('Firebase: ', '') || 'Unable to authenticate. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+
+  const handleProviderLogin = async (providerKey) => {
+    setAuthError('');
+    setProviderLoading(providerKey);
+    try {
+      if (DEMO_MODE || !auth) {
+        setTimeout(() => onComplete(), 350);
+        return;
+      }
+      const provider = providerKey === 'google'
+        ? new GoogleAuthProvider()
+        : new OAuthProvider('apple.com');
+
+      if (providerKey === 'google') {
+        provider.setCustomParameters({ prompt: 'select_account' });
+      }
+
+      const useRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
+      if (useRedirect) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
+      try {
+        await signInWithPopup(auth, provider);
+        onComplete();
+      } catch (popupErr) {
+        const popupMsg = popupErr?.message?.toLowerCase?.() || '';
+        const shouldFallbackToRedirect = popupMsg.includes('popup') || popupMsg.includes('opener') || popupMsg.includes('cross-origin');
+        if (shouldFallbackToRedirect) {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupErr;
+      }
+    } catch (err) {
+      const msg = err?.message?.replace('Firebase: ', '') || 'Social sign-in failed. Please try again.';
+      if (msg.toLowerCase().includes('unauthorized-domain')) {
+        setAuthError(`Domain not allowlisted in Firebase Auth. Add ${window.location.hostname} under Authentication → Settings → Authorized domains.`);
+      } else {
+        setAuthError(msg);
+      }
+    } finally {
+      setProviderLoading('');
+    }
+  };
+
+  const nextSteps = [
+    'Create the parent account and sign in on the main device.',
+    'Open Profile → Manage Members to add each family member.',
+    'Have everyone pick their profile from the profile switcher.',
+  ];
+
   return (
-    <div className="min-h-[100dvh] bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
+    <div className="min-h-[100dvh] bg-slate-900 flex flex-col items-center justify-start p-6 pt-8 text-white relative overflow-y-auto">
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-violet-500/15 rounded-full blur-[100px]" />
       <div className="absolute inset-0 opacity-[0.03]" style={{backgroundImage:'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize:'28px 28px'}} />
 
-      <div className="mb-10 text-center animate-bounce-in relative z-10 flex flex-col items-center">
+      <div className="mb-7 text-center animate-bounce-in relative z-10 flex flex-col items-center w-full">
         <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[1.5rem] flex items-center justify-center shadow-[0_16px_48px_rgba(99,102,241,0.45)] mb-6 ring-1 ring-white/10">
           <Layers className="w-8 h-8 text-white" strokeWidth={1.5} />
         </div>
-        <h1 className="text-3xl font-bold tracking-wide mb-2">Kinflow</h1>
+        <h1 className="text-3xl font-bold tracking-wide mb-2">Orbit</h1>
         <p className="text-white/50 text-sm font-medium">Family organization, simplified.</p>
       </div>
 
@@ -47,15 +129,53 @@ export const AuthScreen = ({ onComplete }) => {
           </button>
         </form>
 
+        <div className="mt-4 space-y-2">
+          <button
+            type="button"
+            onClick={() => handleProviderLogin('google')}
+            disabled={isLoading || providerLoading !== ''}
+            className="w-full py-3 rounded-2xl border border-white/25 bg-white/10 hover:bg-white/15 transition-colors font-bold text-sm text-white disabled:opacity-50"
+          >
+            {providerLoading === 'google' ? 'Connecting Google…' : 'Continue with Google'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleProviderLogin('apple')}
+            disabled={isLoading || providerLoading !== ''}
+            className="w-full py-3 rounded-2xl border border-white/25 bg-white/10 hover:bg-white/15 transition-colors font-bold text-sm text-white disabled:opacity-50"
+          >
+            {providerLoading === 'apple' ? 'Connecting Apple…' : 'Continue with Apple'}
+          </button>
+        </div>
+
         <div className="mt-6 text-center text-sm font-medium text-white/50">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <button onClick={() => setIsLogin(!isLogin)} className="text-indigo-400 hover:text-indigo-300 transition-colors font-bold">
             {isLogin ? "Sign Up" : "Sign In"}
           </button>
         </div>
+        {authError && (
+          <p className="mt-4 text-center text-xs font-semibold text-rose-300">{authError}</p>
+        )}
+        {!DEMO_MODE && (
+          <p className="mt-2 text-center text-[11px] text-white/55">If Google fails, verify this host is authorized in Firebase Auth and OAuth consent is published.</p>
+        )}
+
         {DEMO_MODE && (
           <p className="mt-4 text-center text-[10px] font-bold text-white/25 uppercase tracking-widest">Demo Mode · No login required</p>
         )}
+      </div>
+
+      <div className="w-full max-w-sm mt-4 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 relative z-10">
+        <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-2">Quick setup after sign in</p>
+        <div className="space-y-1.5">
+          {nextSteps.map((stepText) => (
+            <div key={stepText} className="flex gap-2.5 items-start text-xs text-white/75">
+              <CheckCircle2 className="w-3.5 h-3.5 text-indigo-300 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{stepText}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

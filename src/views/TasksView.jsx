@@ -1,9 +1,9 @@
 import React, { useState, useContext, useRef } from 'react';
 import { Plus, Check, Clock, Star, Hourglass, Trash2, Camera, ChevronRight, X, MoreVertical, User, CheckSquare, Loader2 } from 'lucide-react';
 import { ThemeContext, useFamilyContext } from '../contexts/FamilyContext';
-import { Card, Button, Badge, Avatar, Modal, RevealCard } from '../components/shared/Primitives';
+import { Card, Button, Badge, Avatar, Modal, RevealCard, DetailActions } from '../components/shared/Primitives';
 
-export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) => {
+export const TasksView = ({ tasks, onAction, onAdd, onUpdate, onDelete, activeUser, isParent }) => {
   const { familyMembers } = useFamilyContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -23,9 +23,13 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
   const [activeTaskForReview, setActiveTaskForReview] = useState(null);
   const [rejectFeedback, setRejectFeedback] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(null); 
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [taskForm, setTaskForm] = useState(null);
   
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [swipedTaskId, setSwipedTaskId] = useState(null);
+  const [recentlyDeletedTask, setRecentlyDeletedTask] = useState(null);
 
   const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser?.name || t.assignee === 'Anyone');
 
@@ -42,17 +46,17 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
   const handleTaskClick = (task) => {
     if (isParent) {
       if (task.status === 'pending') {
-        if (task.requiresPhoto && task.photoUrl) setActiveTaskForReview(task);
-        else setActiveTaskForReview(task);  // Show review modal for all pending tasks
+        setActiveTaskForReview(task);
       } else {
-        onAction(task.id, 'toggle_simple');
+        setSelectedTask(task);
+        setTaskForm({ ...task });
       }
     } else {
       if (task.status === 'open' && task.requiresPhoto) {
         setActiveTaskForPhoto(task);
         setMockPhotoCaptured(null);
       } else {
-        onAction(task.id, 'toggle_simple');
+        setSelectedTask(task);
       }
     }
   };
@@ -109,8 +113,43 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
     setActiveTaskForPhoto(null);
   };
 
+  const handleTouchStart = (e, taskId) => {
+    const startX = e.changedTouches[0].clientX;
+    e.currentTarget.dataset.touchStartX = String(startX);
+    e.currentTarget.dataset.taskId = String(taskId);
+  };
+
+  const handleTouchEnd = (e) => {
+    const startX = Number(e.currentTarget.dataset.touchStartX || 0);
+    const endX = e.changedTouches[0].clientX;
+    const delta = startX - endX;
+    if (delta > 45 && isParent) {
+      setSwipedTaskId(Number(e.currentTarget.dataset.taskId));
+    }
+    if (delta < -35) setSwipedTaskId(null);
+  };
+
+  const handleDeleteWithUndo = (task) => {
+    onDelete(task.id);
+    setSwipedTaskId(null);
+    setRecentlyDeletedTask(task);
+    setTimeout(() => setRecentlyDeletedTask(null), 4500);
+  };
+
+  const handleUndoDelete = () => {
+    if (!recentlyDeletedTask) return;
+    onAdd({
+      title: recentlyDeletedTask.title,
+      assignee: recentlyDeletedTask.assignee,
+      points: recentlyDeletedTask.points,
+      requiresPhoto: recentlyDeletedTask.requiresPhoto,
+      dueDate: recentlyDeletedTask.dueDate || null,
+    });
+    setRecentlyDeletedTask(null);
+  };
+
   return (
-    <div className="space-y-5 animate-bounce-in">
+    <div className="space-y-5 animate-bounce-in" onClick={() => setSwipedTaskId(null)}>
       <RevealCard delay={0}>
         <div className="flex justify-between items-center">
           <div>
@@ -181,7 +220,9 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
             <RevealCard key={task.id} delay={idx * 60}>
               <div
                 onClick={() => handleTaskClick(task)}
-                className={`spring-press bg-white rounded-3xl p-4 shadow-sm ring-1 flex items-center gap-3 cursor-pointer transition-all
+                onTouchStart={(e) => handleTouchStart(e, task.id)}
+                onTouchEnd={handleTouchEnd}
+                className={`spring-press bg-white rounded-[1.75rem] p-4 shadow-sm ring-1 flex items-center gap-3 cursor-pointer transition-all
                   ${isApproved ? 'opacity-55 ring-black/5' : isPending ? 'ring-amber-200 bg-amber-50/30' : 'ring-black/5'}`}
               >
                 {/* Left accent */}
@@ -215,8 +256,8 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
                 <div className="flex items-center gap-2 shrink-0">
                   {isPending && isParent && <span className="text-[9px] font-bold bg-amber-400 text-white px-2.5 py-1 rounded-full animate-pulse">Review</span>}
                   <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isApproved ? 'bg-slate-100 text-slate-400' : 'bg-indigo-100 text-indigo-600'}`}>+{task.points}</span>
-                  {isParent && (
-                    <button onClick={e=>{e.stopPropagation();onDelete(task.id)}} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-xl transition-colors">
+                  {isParent && swipedTaskId === task.id && (
+                    <button onClick={e=>{e.stopPropagation();handleDeleteWithUndo(task);}} className="p-1.5 text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors">
                       <Trash2 className="w-4 h-4"/>
                     </button>
                   )}
@@ -226,6 +267,41 @@ export const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isPare
           )
         })}
       </div>
+
+      {recentlyDeletedTask && (
+        <div className="fixed left-4 right-4 bottom-28 z-40 bg-slate-900 text-white rounded-2xl px-4 py-3 flex items-center justify-between gap-3 shadow-2xl">
+          <span className="text-sm font-semibold truncate">Task deleted</span>
+          <button onClick={handleUndoDelete} className="text-xs font-bold bg-white text-slate-900 px-3 py-1.5 rounded-xl">Undo</button>
+        </div>
+      )}
+
+      <Modal isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title="Task Details">
+        {selectedTask && (
+          <div className="space-y-4">
+            <div className="bg-slate-50 rounded-2xl p-4 ring-1 ring-slate-200">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Task</p>
+              <p className="font-bold text-slate-900 text-lg">{selectedTask.title}</p>
+              <p className="text-xs text-slate-500 font-semibold mt-1">Assigned to {selectedTask.assignee} · +{selectedTask.points} pts</p>
+            </div>
+            {isParent ? (
+              <form onSubmit={(e) => { e.preventDefault(); onUpdate(taskForm); setSelectedTask(taskForm); }} className="space-y-3">
+                <input value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={taskForm.assignee || ''} onChange={(e) => setTaskForm({ ...taskForm, assignee: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                  <input type="number" value={taskForm.points || 0} onChange={(e) => setTaskForm({ ...taskForm, points: parseInt(e.target.value || '0', 10) })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                </div>
+                <DetailActions
+                  onClose={() => setSelectedTask(null)}
+                  onSave={() => { onUpdate(taskForm); setSelectedTask(taskForm); }}
+                  onDelete={() => { onDelete(selectedTask.id); setSelectedTask(null); }}
+                />
+              </form>
+            ) : (
+              <Button onClick={() => { onAction(selectedTask.id, 'toggle_simple'); setSelectedTask(null); }} variant="primary">Mark Progress</Button>
+            )}
+          </div>
+        )}
+      </Modal>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Task">
         <form onSubmit={handleSubmitNewTask} className="space-y-4">
