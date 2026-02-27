@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Plus, ChefHat, Clock, Utensils, ShoppingCart, Trash2, Check, X, ChevronRight, Loader2 } from 'lucide-react';
-import { ThemeContext } from '../contexts/FamilyContext';
-import { Card, Button, Badge, Modal, RevealCard } from '../components/shared/Primitives';
+import { ThemeContext, useFamilyContext } from '../contexts/FamilyContext';
+import { Card, Button, Badge, Modal, RevealCard, DetailActions } from '../components/shared/Primitives';
 
 export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setGroceries }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -12,17 +12,34 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [addedConfirm, setAddedConfirm] = useState(null);
+  const [servings, setServings] = useState(4);
   
   const [meal, setMeal] = useState('');
   const [day, setDay] = useState('Today');
   const [prepTime, setPrepTime] = useState('30m');
   const [newIngredients, setNewIngredients] = useState('');
   const [newInstructions, setNewInstructions] = useState('');
+  const [manualGroceryItem, setManualGroceryItem] = useState('');
+  const { familyMembers, handleSendMessage, activeUser } = useFamilyContext();
 
   const handleAddSubmit = (e) => { e.preventDefault(); if (!meal.trim()) return; onAdd({ meal, day, prepTime: prepTime + ' prep', ingredients: newIngredients.trim(), instructions: newInstructions.trim() }); setMeal(''); setNewIngredients(''); setNewInstructions(''); setIsModalOpen(false); };
   const handleEditClick = () => { setEditForm({ ...selectedMeal }); setIsEditing(true); };
   const handleEditSubmit = (e) => { e.preventDefault(); if (!editForm.meal.trim()) return; onUpdate(editForm); setSelectedMeal(editForm); setIsEditing(false); };
-  const closeMealModal = () => { setSelectedMeal(null); setIsEditing(false); setSelectedIngredients([]); setAddedConfirm(null); };
+  const closeMealModal = () => { setSelectedMeal(null); setIsEditing(false); setSelectedIngredients([]); setAddedConfirm(null); setServings(4); };
+
+  const parseIngredientLine = (line) => {
+    const cleaned = line.trim().replace(/^[-•]\s*/, '');
+    const match = cleaned.match(/^((?:\d+[\/\d\.]*)(?:\s*[a-zA-Z]+)?)\s+(.+)$/);
+    if (!match) return { quantity: '', name: cleaned.toLowerCase() };
+    return { quantity: match[1].trim(), name: match[2].trim().toLowerCase() };
+  };
+
+  const scaleQuantity = (qty, fromServings, toServings) => {
+    if (!qty) return '';
+    const num = parseFloat(qty);
+    if (Number.isNaN(num)) return qty;
+    return `${(num * (toServings / fromServings)).toFixed(2).replace(/\.00$/, '')}`;
+  };
 
   const generateGroceries = () => {
     setIsGenerating(true);
@@ -39,6 +56,23 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
 
   const toggleGrocery = (id) => setGroceries(groceries.map(g => g.id === id ? { ...g, checked: !g.checked } : g));
   const openGroceryList = () => { if (groceries.length === 0) generateGroceries(); setIsGroceryModalOpen(true); };
+
+  const addManualGroceryItem = () => {
+    const item = manualGroceryItem.trim();
+    if (!item) return;
+    const exists = groceries.some((g) => g.name.toLowerCase() === item.toLowerCase());
+    if (!exists) setGroceries((prev) => [...prev, { id: Date.now(), name: item, checked: false }]);
+    setManualGroceryItem('');
+  };
+
+  const shareGroceryWithCoParent = () => {
+    if (!isParent || !activeUser) return;
+    const parentNames = familyMembers.filter((m) => m.role === 'Parent' && m.id !== activeUser.id).map((m) => m.name);
+    const pendingItems = groceries.filter((g) => !g.checked).slice(0, 8).map((g) => g.name);
+    if (pendingItems.length === 0) return;
+    const target = parentNames.length > 0 ? ` for ${parentNames.join(', ')}` : '';
+    handleSendMessage(`🛒 Grocery sync${target}: ${pendingItems.join(', ')}`);
+  };
 
   return (
     <div className="space-y-5 animate-bounce-in">
@@ -63,18 +97,18 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
 
       <div className="space-y-3">
         {meals.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-3xl ring-1 ring-black/5">
-            <div className="w-14 h-14 bg-orange-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
+          <div className="text-center py-12 bg-white rounded-[1.75rem] ring-1 ring-black/5">
+            <div className="w-14 h-14 bg-orange-100 rounded-[1.75rem] flex items-center justify-center mx-auto mb-4">
               <ChefHat className="w-7 h-7 text-orange-400" />
             </div>
             <p className="text-slate-700 font-bold text-base">No meals planned</p>
             <p className="text-slate-400 text-xs font-medium mt-1 max-w-[200px] mx-auto">Plan your family's meals for the week ahead</p>
-            {isParent && <button onClick={() => setShowNewRecipe(true)} className="mt-4 px-5 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors">Plan First Meal</button>}
+            {isParent && <button onClick={() => setIsModalOpen(true)} className="mt-4 px-5 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors">Plan First Meal</button>}
           </div>
         )}
         {meals?.map((meal, idx) => (
           <RevealCard key={meal.id} delay={idx * 60}>
-            <div onClick={() => setSelectedMeal(meal)} className="spring-press bg-white rounded-3xl overflow-hidden shadow-md ring-1 ring-slate-900/6 cursor-pointer group transition-all active:scale-[0.98]">
+            <div onClick={() => setSelectedMeal(meal)} className="spring-press bg-white rounded-[1.75rem] overflow-hidden shadow-md ring-1 ring-slate-900/6 cursor-pointer group transition-all active:scale-[0.98]">
               {/* Gradient banner */}
               <div className="h-20 relative flex items-center justify-center" style={{background:'linear-gradient(135deg, #f97316 0%, #ea580c 50%, #dc2626 100%)'}}>
                 <div className="absolute inset-0 opacity-10" style={{backgroundImage:'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize:'16px 16px'}} />
@@ -134,16 +168,19 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
               <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Utensils className="w-4 h-4"/> Ingredients</h4>
               <div className="space-y-2">
                 {(selectedMeal.ingredients || "").split('\n').filter(i => i.trim()).map((item, i) => {
-                  const isSelected = selectedIngredients.includes(item.trim());
+                  const parsed = parseIngredientLine(item);
+                  const scaledQty = scaleQuantity(parsed.quantity, 4, servings);
+                  const ingredientLabel = `${scaledQty ? `${scaledQty} ` : ''}${parsed.name}`.trim();
+                  const isSelected = selectedIngredients.includes(parsed.name);
                   return (
                     <div key={i} className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 hover:border-slate-300'}`} onClick={() => {
-                      const trimmed = item.trim();
+                      const trimmed = parsed.name;
                       setSelectedIngredients(prev => prev.includes(trimmed) ? prev.filter(x => x !== trimmed) : [...prev, trimmed]);
                     }}>
                       <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors shrink-0 ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
                         {isSelected && <Check className="w-3 h-3 text-white" />}
                       </div>
-                      <span className="text-sm text-slate-700 font-medium flex-1">{item.trim()}</span>
+                      <span className="text-sm text-slate-700 font-medium flex-1">{ingredientLabel}</span>
                       <ShoppingCart className={`w-3.5 h-3.5 transition-colors ${isSelected ? 'text-emerald-500' : 'text-slate-300'}`} />
                     </div>
                   );
@@ -152,22 +189,23 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
               {(selectedMeal.ingredients || "").split('\n').filter(i => i.trim()).length > 0 && (
                 <div className="mt-3 flex gap-2">
                   <button onClick={() => {
-                    const allItems = (selectedMeal.ingredients || "").split('\n').filter(i => i.trim()).map(i => i.trim());
+                    const allItems = (selectedMeal.ingredients || "").split('\n').filter(i => i.trim()).map(i => parseIngredientLine(i).name);
                     setSelectedIngredients(prev => prev.length === allItems.length ? [] : allItems);
                   }} className="text-xs font-bold text-indigo-500 hover:text-indigo-700 transition-colors">
                     {selectedIngredients.length === (selectedMeal.ingredients || "").split('\n').filter(i => i.trim()).length ? 'Deselect All' : 'Select All'}
                   </button>
                   {selectedIngredients.length > 0 && (
                     <button onClick={() => {
-                      const newItems = selectedIngredients.map((item, i) => ({
-                        id: Date.now() + i,
-                        name: item,
-                        checked: false
-                      }));
-                      const existingNames = groceries.map(g => g.name.toLowerCase());
-                      const uniqueNew = newItems.filter(n => !existingNames.includes(n.name.toLowerCase()));
-                      setGroceries(prev => [...prev, ...uniqueNew]);
-                      const count = uniqueNew.length;
+                      const groceryMap = new Map(groceries.map(g => [g.name.toLowerCase(), g]));
+                      selectedIngredients.forEach((name, i) => {
+                        const key = name.toLowerCase();
+                        if (!groceryMap.has(key)) {
+                          groceryMap.set(key, { id: Date.now() + i, name, checked: false });
+                        }
+                      });
+                      const merged = Array.from(groceryMap.values());
+                      setGroceries(merged);
+                      const count = merged.length - groceries.length;
                       setAddedConfirm(count > 0 ? `${count} item${count > 1 ? 's' : ''} added` : 'Already in list');
                       setSelectedIngredients([]);
                       setTimeout(() => setAddedConfirm(null), 2500);
@@ -184,18 +222,24 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
                 </div>
               )}
             </div>
-            <div className="bg-slate-50 p-4 rounded-2xl ring-1 ring-slate-900/5"><h4 className="font-bold text-slate-800 mb-2">Instructions</h4><ol className="list-decimal pl-5 text-sm text-slate-600 space-y-2">{(selectedMeal.instructions || "").split('\n').map((item, i) => <li key={i}>{item}</li>)}</ol></div>
-            <div className="flex gap-3">
-              <Button onClick={closeMealModal} variant="secondary" className="flex-1">Close</Button>
-              {isParent && (
-                <>
-                  <Button onClick={handleEditClick} className="flex-1">Edit Plan</Button>
-                  <Button onClick={() => { closeMealModal(); onDelete(selectedMeal.id); }} variant="secondary" className="!w-auto !px-4 !bg-rose-50 !text-rose-500 !border-rose-200 hover:!bg-rose-100">
-                    <Trash2 className="w-5 h-5" />
-                  </Button>
-                </>
-              )}
+            <div className="flex items-center justify-between bg-white rounded-2xl p-3 ring-1 ring-slate-200">
+              <span className="text-sm font-bold text-slate-700">Serves {servings}</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setServings(v => Math.max(1, v - 1))} className="w-8 h-8 rounded-full bg-slate-100 font-bold">-</button>
+                <button onClick={() => setServings(v => Math.min(12, v + 1))} className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold">+</button>
+              </div>
             </div>
+            <div className="bg-slate-50 p-4 rounded-2xl ring-1 ring-slate-900/5"><h4 className="font-bold text-slate-800 mb-2">Instructions</h4><ol className="list-decimal pl-5 text-sm text-slate-600 space-y-2">{(selectedMeal.instructions || "").split('\n').map((item, i) => <li key={i}>{item}</li>)}</ol></div>
+            {isParent ? (
+              <DetailActions
+                onClose={closeMealModal}
+                onSave={handleEditClick}
+                saveLabel="Edit"
+                onDelete={() => { closeMealModal(); onDelete(selectedMeal.id); }}
+              />
+            ) : (
+              <Button onClick={closeMealModal} variant="secondary" className="flex-1">Close</Button>
+            )}
           </div>
         )}
         {selectedMeal && isEditing && (
@@ -210,12 +254,24 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
 
       <Modal isOpen={isGroceryModalOpen} onClose={() => setIsGroceryModalOpen(false)} title="🛒 Grocery List" fullHeight>
         <div className="flex flex-col h-full h-[60vh]">
-          <div className="flex items-center justify-between bg-slate-50 text-slate-700 p-3 rounded-xl border border-slate-200 mb-4 shrink-0">
+          <div className="flex items-center justify-between bg-slate-50 text-slate-700 p-3 rounded-xl border border-slate-200 mb-3 shrink-0">
             <div className="flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-emerald-500" /><span className="text-sm font-bold">{groceries.length} item{groceries.length !== 1 ? 's' : ''} · {groceries.filter(g => g.checked).length} done</span></div>
             <div className="flex gap-1.5">
               {groceries.some(g => g.checked) && <button onClick={() => setGroceries(groceries.filter(g => !g.checked))} className="text-xs font-bold bg-white px-2 py-1 rounded-lg shadow-sm hover:scale-105 transition-transform active:scale-95 border border-slate-200 text-rose-500">Clear Done</button>}
               <button onClick={generateGroceries} className="text-xs font-bold bg-white px-2 py-1 rounded-lg shadow-sm hover:scale-105 transition-transform active:scale-95 border border-slate-200">Refresh</button>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              value={manualGroceryItem}
+              onChange={(e) => setManualGroceryItem(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addManualGroceryItem(); } }}
+              placeholder="Add grocery item"
+              className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium"
+            />
+            <button onClick={addManualGroceryItem} className="px-3 py-2 text-xs font-bold bg-slate-900 text-white rounded-xl">Add</button>
+            {isParent && <button onClick={shareGroceryWithCoParent} className="px-3 py-2 text-xs font-bold bg-indigo-500 text-white rounded-xl">Share</button>}
           </div>
           <div className="flex-1 overflow-y-auto no-scrollbar pb-4 relative">
             {isGenerating ? (
