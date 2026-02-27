@@ -149,7 +149,7 @@ export const TasksView = ({ tasks, onAction, onAdd, onUpdate, onDelete, activeUs
   };
 
   return (
-    <div className="space-y-5 animate-bounce-in">
+    <div className="space-y-5 animate-bounce-in" onClick={() => setSwipedTaskId(null)}>
       <RevealCard delay={0}>
         <div className="flex justify-between items-center">
           <div>

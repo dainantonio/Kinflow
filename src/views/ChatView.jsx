@@ -112,7 +112,7 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
               <div key={msg.id} className={`flex gap-2 items-end ${isMe ? 'justify-end' : 'justify-start'}`}>
                 {!isMe && <Avatar user={sender} size="sm" className="shrink-0 mb-4 ring-2 ring-white shadow-sm" />}
                 <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[78%]`}>
-                  {!isMe && <span className="text-[10px] font-bold text-slate-500 ml-2 mb-1 inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-400" />{sender?.name} · {sender?.role}</span>}
+                  <span className="text-[10px] font-bold text-slate-500 ml-2 mb-1 inline-flex items-center gap-1"><span className={`w-2 h-2 rounded-full bg-gradient-to-br ${sender?.color || user?.color || 'from-indigo-400 to-violet-500'}`} />{isMe ? `${user?.name} (You)` : sender?.name} · {isMe ? user?.role : sender?.role}</span>
                   <div className={`px-4 py-2.5 text-sm font-medium leading-relaxed shadow-sm
                     ${isMe
                       ? (isChild ? 'bg-sky-500 text-white rounded-3xl rounded-br-md' : 'bg-slate-900 text-white rounded-3xl rounded-br-md')

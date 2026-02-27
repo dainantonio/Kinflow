@@ -1,20 +1,31 @@
 import React, { useState } from 'react';
 import { Layers, Loader2, CheckCircle2 } from 'lucide-react';
-import { DEMO_MODE } from '../../utils/firebase';
+import { DEMO_MODE, auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from '../../utils/firebase';
 
 export const AuthScreen = ({ onComplete }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    setAuthError('');
+    try {
+      if (DEMO_MODE || !auth) {
+        setTimeout(() => onComplete(), 450);
+        return;
+      }
+      if (isLogin) await signInWithEmailAndPassword(auth, email.trim(), password);
+      else await createUserWithEmailAndPassword(auth, email.trim(), password);
       onComplete();
-    }, 800);
+    } catch (err) {
+      setAuthError(err?.message?.replace('Firebase: ', '') || 'Unable to authenticate. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const nextSteps = [
@@ -59,6 +70,9 @@ export const AuthScreen = ({ onComplete }) => {
             {isLogin ? "Sign Up" : "Sign In"}
           </button>
         </div>
+        {authError && (
+          <p className="mt-4 text-center text-xs font-semibold text-rose-300">{authError}</p>
+        )}
         {DEMO_MODE && (
           <p className="mt-4 text-center text-[10px] font-bold text-white/25 uppercase tracking-widest">Demo Mode · No login required</p>
         )}

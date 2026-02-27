@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { Plus, ChefHat, Clock, Utensils, ShoppingCart, Trash2, Check, X, ChevronRight, Loader2 } from 'lucide-react';
-import { ThemeContext } from '../contexts/FamilyContext';
+import { ThemeContext, useFamilyContext } from '../contexts/FamilyContext';
 import { Card, Button, Badge, Modal, RevealCard, DetailActions } from '../components/shared/Primitives';
 
 export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setGroceries }) => {
@@ -19,6 +19,8 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
   const [prepTime, setPrepTime] = useState('30m');
   const [newIngredients, setNewIngredients] = useState('');
   const [newInstructions, setNewInstructions] = useState('');
+  const [manualGroceryItem, setManualGroceryItem] = useState('');
+  const { familyMembers, handleSendMessage, activeUser } = useFamilyContext();
 
   const handleAddSubmit = (e) => { e.preventDefault(); if (!meal.trim()) return; onAdd({ meal, day, prepTime: prepTime + ' prep', ingredients: newIngredients.trim(), instructions: newInstructions.trim() }); setMeal(''); setNewIngredients(''); setNewInstructions(''); setIsModalOpen(false); };
   const handleEditClick = () => { setEditForm({ ...selectedMeal }); setIsEditing(true); };
@@ -54,6 +56,23 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
 
   const toggleGrocery = (id) => setGroceries(groceries.map(g => g.id === id ? { ...g, checked: !g.checked } : g));
   const openGroceryList = () => { if (groceries.length === 0) generateGroceries(); setIsGroceryModalOpen(true); };
+
+  const addManualGroceryItem = () => {
+    const item = manualGroceryItem.trim();
+    if (!item) return;
+    const exists = groceries.some((g) => g.name.toLowerCase() === item.toLowerCase());
+    if (!exists) setGroceries((prev) => [...prev, { id: Date.now(), name: item, checked: false }]);
+    setManualGroceryItem('');
+  };
+
+  const shareGroceryWithCoParent = () => {
+    if (!isParent || !activeUser) return;
+    const parentNames = familyMembers.filter((m) => m.role === 'Parent' && m.id !== activeUser.id).map((m) => m.name);
+    const pendingItems = groceries.filter((g) => !g.checked).slice(0, 8).map((g) => g.name);
+    if (pendingItems.length === 0) return;
+    const target = parentNames.length > 0 ? ` for ${parentNames.join(', ')}` : '';
+    handleSendMessage(`🛒 Grocery sync${target}: ${pendingItems.join(', ')}`);
+  };
 
   return (
     <div className="space-y-5 animate-bounce-in">
@@ -235,12 +254,24 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
 
       <Modal isOpen={isGroceryModalOpen} onClose={() => setIsGroceryModalOpen(false)} title="🛒 Grocery List" fullHeight>
         <div className="flex flex-col h-full h-[60vh]">
-          <div className="flex items-center justify-between bg-slate-50 text-slate-700 p-3 rounded-xl border border-slate-200 mb-4 shrink-0">
+          <div className="flex items-center justify-between bg-slate-50 text-slate-700 p-3 rounded-xl border border-slate-200 mb-3 shrink-0">
             <div className="flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-emerald-500" /><span className="text-sm font-bold">{groceries.length} item{groceries.length !== 1 ? 's' : ''} · {groceries.filter(g => g.checked).length} done</span></div>
             <div className="flex gap-1.5">
               {groceries.some(g => g.checked) && <button onClick={() => setGroceries(groceries.filter(g => !g.checked))} className="text-xs font-bold bg-white px-2 py-1 rounded-lg shadow-sm hover:scale-105 transition-transform active:scale-95 border border-slate-200 text-rose-500">Clear Done</button>}
               <button onClick={generateGroceries} className="text-xs font-bold bg-white px-2 py-1 rounded-lg shadow-sm hover:scale-105 transition-transform active:scale-95 border border-slate-200">Refresh</button>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              value={manualGroceryItem}
+              onChange={(e) => setManualGroceryItem(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addManualGroceryItem(); } }}
+              placeholder="Add grocery item"
+              className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium"
+            />
+            <button onClick={addManualGroceryItem} className="px-3 py-2 text-xs font-bold bg-slate-900 text-white rounded-xl">Add</button>
+            {isParent && <button onClick={shareGroceryWithCoParent} className="px-3 py-2 text-xs font-bold bg-indigo-500 text-white rounded-xl">Share</button>}
           </div>
           <div className="flex-1 overflow-y-auto no-scrollbar pb-4 relative">
             {isGenerating ? (

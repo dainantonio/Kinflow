@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION ---
@@ -33,6 +33,6 @@ const fetchWithRetry = async (url, options, retries = 5) => {
 
 export {
   DEMO_MODE, auth, db, appId, fetchWithRetry,
-  signInWithCustomToken, signInAnonymously, onAuthStateChanged,
+  signInWithCustomToken, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc
 };

@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { Plus, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, Calendar as CalendarIcon, Rows3, CalendarDays } from 'lucide-react';
 import { ThemeContext } from '../contexts/FamilyContext';
 import { Card, Button, Modal, RevealCard, DetailActions } from '../components/shared/Primitives';
 
@@ -12,6 +12,9 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [editEvent, setEditEvent] = useState(null);
+  const [viewMode, setViewMode] = useState('calendar');
+  const [swipedEventId, setSwipedEventId] = useState(null);
+  const [deletedEvent, setDeletedEvent] = useState(null);
 
   const startOfWeek = new Date(baseDate);
   const day = startOfWeek.getDay();
@@ -50,8 +53,32 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
 
   const openEvent = (event) => { setSelectedEvent(event); setEditEvent({ ...event }); };
 
+  const handleTouchStart = (e, eventId) => {
+    e.currentTarget.dataset.touchStartX = String(e.changedTouches[0].clientX);
+    e.currentTarget.dataset.eventId = String(eventId);
+  };
+
+  const handleTouchEnd = (e) => {
+    const delta = Number(e.currentTarget.dataset.touchStartX || 0) - e.changedTouches[0].clientX;
+    if (delta > 40 && isParent) setSwipedEventId(Number(e.currentTarget.dataset.eventId));
+    if (delta < -35) setSwipedEventId(null);
+  };
+
+  const deleteWithUndo = (event) => {
+    onDelete(event.id);
+    setDeletedEvent(event);
+    setSwipedEventId(null);
+    setTimeout(() => setDeletedEvent(null), 4500);
+  };
+
+  const undoDelete = () => {
+    if (!deletedEvent) return;
+    onAdd({ title: deletedEvent.title, time: deletedEvent.time, location: deletedEvent.location });
+    setDeletedEvent(null);
+  };
+
   return (
-    <div className="space-y-5 animate-bounce-in">
+    <div className="space-y-5 animate-bounce-in" onClick={() => setSwipedEventId(null)}>
       <RevealCard delay={0}>
         <div className="flex justify-between items-center">
           <div>
@@ -62,14 +89,21 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
               <button onClick={() => moveWeek(1)} className="spring-press p-1.5 text-slate-400 hover:text-slate-700 bg-white rounded-xl shadow-sm ring-1 ring-black/5 transition-colors"><ChevronRight className="w-3.5 h-3.5" /></button>
             </div>
           </div>
-          {isParent && (
-            <button onClick={() => setIsModalOpen(true)} className="spring-press w-10 h-10 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-md shadow-slate-900/20">
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="bg-white rounded-2xl p-1 ring-1 ring-black/5 flex">
+              <button onClick={() => setViewMode('calendar')} className={`px-2 py-1 rounded-xl text-xs font-bold flex items-center gap-1 ${viewMode === 'calendar' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}><CalendarDays className="w-3.5 h-3.5"/>Cal</button>
+              <button onClick={() => setViewMode('list')} className={`px-2 py-1 rounded-xl text-xs font-bold flex items-center gap-1 ${viewMode === 'list' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}><Rows3 className="w-3.5 h-3.5"/>List</button>
+            </div>
+            {isParent && (
+              <button onClick={() => setIsModalOpen(true)} className="spring-press w-10 h-10 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-md shadow-slate-900/20">
+                <Plus className="w-4 h-4" strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
         </div>
       </RevealCard>
 
+      {viewMode === 'calendar' && (<>
       {/* WEEK STRIP */}
       <RevealCard delay={60}>
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1" style={{scrollSnapType:'x mandatory'}}>
@@ -147,8 +181,10 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
         </RevealCard>
       )}
 
+      </>)}
+
       {/* ALL EVENTS (when no day selected) */}
-      {!selectedDay && (
+      {viewMode === 'list' && (
         <div className="space-y-3">
           {events.length === 0 && (
             <div className="text-center py-12 bg-white rounded-[1.75rem] ring-1 ring-black/5">
@@ -162,7 +198,7 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
           )}
           {events?.map((event, idx) => (
             <RevealCard key={event.id} delay={idx * 60}>
-              <div onClick={() => openEvent(event)} className="bg-white rounded-[1.75rem] p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4 cursor-pointer">
+              <div onClick={() => openEvent(event)} onTouchStart={(e) => handleTouchStart(e, event.id)} onTouchEnd={handleTouchEnd} className="bg-white rounded-[1.75rem] p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4 cursor-pointer">
                 <div className={`w-1 h-14 rounded-full shrink-0 ${event.color}`} />
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-slate-800 text-sm">{event.title}</p>
@@ -171,8 +207,8 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
                     <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3"/> {event.location}</span>
                   </div>
                 </div>
-                {isParent && (
-                  <button onClick={() => onDelete(event.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-xl transition-colors shrink-0">
+                {isParent && swipedEventId === event.id && (
+                  <button onClick={() => deleteWithUndo(event)} className="p-1.5 text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors shrink-0">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
@@ -182,6 +218,13 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
         </div>
       )}
 
+
+      {deletedEvent && (
+        <div className="fixed left-4 right-4 bottom-28 z-40 bg-slate-900 text-white rounded-2xl px-4 py-3 flex items-center justify-between gap-3 shadow-2xl">
+          <span className="text-sm font-semibold truncate">Event deleted</span>
+          <button onClick={undoDelete} className="text-xs font-bold bg-white text-slate-900 px-3 py-1.5 rounded-xl">Undo</button>
+        </div>
+      )}
 
       <Modal isOpen={!!selectedEvent} onClose={() => setSelectedEvent(null)} title="Event Details">
         {selectedEvent && (
