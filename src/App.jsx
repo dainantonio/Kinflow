@@ -11,7 +11,7 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION ---
@@ -223,12 +223,17 @@ const Badge = ({ children, variant = 'default', className = '' }) => {
   return <span className={`${isChild ? 'text-xs px-3 py-1.5 rounded-xl' : 'text-[10px] sm:text-xs px-2.5 py-1 rounded-full uppercase tracking-wider backdrop-blur-sm'} font-bold ${variants[variant]} ${className}`}>{children}</span>;
 };
 
+const AVATAR_EMOJIS = { mom: '👩🏾', dad: '👨🏾', boy: '👦🏾', girl: '👧🏾' };
 const Avatar = ({ user, size = 'md', className = '' }) => {
   if (!user) return null;
-  const sizes = { sm: 'w-8 h-8 text-sm', md: 'w-10 h-10 text-base', lg: 'w-14 h-14 text-2xl', xl: 'w-20 h-20 text-4xl', xxl: 'w-24 h-24 text-4xl' };
+  const sizes = { sm: 'w-8 h-8 text-xl', md: 'w-10 h-10 text-2xl', lg: 'w-14 h-14 text-3xl', xl: 'w-20 h-20 text-5xl', xxl: 'w-24 h-24 text-5xl' };
+  const emoji = user.avatar ? AVATAR_EMOJIS[user.avatar] : null;
   return (
-    <div className={`flex items-center justify-center rounded-full bg-gradient-to-br ${user.color} text-white font-bold shadow-inner ring-2 ring-white/20 ${sizes[size]} ${className}`}>
-      {user.initials}
+    <div className={`flex items-center justify-center rounded-full bg-gradient-to-br ${user.color} shadow-inner ring-2 ring-white/20 ${sizes[size]} ${className}`}>
+      {emoji
+        ? <span style={{lineHeight:1}}>{emoji}</span>
+        : <span className="text-white font-bold" style={{fontSize:'0.6em'}}>{user.initials}</span>
+      }
     </div>
   );
 };
@@ -275,20 +280,20 @@ const Confetti = ({ active }) => {
 
 // --- MOCK DATA FOR SEEDING FIREBASE ON FIRST LOAD ---
 const MOCK_USERS = [
-  { id: 'p1', name: "Sarah", role: "Parent", initials: "S", color: "from-pink-500 to-rose-500" },
-  { id: 'p2', name: "Dad", role: "Parent", initials: "D", color: "from-blue-500 to-cyan-500" },
-  { id: 'c1', name: "Tommy", role: "Child", initials: "T", color: "from-emerald-400 to-teal-500" },
-  { id: 'c2', name: "Lily", role: "Child", initials: "L", color: "from-purple-500 to-indigo-500" }
+  { id: 'p1', name: "Mom", role: "Parent", initials: "M", color: "from-rose-400 to-pink-600", avatar: "mom" },
+  { id: 'p2', name: "Dad", role: "Parent", initials: "D", color: "from-blue-500 to-indigo-600", avatar: "dad" },
+  { id: 'c1', name: "Jaylen", role: "Child", initials: "J", color: "from-emerald-400 to-teal-500", avatar: "boy" },
+  { id: 'c2', name: "Amara", role: "Child", initials: "A", color: "from-purple-400 to-violet-500", avatar: "girl" },
 ];
 const mockTasks = [
-  { id: 1, title: "Empty Dishwasher", assignee: "Tommy", points: 10, status: 'open', requiresPhoto: false },
-  { id: 4, title: "Clean Bedroom", assignee: "Tommy", points: 25, status: 'open', requiresPhoto: true },
-  { id: 2, title: "Walk the Dog", assignee: "Sarah", points: 20, status: 'approved', requiresPhoto: false },
-  { id: 3, title: "Finish Math Homework", assignee: "Lily", points: 15, status: 'pending', requiresPhoto: true, photoUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=400&q=80" },
+  { id: 1, title: "Empty Dishwasher", assignee: "Jaylen", points: 10, status: 'open', requiresPhoto: false },
+  { id: 4, title: "Clean Bedroom", assignee: "Jaylen", points: 25, status: 'open', requiresPhoto: true },
+  { id: 2, title: "Walk the Dog", assignee: "Mom", points: 20, status: 'approved', requiresPhoto: false },
+  { id: 3, title: "Finish Math Homework", assignee: "Amara", points: 15, status: 'pending', requiresPhoto: true, photoUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=400&q=80" },
 ];
 const mockChats = [
   { id: 1, senderId: 'p1', text: "Hey family, what's everyone doing?", time: "3:30 PM" },
-  { id: 2, senderId: 'c1', text: "Just finished my homework! Can I have a snack?", time: "3:32 PM" },
+  { id: 2, senderId: 'c1', text: "Just finished my homework! 🙌", time: "3:32 PM" },
 ];
 const mockEvents = [
   { id: 1, title: "Tommy's Soccer Practice", time: "4:00 PM - 5:30 PM", location: "City Park", color: "bg-emerald-500" },
@@ -485,18 +490,43 @@ const OnboardingFlow = ({ onComplete }) => {
 
 
 const AuthScreen = ({ onComplete }) => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(null); // 'google' | 'apple' | 'demo' | null
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+  const handleGoogle = async () => {
+    setError('');
+    setIsLoading('google');
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      await signInWithPopup(auth, provider);
       onComplete();
-    }, 800);
+    } catch (err) {
+      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+        setError('Google sign-in failed. Please try again.');
+      }
+    } finally { setIsLoading(null); }
+  };
+
+  const handleApple = async () => {
+    setError('');
+    setIsLoading('apple');
+    try {
+      const provider = new OAuthProvider('apple.com');
+      provider.addScope('email');
+      provider.addScope('name');
+      await signInWithPopup(auth, provider);
+      onComplete();
+    } catch (err) {
+      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+        setError('Apple sign-in failed. Please try again.');
+      }
+    } finally { setIsLoading(null); }
+  };
+
+  const handleDemo = () => {
+    setIsLoading('demo');
+    setTimeout(() => { setIsLoading(null); onComplete(); }, 600);
   };
 
   return (
@@ -505,44 +535,76 @@ const AuthScreen = ({ onComplete }) => {
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-violet-500/15 rounded-full blur-[100px]" />
       <div className="absolute inset-0 opacity-[0.03]" style={{backgroundImage:'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize:'28px 28px'}} />
 
-      <div className="mb-10 text-center animate-bounce-in relative z-10 flex flex-col items-center">
-        <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[1.5rem] flex items-center justify-center shadow-[0_16px_48px_rgba(99,102,241,0.45)] mb-6 ring-1 ring-white/10">
-          <Layers className="w-8 h-8 text-white" strokeWidth={1.5} />
+      {/* Family avatar trio */}
+      <div className="mb-8 flex flex-col items-center animate-bounce-in relative z-10">
+        <div className="flex items-center mb-6">
+          {[
+            {color:'from-rose-400 to-pink-600', emoji:'👩🏾'},
+            {color:'from-blue-500 to-indigo-600', emoji:'👨🏾'},
+            {color:'from-emerald-400 to-teal-500', emoji:'👦🏾'},
+            {color:'from-purple-400 to-violet-500', emoji:'👧🏾'},
+          ].map((u,i) => (
+            <div key={i} className={`w-12 h-12 rounded-full bg-gradient-to-br ${u.color} flex items-center justify-center text-xl shadow-lg ring-2 ring-slate-900`} style={{marginLeft: i>0 ? '-8px': 0, zIndex: 4-i}}>
+              <span style={{lineHeight:1}}>{u.emoji}</span>
+            </div>
+          ))}
         </div>
-        <h1 className="text-3xl font-bold tracking-wide mb-2">Kinflow</h1>
-        <p className="text-white/50 text-sm font-medium">Family organization, simplified.</p>
+        <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[1.5rem] flex items-center justify-center shadow-[0_16px_48px_rgba(99,102,241,0.45)] mb-5 ring-1 ring-white/10">
+          <Layers className="w-7 h-7 text-white" strokeWidth={1.5} />
+        </div>
+        <h1 className="text-3xl font-bold tracking-wide mb-1">Kinflow</h1>
+        <p className="text-white/45 text-sm font-medium">Your family, in sync.</p>
       </div>
 
-      <div className="w-full max-w-sm bg-white/10 backdrop-blur-xl p-6 rounded-3xl border border-white/15 shadow-2xl relative z-10 animate-bounce-in" style={{animationDelay:'0.1s'}}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-[10px] font-bold text-white/60 mb-1.5 uppercase tracking-widest">Email</label>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required className="w-full bg-white/5 border border-white/15 rounded-2xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium placeholder:text-white/25" placeholder="parent@family.com" />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-white/60 mb-1.5 uppercase tracking-widest">Password</label>
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required className="w-full bg-white/5 border border-white/15 rounded-2xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium placeholder:text-white/25" placeholder="••••••••" />
-          </div>
+      <div className="w-full max-w-sm relative z-10 animate-bounce-in space-y-3" style={{animationDelay:'0.1s'}}>
+        {/* Google */}
+        <button
+          onClick={handleGoogle}
+          disabled={!!isLoading}
+          className="spring-press w-full py-4 px-5 rounded-[1.25rem] font-semibold text-[15px] bg-white text-slate-800 shadow-lg hover:bg-white/95 transition-all disabled:opacity-60 flex items-center justify-center gap-3"
+        >
+          {isLoading === 'google' ? <Loader2 className="w-5 h-5 animate-spin text-slate-500" /> : (
+            <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+          )}
+          Continue with Google
+        </button>
 
-          <button type="submit" disabled={isLoading} className="spring-press w-full mt-6 py-4 rounded-2xl font-bold text-base bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-shadow disabled:opacity-50 flex items-center justify-center gap-2">
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isLogin ? "Sign In" : "Create Family Account")}
-          </button>
-        </form>
+        {/* Apple */}
+        <button
+          onClick={handleApple}
+          disabled={!!isLoading}
+          className="spring-press w-full py-4 px-5 rounded-[1.25rem] font-semibold text-[15px] bg-black text-white border border-white/10 shadow-lg hover:bg-black/80 transition-all disabled:opacity-60 flex items-center justify-center gap-3"
+        >
+          {isLoading === 'apple' ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+            <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+            </svg>
+          )}
+          Continue with Apple
+        </button>
 
-        <div className="mt-6 text-center text-sm font-medium text-white/50">
-          {isLogin ? "Don't have an account? " : "Already have an account? "}
-          <button onClick={() => setIsLogin(!isLogin)} className="text-indigo-400 hover:text-indigo-300 transition-colors font-bold">
-            {isLogin ? "Sign Up" : "Sign In"}
-          </button>
-        </div>
-        {DEMO_MODE && (
-          <p className="mt-4 text-center text-[10px] font-bold text-white/25 uppercase tracking-widest">Demo Mode · No login required</p>
+        {error && (
+          <div className="text-red-400 text-xs text-center font-medium px-2 py-2 bg-red-500/10 rounded-xl border border-red-500/20">{error}</div>
         )}
+
+        <div className="pt-2 text-center">
+          <button onClick={handleDemo} disabled={!!isLoading} className="text-white/35 hover:text-white/55 transition-colors text-xs font-medium underline underline-offset-2">
+            {isLoading === 'demo' ? 'Loading…' : 'Try Demo (no account needed)'}
+          </button>
+        </div>
       </div>
+
+      <p className="mt-10 text-white/20 text-[10px] font-medium text-center relative z-10 px-8">
+        By continuing, you agree to our Terms of Service and Privacy Policy.
+      </p>
     </div>
   );
 };
-
 const ProfileSelectorScreen = ({ onLogin, users, onLogout }) => (
   <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
     <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[120px]" />
@@ -989,7 +1051,7 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Assignee</label>
               <select value={assignee} onChange={e => setAssignee(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium">
-                <option>Tommy</option><option>Lily</option><option>Sarah</option><option>Dad</option><option>Anyone</option>
+                <option>Jaylen</option><option>Amara</option><option>Mom</option><option>Dad</option><option>Anyone</option>
               </select>
             </div>
             <div>
@@ -1076,117 +1138,287 @@ const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
   const [location, setLocation] = useState('');
-  const [baseDate, setBaseDate] = useState(new Date());
+  const [eventDate, setEventDate] = useState('');
+  const [monthDate, setMonthDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
+  const [viewMode, setViewMode] = useState('calendar'); // 'calendar' | 'list'
+  const [swipedEventId, setSwipedEventId] = useState(null);
+  const [undoEvent, setUndoEvent] = useState(null);
+  const listRef = useRef(null);
 
-  const startOfWeek = new Date(baseDate);
-  const day = startOfWeek.getDay();
-  const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
-  startOfWeek.setDate(diff);
+  const today = new Date();
 
-  const weekDays = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(startOfWeek);
-    d.setDate(startOfWeek.getDate() + i);
-    weekDays.push(d);
-  }
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const gridStart = new Date(monthStart);
+  gridStart.setDate(monthStart.getDate() - monthStart.getDay());
 
-  const moveWeek = (offset) => {
-    const newDate = new Date(baseDate);
-    newDate.setDate(baseDate.getDate() + offset * 7);
-    setBaseDate(newDate);
+  const calendarDays = React.useMemo(() => {
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(gridStart);
+      d.setDate(gridStart.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  }, [monthDate]);
+
+  const isSameDate = (a, b) =>
+    a && b &&
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const parseEventDate = (event) => {
+    if (event.date) return new Date(event.date + 'T12:00:00');
+    return new Date();
   };
 
-  const isToday = (date) => {
-    const today = new Date();
-    return date.getDate() === today.getDate() && 
-           date.getMonth() === today.getMonth() && 
-           date.getFullYear() === today.getFullYear();
+  const eventsByDate = React.useMemo(() => {
+    const map = {};
+    (events || []).forEach((ev) => {
+      const d = parseEventDate(ev);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(ev);
+    });
+    return map;
+  }, [events]);
+
+  const eventsForDay = (d) => {
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    return eventsByDate[key] || [];
   };
+
+  const selectedDayEvents = React.useMemo(() =>
+    (events || []).filter((ev) => isSameDate(parseEventDate(ev), selectedDay)),
+    [events, selectedDay]
+  );
+
+  const allSortedEvents = React.useMemo(() =>
+    [...(events || [])].sort((a, b) => {
+      const da = parseEventDate(a), db = parseEventDate(b);
+      return da - db || (a.createdAt || 0) - (b.createdAt || 0);
+    }),
+    [events]
+  );
+
+  const listEvents = selectedDayEvents.length > 0 ? selectedDayEvents : allSortedEvents;
+
+  const moveMonth = (offset) => {
+    const next = new Date(monthDate);
+    next.setMonth(monthDate.getMonth() + offset);
+    setMonthDate(next);
+  };
+
+  const jumpToToday = () => {
+    setMonthDate(new Date());
+    setSelectedDay(new Date());
+  };
+
+  const handleDayClick = (d) => {
+    setSelectedDay(d);
+    setSwipedEventId(null);
+    setViewMode('list');
+  };
+
+  const handleDeleteEvent = (id) => {
+    const ev = events.find(e => String(e.id) === String(id));
+    if (ev) setUndoEvent(ev);
+    onDelete(id);
+    setSwipedEventId(null);
+    setTimeout(() => setUndoEvent(null), 4000);
+  };
+
+  // Tap-outside resets swipe
+  useEffect(() => {
+    const handler = (e) => {
+      if (listRef.current && !listRef.current.contains(e.target)) {
+        setSwipedEventId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('touchstart', handler); };
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd({ title, time: time || 'TBD', location: location || 'Home' });
-    setTitle('');
-    setTime('');
-    setLocation('');
+    const dateStr = eventDate || new Date().toISOString().split('T')[0];
+    onAdd({ title, time: time || 'TBD', location: location || 'Home', date: dateStr, color: 'bg-indigo-500' });
+    setTitle(''); setTime(''); setLocation(''); setEventDate('');
     setIsModalOpen(false);
   };
 
+  const monthName = monthDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const DAY_HEADERS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const COLOR_POOL = ['bg-indigo-500','bg-emerald-500','bg-pink-500','bg-amber-500','bg-blue-500','bg-violet-500'];
+
   return (
-    <div className="space-y-5 animate-bounce-in">
+    <div className="space-y-4 animate-bounce-in">
+      {/* Header */}
       <RevealCard delay={0}>
         <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Schedule</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <button onClick={() => moveWeek(-1)} className="spring-press p-1.5 text-slate-400 hover:text-slate-700 bg-white rounded-xl shadow-sm ring-1 ring-black/5 transition-colors"><ChevronLeft className="w-3.5 h-3.5" /></button>
-              <p className="text-slate-500 font-bold text-xs tracking-widest uppercase">{weekDays[0].toLocaleString('en-US', { month: 'short' })} {weekDays[0].getFullYear()}</p>
-              <button onClick={() => moveWeek(1)} className="spring-press p-1.5 text-slate-400 hover:text-slate-700 bg-white rounded-xl shadow-sm ring-1 ring-black/5 transition-colors"><ChevronRight className="w-3.5 h-3.5" /></button>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Schedule</h2>
+          <div className="flex items-center gap-2">
+            {/* Cal / List toggle */}
+            <div className="flex items-center bg-slate-100 rounded-2xl p-1 gap-0.5">
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`spring-press flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${viewMode === 'calendar' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+              >
+                <CalendarIcon className="w-3.5 h-3.5" /> Cal
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`spring-press flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${viewMode === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+              >
+                <ArrowRight className="w-3.5 h-3.5 rotate-90" /> List
+              </button>
             </div>
+            {isParent && (
+              <button onClick={() => setIsModalOpen(true)} className="spring-press w-10 h-10 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-md shadow-slate-900/20">
+                <Plus className="w-4 h-4" strokeWidth={2.5} />
+              </button>
+            )}
           </div>
-          {isParent && (
-            <button onClick={() => setIsModalOpen(true)} className="spring-press w-10 h-10 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-md shadow-slate-900/20">
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
+        </div>
+      </RevealCard>
+
+      {/* Full Month Calendar */}
+      {viewMode === 'calendar' && (
+        <RevealCard delay={60}>
+          {/* Month nav */}
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={() => moveMonth(-1)} className="spring-press p-2 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-xl transition-colors">
+              <ChevronLeft className="w-4 h-4" />
             </button>
+            <button onClick={jumpToToday} className="font-bold text-slate-800 text-sm tracking-wide hover:text-indigo-600 transition-colors">{monthName}</button>
+            <button onClick={() => moveMonth(1)} className="spring-press p-2 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-xl transition-colors">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Day headers */}
+          <div className="grid grid-cols-7 mb-1">
+            {DAY_HEADERS.map(h => (
+              <div key={h} className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest py-1">{h}</div>
+            ))}
+          </div>
+
+          {/* Calendar grid */}
+          <div className="grid grid-cols-7 gap-y-1">
+            {calendarDays.map((d, i) => {
+              const isCurrentMonth = d.getMonth() === monthDate.getMonth();
+              const isTodayDate = isSameDate(d, today);
+              const isSelected = isSameDate(d, selectedDay);
+              const dayEvs = eventsForDay(d);
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleDayClick(d)}
+                  className={`spring-press flex flex-col items-center justify-start pt-1.5 pb-1 h-14 rounded-2xl transition-all
+                    ${isCurrentMonth ? '' : 'opacity-25'}
+                    ${isSelected && !isTodayDate ? 'bg-indigo-50 ring-1 ring-indigo-200' : ''}
+                    ${!isSelected && !isTodayDate ? 'hover:bg-slate-50' : ''}
+                  `}
+                >
+                  <span className={`text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full leading-none
+                    ${isTodayDate ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/40' : isSelected ? 'text-indigo-600' : 'text-slate-700'}
+                  `}>{d.getDate()}</span>
+                  {/* Event dots */}
+                  {dayEvs.length > 0 && (
+                    <div className="flex gap-0.5 mt-0.5">
+                      {dayEvs.slice(0,3).map((ev,j) => (
+                        <div key={j} className={`w-1.5 h-1.5 rounded-full ${ev.color || COLOR_POOL[j % COLOR_POOL.length]}`} />
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </RevealCard>
+      )}
+
+      {/* List section */}
+      <div>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+            {selectedDayEvents.length > 0
+              ? selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+              : viewMode === 'list' ? 'All Events' : 'Today'}
+          </p>
+          {selectedDayEvents.length > 0 && (
+            <button
+              onClick={() => { setSelectedDay(null); }}
+              className="text-xs font-bold text-indigo-500 hover:text-indigo-700 transition-colors"
+            >Show all</button>
           )}
         </div>
-      </RevealCard>
 
-      {/* WEEK STRIP */}
-      <RevealCard delay={60}>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1" style={{scrollSnapType:'x mandatory'}}>
-          {weekDays.map((d, idx) => {
-            const today = isToday(d);
-            return (
-              <div key={idx}
-                onClick={() => setSelectedDay(d)}
-                className="spring-press flex flex-col items-center justify-center min-w-[3.25rem] h-16 rounded-2xl transition-all cursor-pointer shrink-0"
-                style={{scrollSnapAlign:'start', background: today ? 'linear-gradient(135deg, #4f46e5, #7c3aed)' : selectedDay && d.getDate()===selectedDay.getDate() && d.getMonth()===selectedDay.getMonth() ? 'linear-gradient(135deg, #e0e7ff, #ede9fe)' : 'white', boxShadow: today ? '0 4px 16px rgba(79,70,229,0.3)' : selectedDay && d.getDate()===selectedDay.getDate() ? '0 2px 8px rgba(79,70,229,0.15)' : '0 1px 4px rgba(0,0,0,0.06)', border:'1px solid ' + (today ? 'transparent' : selectedDay && d.getDate()===selectedDay.getDate() && d.getMonth()===selectedDay.getMonth() ? 'rgba(99,102,241,0.3)' : 'rgba(0,0,0,0.05)')}}
-              >
-                <span className={`text-[9px] font-bold uppercase tracking-widest ${today ? 'text-white/70' : selectedDay && d.getDate()===selectedDay.getDate() && d.getMonth()===selectedDay.getMonth() ? 'text-indigo-500' : 'text-slate-400'}`}>{d.toLocaleString('en-US',{weekday:'short'})}</span>
-                <span className={`text-xl font-bold mt-0.5 ${today ? 'text-white' : selectedDay && d.getDate()===selectedDay.getDate() && d.getMonth()===selectedDay.getMonth() ? 'text-indigo-600' : 'text-slate-800'}`}>{d.getDate()}</span>
-              </div>
-            );
-          })}
-        </div>
-      </RevealCard>
-
-      {/* EVENTS LIST */}
-      <div className="space-y-3">
-        {events.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-3xl ring-1 ring-black/5">
-            <div className="text-4xl mb-3">📅</div>
-            <p className="text-slate-400 font-medium text-sm">No events scheduled</p>
-          </div>
-        )}
-        {events.map((event, idx) => (
-          <RevealCard key={event.id} delay={idx * 60}>
-            <div className="bg-white rounded-3xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4">
-              <div className={`w-1 h-14 rounded-full shrink-0 ${event.color}`} />
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-slate-800 text-sm">{event.title}</p>
-                <div className="flex items-center gap-3 mt-1 flex-wrap">
-                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {event.time}</span>
-                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3"/> {event.location}</span>
-                </div>
-              </div>
+        <div className="space-y-3" ref={listRef}>
+          {listEvents.length === 0 && (
+            <div className="text-center py-12 bg-white rounded-3xl ring-1 ring-black/5">
+              <div className="text-4xl mb-3">📅</div>
+              <p className="text-slate-400 font-medium text-sm">No events yet</p>
               {isParent && (
-                <button onClick={() => onDelete(event.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-xl transition-colors shrink-0">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <button onClick={() => setIsModalOpen(true)} className="mt-3 text-indigo-500 font-bold text-sm hover:text-indigo-700">Add Event →</button>
               )}
             </div>
-          </RevealCard>
-        ))}
+          )}
+          {listEvents.map((event, idx) => (
+            <RevealCard key={event.id} delay={idx * 50}>
+              <div className="relative overflow-hidden rounded-3xl">
+                <div
+                  onClick={() => { if (isParent) setSwipedEventId(swipedEventId === event.id ? null : event.id); }}
+                  className={`bg-white rounded-3xl shadow-sm ring-1 ring-black/5 flex items-center gap-4 p-4 transition-all duration-300 cursor-pointer ${isParent && swipedEventId === event.id ? '-translate-x-16' : 'translate-x-0'}`}
+                >
+                  <div className={`w-1 h-14 rounded-full shrink-0 ${event.color || 'bg-indigo-500'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-800 text-sm">{event.title}</p>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      {event.time && <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/>{event.time}</span>}
+                      {event.location && <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3"/>{event.location}</span>}
+                    </div>
+                    {event.date && (
+                      <span className="text-[9px] font-bold text-indigo-400 mt-0.5 block">
+                        {new Date(event.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {isParent && swipedEventId === event.id && (
+                  <button
+                    onClick={() => handleDeleteEvent(event.id)}
+                    className="absolute right-0 top-0 bottom-0 w-16 bg-rose-500 flex items-center justify-center rounded-r-3xl"
+                  >
+                    <Trash2 className="w-5 h-5 text-white" />
+                  </button>
+                )}
+              </div>
+            </RevealCard>
+          ))}
+        </div>
       </div>
+
+      {/* Undo toast */}
+      {undoEvent && (
+        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-up whitespace-nowrap">
+          <span className="text-sm font-medium">Event deleted</span>
+          <button onClick={() => { onAdd({...undoEvent}); setUndoEvent(null); }} className="text-indigo-300 font-bold text-sm hover:text-white transition-colors">Undo</button>
+        </div>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Event">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Event Name</label>
             <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium transition-all" placeholder="e.g., Dentist Appointment" autoFocus />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Date</label>
+            <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -1204,6 +1436,7 @@ const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
     </div>
   );
 };
+
 
 const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setGroceries }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1910,7 +2143,7 @@ export default function App() {
   const [firebaseUser, setFirebaseUser] = useState(null); 
   const [tasks, setTasks] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [userPoints, setUserPoints] = useState({ 'Tommy': 0, 'Lily': 0 });
+  const [userPoints, setUserPoints] = useState({ 'Jaylen': 0, 'Amara': 0 });
   const [events, setEvents] = useState([]);
   const [meals, setMeals] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -1930,20 +2163,23 @@ export default function App() {
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
 
   useEffect(() => {
-    if (DEMO_MODE) { setFirebaseUser({ uid: 'demo-user' }); return; }
+    if (DEMO_MODE) { setFirebaseUser({ uid: 'demo-user' }); setIsLoggedIn(true); return; }
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
         }
+        // No signInAnonymously — user must sign in with Google or Apple
       } catch (error) {
         console.error("Firebase Auth Error:", error);
       }
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, user => setFirebaseUser(user));
+    const unsubscribe = onAuthStateChanged(auth, user => {
+      setFirebaseUser(user);
+      // Auto-mark logged in when a real (non-anonymous) Firebase user is detected
+      if (user && !user.isAnonymous) setIsLoggedIn(true);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -1963,23 +2199,23 @@ export default function App() {
 
     const tasksRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_tasks');
     const unsubTasks = onSnapshot(tasksRef, (snap) => {
-      if (snap.empty) mockTasks.forEach(mt => setDoc(doc(tasksRef, mt.id.toString()), { ...mt, createdAt: Date.now() }));
+      if (snap.empty) { /* No seeding — start fresh */ }
       else setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
     const msgsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_messages');
     const unsubMsgs = onSnapshot(msgsRef, (snap) => {
-      if (snap.empty) mockChats.forEach(mc => setDoc(doc(msgsRef, mc.id.toString()), { ...mc, createdAt: Date.now() }));
+      if (snap.empty) { /* No seeding — start fresh */ }
       else setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
     const pointsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_points');
     const unsubPoints = onSnapshot(pointsRef, (snap) => {
       if (snap.empty) {
-        setDoc(doc(pointsRef, 'Tommy'), { points: 45 });
-        setDoc(doc(pointsRef, 'Lily'), { points: 30 });
+        /* seed removed */;
+        /* seed removed */;
       } else {
-        let p = { 'Tommy': 0, 'Lily': 0 };
+        let p = { 'Jaylen': 0, 'Amara': 0 };
         snap.docs.forEach(d => { p[d.id] = d.data().points; });
         setUserPoints(p);
       }
@@ -1987,13 +2223,13 @@ export default function App() {
 
     const eventsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_events');
     const unsubEvents = onSnapshot(eventsRef, (snap) => {
-      if (snap.empty) mockEvents.forEach(me => setDoc(doc(eventsRef, me.id.toString()), { ...me, createdAt: Date.now() }));
+      if (snap.empty) { /* No seeding — start fresh */ }
       else setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
     const mealsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_meals');
     const unsubMeals = onSnapshot(mealsRef, (snap) => {
-      if (snap.empty) mockMeals.forEach(mm => setDoc(doc(mealsRef, mm.id.toString()), { ...mm, createdAt: Date.now() }));
+      if (snap.empty) { /* No seeding — start fresh */ }
       else setMeals(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
