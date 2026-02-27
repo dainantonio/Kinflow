@@ -1,0 +1,37 @@
+name: Build and Test
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Setup check
+        run: npm run setup:check
+        env:
+          VITE_FIREBASE_API_KEY: dummy
+          VITE_FIREBASE_AUTH_DOMAIN: dummy.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: dummy
+          VITE_FIREBASE_STORAGE_BUCKET: dummy.appspot.com
+          VITE_FIREBASE_MESSAGING_SENDER_ID: 1234567890
+          VITE_FIREBASE_APP_ID: 1:1234567890:web:dummy
+          VITE_GEMINI_API_KEY: dummy
+
+      - name: Build
+        run: npm run build

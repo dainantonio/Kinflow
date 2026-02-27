@@ -12,6 +12,7 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [addedConfirm, setAddedConfirm] = useState(null);
+  const [servings, setServings] = useState(4);
   
   const [meal, setMeal] = useState('');
   const [day, setDay] = useState('Today');
@@ -22,7 +23,7 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
   const handleAddSubmit = (e) => { e.preventDefault(); if (!meal.trim()) return; onAdd({ meal, day, prepTime: prepTime + ' prep', ingredients: newIngredients.trim(), instructions: newInstructions.trim() }); setMeal(''); setNewIngredients(''); setNewInstructions(''); setIsModalOpen(false); };
   const handleEditClick = () => { setEditForm({ ...selectedMeal }); setIsEditing(true); };
   const handleEditSubmit = (e) => { e.preventDefault(); if (!editForm.meal.trim()) return; onUpdate(editForm); setSelectedMeal(editForm); setIsEditing(false); };
-  const closeMealModal = () => { setSelectedMeal(null); setIsEditing(false); setSelectedIngredients([]); setAddedConfirm(null); };
+  const closeMealModal = () => { setSelectedMeal(null); setIsEditing(false); setSelectedIngredients([]); setAddedConfirm(null); setServings(4); };
 
   const generateGroceries = () => {
     setIsGenerating(true);
@@ -69,7 +70,7 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
             </div>
             <p className="text-slate-700 font-bold text-base">No meals planned</p>
             <p className="text-slate-400 text-xs font-medium mt-1 max-w-[200px] mx-auto">Plan your family's meals for the week ahead</p>
-            {isParent && <button onClick={() => setShowNewRecipe(true)} className="mt-4 px-5 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors">Plan First Meal</button>}
+            {isParent && <button onClick={() => setIsModalOpen(true)} className="mt-4 px-5 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors">Plan First Meal</button>}
           </div>
         )}
         {meals?.map((meal, idx) => (
@@ -183,6 +184,13 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
                   <span className="text-sm font-bold">{addedConfirm}</span>
                 </div>
               )}
+            </div>
+            <div className="flex items-center justify-between bg-white rounded-2xl p-3 ring-1 ring-slate-200">
+              <span className="text-sm font-bold text-slate-700">Serves {servings}</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setServings(v => Math.max(1, v - 1))} className="w-8 h-8 rounded-full bg-slate-100 font-bold">-</button>
+                <button onClick={() => setServings(v => Math.min(12, v + 1))} className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold">+</button>
+              </div>
             </div>
             <div className="bg-slate-50 p-4 rounded-2xl ring-1 ring-slate-900/5"><h4 className="font-bold text-slate-800 mb-2">Instructions</h4><ol className="list-decimal pl-5 text-sm text-slate-600 space-y-2">{(selectedMeal.instructions || "").split('\n').map((item, i) => <li key={i}>{item}</li>)}</ol></div>
             <div className="flex gap-3">
