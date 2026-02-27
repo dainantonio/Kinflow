@@ -3,13 +3,15 @@ import { Plus, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, Calendar as Cal
 import { ThemeContext } from '../contexts/FamilyContext';
 import { Card, Button, Modal, RevealCard } from '../components/shared/Primitives';
 
-export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
+export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
   const [location, setLocation] = useState('');
   const [baseDate, setBaseDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [editEvent, setEditEvent] = useState(null);
 
   const startOfWeek = new Date(baseDate);
   const day = startOfWeek.getDay();
@@ -45,6 +47,8 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
     setLocation('');
     setIsModalOpen(false);
   };
+
+  const openEvent = (event) => { setSelectedEvent(event); setEditEvent({ ...event }); };
 
   return (
     <div className="space-y-5 animate-bounce-in">
@@ -115,12 +119,12 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
                   </div>
                   <p className="text-slate-700 font-bold text-base">Nothing planned</p>
                   <p className="text-slate-400 text-xs font-medium mt-1">This day is wide open 🌤️</p>
-                  {isParent && <button onClick={() => setShowNewEvent(true)} className="mt-4 px-5 py-2.5 bg-sky-500 text-white text-xs font-bold rounded-xl hover:bg-sky-600 transition-colors">Add Event</button>}
+                  {isParent && <button onClick={() => setIsModalOpen(true)} className="mt-4 px-5 py-2.5 bg-sky-500 text-white text-xs font-bold rounded-xl hover:bg-sky-600 transition-colors">Add Event</button>}
                 </div>
               ) : (
                 <div className="space-y-2">
                   {events?.map((event, idx) => (
-                    <div key={event.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors group">
+                    <div key={event.id} onClick={() => openEvent(event)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors group cursor-pointer">
                       <div className={`w-1 h-10 rounded-full shrink-0 ${event.color}`} />
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-slate-800 text-sm">{event.title}</p>
@@ -153,12 +157,12 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
               </div>
               <p className="text-slate-700 font-bold text-base">No events yet</p>
               <p className="text-slate-400 text-xs font-medium mt-1 max-w-[200px] mx-auto">Add your family's events to keep everyone in sync</p>
-              {isParent && <button onClick={() => setShowNewEvent(true)} className="mt-4 px-5 py-2.5 bg-violet-500 text-white text-xs font-bold rounded-xl hover:bg-violet-600 transition-colors">Add First Event</button>}
+              {isParent && <button onClick={() => setIsModalOpen(true)} className="mt-4 px-5 py-2.5 bg-violet-500 text-white text-xs font-bold rounded-xl hover:bg-violet-600 transition-colors">Add First Event</button>}
             </div>
           )}
           {events?.map((event, idx) => (
             <RevealCard key={event.id} delay={idx * 60}>
-              <div className="bg-white rounded-3xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4">
+              <div onClick={() => openEvent(event)} className="bg-white rounded-3xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4 cursor-pointer">
                 <div className={`w-1 h-14 rounded-full shrink-0 ${event.color}`} />
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-slate-800 text-sm">{event.title}</p>
@@ -177,6 +181,34 @@ export const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
           ))}
         </div>
       )}
+
+
+      <Modal isOpen={!!selectedEvent} onClose={() => setSelectedEvent(null)} title="Event Details">
+        {selectedEvent && (
+          <div className="space-y-4">
+            <div className="bg-slate-50 rounded-2xl p-4 ring-1 ring-slate-200">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Event</p>
+              <p className="font-bold text-slate-900 text-lg">{selectedEvent.title}</p>
+              <p className="text-xs text-slate-500 font-semibold mt-2">{selectedEvent.time} · {selectedEvent.location}</p>
+            </div>
+            {isParent ? (
+              <form onSubmit={(e) => { e.preventDefault(); onUpdate(editEvent); setSelectedEvent(editEvent); }} className="space-y-3">
+                <input value={editEvent.title} onChange={(e) => setEditEvent({ ...editEvent, title: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={editEvent.time || ''} onChange={(e) => setEditEvent({ ...editEvent, time: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                  <input value={editEvent.location || ''} onChange={(e) => setEditEvent({ ...editEvent, location: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium" />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" className="flex-1">Save</Button>
+                  <Button type="button" variant="secondary" className="!bg-rose-50 !text-rose-600 !border-rose-200" onClick={() => { onDelete(selectedEvent.id); setSelectedEvent(null); }}>Delete</Button>
+                </div>
+              </form>
+            ) : (
+              <Button onClick={() => setSelectedEvent(null)}>Close</Button>
+            )}
+          </div>
+        )}
+      </Modal>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Event">
         <form onSubmit={handleSubmit} className="space-y-4">
