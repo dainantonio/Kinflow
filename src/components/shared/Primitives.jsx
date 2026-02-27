@@ -66,6 +66,24 @@ export const Button = ({ children, variant = 'primary', className = '', ...props
   );
 };
 
+export const DetailActions = ({ onSave, onDelete, onEditLabel = 'Edit', onClose, saveLabel = 'Save', showDelete = true, showSave = true }) => (
+  <div className="grid grid-cols-3 gap-2 pt-2">
+    <Button type="button" variant="secondary" className="!rounded-2xl !py-3 !text-sm" onClick={onClose}>
+      Close
+    </Button>
+    <Button type="button" className="!rounded-2xl !py-3 !text-sm" onClick={onSave}>
+      {showSave ? saveLabel : onEditLabel}
+    </Button>
+    {showDelete ? (
+      <Button type="button" variant="secondary" className="!rounded-2xl !py-3 !text-sm !bg-rose-50 !text-rose-600 !ring-1 !ring-rose-200" onClick={onDelete}>
+        Delete
+      </Button>
+    ) : (
+      <div />
+    )}
+  </div>
+);
+
 export const Badge = ({ children, variant = 'default', className = '' }) => {
   const { isChild } = useContext(ThemeContext);
   const variants = {
@@ -94,7 +112,7 @@ export const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-900/75" onClick={onClose} style={{backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
       <div
-        className={`${isChild ? 'bg-white rounded-t-[2rem] sm:rounded-[2rem] border-t-8 border-indigo-100' : 'bg-white rounded-t-[2rem] sm:rounded-[2rem]'} w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl ring-1 ring-black/8 relative animate-slide-up cursor-default overflow-hidden`}
+        className={`${isChild ? 'bg-white rounded-t-[1.75rem] sm:rounded-[1.75rem] border-t-8 border-indigo-100' : 'bg-white rounded-t-[1.75rem] sm:rounded-[1.75rem]'} w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl ring-1 ring-black/8 relative animate-slide-up cursor-default overflow-hidden`}
         style={{transformOrigin:'bottom center'}}
         onClick={e => e.stopPropagation()}
       >

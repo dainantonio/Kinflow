@@ -97,7 +97,7 @@ export const PreferencesPanel = ({ onClose }) => {
   );
 };
 
-export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}, tasks = [], onBack, onUpdateProfile, onAddMember, onUpdateMember, onRemoveMember }) => {
+export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}, tasks = [], onBack, onUpdateProfile, onAddMember, onUpdateMember, onRemoveMember, theme = 'indigo', onThemeChange }) => {
   const [activeModal, setActiveModal] = useState(null);
   const [editName, setEditName] = useState(user?.name || '');
   const [profileSaved, setProfileSaved] = useState(false);
@@ -183,7 +183,7 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
       ];
 
   return (
-    <div className="animate-bounce-in -mx-4 sm:-mx-6 -mt-6">
+    <div className="animate-bounce-in -mx-4 sm:-mx-6">
 
       {/* HERO BANNER */}
       <div className="relative h-44 overflow-hidden" style={{background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)'}}>
@@ -216,7 +216,7 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
           <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isParent ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
             {user?.role}
           </span>
-          <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-100 text-slate-500">Kinflow Family</span>
+          <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-100 text-slate-500">Orbit Family</span>
         </div>
       </div>
 
@@ -282,7 +282,7 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
                   <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
                   <span className="text-xs font-bold text-white/80 uppercase tracking-wider">Premium Plan</span>
                 </div>
-                <h4 className="text-xl font-bold text-white leading-tight mb-1">Kinflow Family</h4>
+                <h4 className="text-xl font-bold text-white leading-tight mb-1">Orbit Family</h4>
                 <p className="text-white/60 text-xs font-medium">All features unlocked · AI Copilot included</p>
               </div>
               <div className="bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full">
@@ -296,7 +296,7 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
         <div>
           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Appearance</h3>
           <div className="bg-white rounded-[1.75rem] ring-1 ring-slate-900/5 overflow-hidden shadow-sm divide-y divide-slate-50">
-            <SettingRow onClick={() => setActiveModal('themes')} icon={Settings} label="App Theme" value="Classic" />
+            <SettingRow onClick={() => setActiveModal('themes')} icon={Settings} label="App Theme" value={theme.charAt(0).toUpperCase() + theme.slice(1)} />
           </div>
         </div>
 
@@ -491,51 +491,21 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
       </Modal>
 
       <Modal isOpen={activeModal === 'themes'} onClose={handleModalClose} title="App Theme">
-        <div className="space-y-5">
-          <p className="text-sm font-medium text-slate-500">Choose a theme for your Kinflow experience. All themes stay fully legible.</p>
-
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Parent Themes</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { name: 'Classic', desc: 'Deep indigo & violet', gradient: 'from-indigo-600 to-violet-700', selected: true },
-                { name: 'Slate', desc: 'Professional dark slate', gradient: 'from-slate-700 to-slate-900', selected: false },
-                { name: 'Ocean', desc: 'Blue & teal tones', gradient: 'from-blue-600 to-teal-600', selected: false },
-                { name: 'Forest', desc: 'Calm greens & earth', gradient: 'from-emerald-600 to-green-800', selected: false },
-              ].map(t => (
-                <div key={t.name} className={`relative rounded-2xl overflow-hidden cursor-pointer ring-2 transition-all ${t.selected ? 'ring-indigo-500 shadow-lg shadow-indigo-200' : 'ring-transparent hover:ring-slate-200'}`}>
-                  <div className={`h-16 bg-gradient-to-br ${t.gradient}`} />
-                  <div className="bg-white p-2.5">
-                    <p className="font-bold text-sm text-slate-800">{t.name}</p>
-                    <p className="text-[10px] font-medium text-slate-400">{t.desc}</p>
-                  </div>
-                  {t.selected && <div className="absolute top-2 right-2 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-sm"><Check className="w-3 h-3 text-indigo-500" strokeWidth={3} /></div>}
-                </div>
-              ))}
-            </div>
+        <div className="space-y-4">
+          <p className="text-sm font-medium text-slate-500">Pick a color mood for Orbit.</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            {[
+              { id: 'indigo', colors: 'from-indigo-500 to-violet-600' },
+              { id: 'ocean', colors: 'from-cyan-500 to-blue-500' },
+              { id: 'sunset', colors: 'from-orange-400 to-rose-500' },
+              { id: 'forest', colors: 'from-emerald-500 to-teal-600' },
+              { id: 'grape', colors: 'from-fuchsia-500 to-purple-600' },
+            ].map(t => (
+              <button key={t.id} onClick={() => onThemeChange && onThemeChange(t.id)} className={`w-9 h-9 rounded-full bg-gradient-to-br ${t.colors} ring-2 transition-all ${theme === t.id ? 'ring-slate-900 scale-110' : 'ring-transparent'}`} aria-label={t.id}>
+                {theme === t.id && <Check className="w-3.5 h-3.5 text-white mx-auto" />}
+              </button>
+            ))}
           </div>
-
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Kids Themes (Fun & Bright)</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { name: 'Sky Kids', desc: 'Bright sky blue', gradient: 'from-sky-400 to-cyan-500', selected: false },
-                { name: 'Sunshine', desc: 'Warm amber & yellow', gradient: 'from-amber-400 to-yellow-400', selected: false },
-                { name: 'Berry', desc: 'Playful pink & purple', gradient: 'from-pink-500 to-purple-500', selected: false },
-                { name: 'Lime', desc: 'Fresh green & mint', gradient: 'from-lime-400 to-emerald-400', selected: false },
-              ].map(t => (
-                <div key={t.name} className="relative rounded-2xl overflow-hidden cursor-pointer ring-2 ring-transparent hover:ring-slate-200 transition-all">
-                  <div className={`h-16 bg-gradient-to-br ${t.gradient}`} />
-                  <div className="bg-white p-2.5">
-                    <p className="font-bold text-sm text-slate-800">{t.name}</p>
-                    <p className="text-[10px] font-medium text-slate-400">{t.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <p className="text-[10px] font-medium text-slate-400 text-center">Theme switching coming in the next update ✨</p>
           <Button onClick={handleModalClose} variant="secondary">Done</Button>
         </div>
       </Modal>
@@ -546,7 +516,7 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
 
       <Modal isOpen={activeModal === 'logout'} onClose={handleModalClose} title="Sign Out">
         <div className="space-y-4">
-          <p className="text-slate-600 font-medium">Are you sure you want to sign out of Kinflow?</p>
+          <p className="text-slate-600 font-medium">Are you sure you want to sign out of Orbit?</p>
           <div className="flex gap-3 mt-4">
             <Button variant="secondary" onClick={handleModalClose} className="flex-1">Cancel</Button>
             <Button onClick={() => { handleModalClose(); onLogout(); }} className="flex-1 !bg-rose-500 hover:!bg-rose-600 !shadow-none">Sign Out</Button>

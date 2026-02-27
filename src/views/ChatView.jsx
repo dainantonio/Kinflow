@@ -112,7 +112,7 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
               <div key={msg.id} className={`flex gap-2 items-end ${isMe ? 'justify-end' : 'justify-start'}`}>
                 {!isMe && <Avatar user={sender} size="sm" className="shrink-0 mb-4 ring-2 ring-white shadow-sm" />}
                 <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[78%]`}>
-                  {!isMe && <span className="text-[10px] font-bold text-slate-400 ml-2 mb-1">{sender?.name}</span>}
+                  {!isMe && <span className="text-[10px] font-bold text-slate-500 ml-2 mb-1 inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-400" />{sender?.name} · {sender?.role}</span>}
                   <div className={`px-4 py-2.5 text-sm font-medium leading-relaxed shadow-sm
                     ${isMe
                       ? (isChild ? 'bg-sky-500 text-white rounded-3xl rounded-br-md' : 'bg-slate-900 text-white rounded-3xl rounded-br-md')
@@ -120,6 +120,7 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
                     {msg.text}
                   </div>
                   <div className={`flex items-center gap-1.5 mt-1 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    {isMe && <span className="text-[9px] font-bold text-slate-400">You · {user?.name}</span>}
                     {isMe && (
                       <button onClick={() => onDelete(msg.id)} className="text-slate-300 hover:text-rose-500 p-0.5 rounded transition-colors">
                         <Trash2 className="w-3 h-3" />

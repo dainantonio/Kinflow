@@ -83,6 +83,9 @@ export const FamilyProvider = ({ children }) => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [lastRedeemed, setLastRedeemed] = useState(null);
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('orbit_theme') || 'indigo'; } catch(e) { return 'indigo'; }
+  });
 
   const prevNotifsLength = useRef(0);
 
@@ -302,6 +305,17 @@ export const FamilyProvider = ({ children }) => {
     }
   };
 
+
+  const handleUpdateTask = async (updatedTask) => {
+    if (!updatedTask?.id) return;
+    if (DEMO_MODE) {
+      setTasks(prev => prev.map(t => String(t.id) === String(updatedTask.id) ? { ...t, ...updatedTask } : t));
+      return;
+    }
+    if (!firebaseUser) return;
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', updatedTask.id.toString()), updatedTask);
+  };
+
   const requestDeleteTask = (id) => {
     setConfirmActionState({ title: 'Delete Task', message: 'Are you sure you want to permanently remove this chore?', onConfirm: async () => {
       if (DEMO_MODE) { setTasks(prev => prev.filter(t => String(t.id) !== String(id))); }
@@ -419,6 +433,17 @@ export const FamilyProvider = ({ children }) => {
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', newId), eventData);
   };
 
+
+  const handleUpdateEvent = async (updatedEvent) => {
+    if (!updatedEvent?.id) return;
+    if (DEMO_MODE) {
+      setEvents(prev => prev.map(e => String(e.id) === String(updatedEvent.id) ? { ...e, ...updatedEvent } : e));
+      return;
+    }
+    if (!firebaseUser) return;
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', updatedEvent.id.toString()), updatedEvent);
+  };
+
   const requestDeleteEvent = (id) => {
     setConfirmActionState({ title: 'Delete Event', message: 'Are you sure you want to remove this event from the calendar?', onConfirm: async () => {
       if (DEMO_MODE) { setEvents(prev => prev.filter(e => String(e.id) !== String(id))); }
@@ -476,6 +501,11 @@ export const FamilyProvider = ({ children }) => {
     });
   };
 
+
+  useEffect(() => {
+    try { localStorage.setItem('orbit_theme', theme); } catch(e) {}
+  }, [theme]);
+
   const value = {
     // State
     showSplash, activeTab, setActiveTab,
@@ -492,15 +522,16 @@ export const FamilyProvider = ({ children }) => {
     groceries, setGroceries,
     showConfetti, isCopilotOpen, setIsCopilotOpen,
     lastRedeemed,
+    theme, setTheme,
     isParent, isChild, greeting,
     familyMembers,
 
     // Actions
     handleLogin, completeOnboarding, triggerConfetti,
-    handleAddTask, requestDeleteTask, handleTaskAction,
+    handleAddTask, handleUpdateTask, requestDeleteTask, handleTaskAction,
     handleSendMessage, requestDeleteMessage,
     handleRedeemReward,
-    handleAddEvent, requestDeleteEvent,
+    handleAddEvent, handleUpdateEvent, requestDeleteEvent,
     handleAddMeal, handleUpdateMeal, requestDeleteMeal,
     handleUpdateProfile,
     handleAddMember, handleUpdateMember, handleRemoveMember,
