@@ -1,5 +1,10 @@
-const CACHE_NAME = 'orbit-cache-v1';
-const APP_SHELL = ['/', '/index.html', '/manifest.json'];
+const CACHE_NAME = 'kinflow-cache-v2';
+const BASE = '/Kinflow';
+const APP_SHELL = [
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/manifest.json',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -28,7 +33,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
           return response;
         })
-        .catch(() => caches.match('/index.html'));
+        .catch(() => caches.match(BASE + '/index.html'));
     })
   );
 });

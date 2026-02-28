@@ -1,0 +1,23 @@
+{
+  "name": "Kinflow",
+  "short_name": "Kinflow",
+  "description": "AI-powered family command center",
+  "start_url": "/Kinflow/",
+  "scope": "/Kinflow/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/Kinflow/apple-touch-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Kinflow/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
