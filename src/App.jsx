@@ -517,17 +517,24 @@ const AuthScreen = () => {
       provider.addScope('email');
       provider.addScope('name');
       await signInWithPopup(auth, provider);
-      onComplete();
+      // onAuthStateChanged handles the screen transition automatically
     } catch (err) {
       if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
         setError('Apple sign-in failed. Please try again.');
       }
-    } finally { setIsLoading(null); }
+      setIsLoading(null);
+    }
   };
 
-  const handleDemo = () => {
+  const handleDemo = async () => {
     setIsLoading('demo');
-    setTimeout(() => { setIsLoading(null); onComplete(); }, 600);
+    try {
+      await signInAnonymously(auth);
+      // onAuthStateChanged handles the transition
+    } catch (err) {
+      setError('Demo failed. Please try again.');
+      setIsLoading(null);
+    }
   };
 
   return (
@@ -2287,7 +2294,7 @@ export default function App() {
   }, []);
 
   // Derived: logged in = Firebase user is real (not anonymous) and auth has initialized
-  const isLoggedIn = authReady && !!firebaseUser && !firebaseUser.isAnonymous;
+  const isLoggedIn = authReady && !!firebaseUser; // anonymous = demo mode, real auth = Google/Apple
 
   // Sync DB
   useEffect(() => {
@@ -2623,7 +2630,7 @@ export default function App() {
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
       case 'rewards': return <RewardsView rewards={rewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
       case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} allUsers={users} />;
-      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setActiveUser(null); setFirebaseUser(null); }} allUsers={users} userPoints={userPoints} tasks={tasks} onUpdatePhoto={handleUpdatePhoto} onUpdateUser={handleUpdateUser} onBack={() => setActiveTab('home')} onUpdateMember={handleUpdateFamilyMember} onAddMember={handleAddFamilyMember} onDeleteMember={handleDeleteFamilyMember} />;
+      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setActiveUser(null); signOut(auth); }} allUsers={users} userPoints={userPoints} tasks={tasks} onUpdatePhoto={handleUpdatePhoto} onUpdateUser={handleUpdateUser} onBack={() => setActiveTab('home')} onUpdateMember={handleUpdateFamilyMember} onAddMember={handleAddFamilyMember} onDeleteMember={handleDeleteFamilyMember} />;
       default: return null;
     }
   };
@@ -2647,7 +2654,7 @@ export default function App() {
 
   if (showSplash || !authReady) return <SplashScreen />;
   if (!isLoggedIn) return <AuthScreen />;
-  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={users} onLogout={() => setIsLoggedIn(false)} onAddMember={handleAddFamilyMember} firebaseUser={firebaseUser} />;
+  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={users} onLogout={() => signOut(auth)} onAddMember={handleAddFamilyMember} firebaseUser={firebaseUser} />;
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
   const navItems = isParent 
