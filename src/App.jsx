@@ -11,21 +11,29 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithPopup } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
-// --- FIREBASE INITIALIZATION ---
-const DEMO_MODE = typeof __firebase_config === 'undefined' || !__firebase_config;
+// --- FIREBASE INITIALIZATION using VITE env vars ---
+const envConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+};
+const hasEnvConfig = Object.values(envConfig).every(Boolean);
+const DEMO_MODE = !hasEnvConfig;
 let _fbApp = null, auth = null, db = null;
 if (!DEMO_MODE) {
   try {
-    const firebaseConfig = JSON.parse(__firebase_config);
-    _fbApp = initializeApp(firebaseConfig);
+    _fbApp = initializeApp(envConfig);
     auth = getAuth(_fbApp);
     db = getFirestore(_fbApp);
-  } catch (e) { console.warn('Firebase init failed, running in demo mode'); }
+  } catch (e) { console.warn('Firebase init failed:', e); }
 }
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-kinflow';
+const appId = 'kinflow-family';
 
 // --- GEMINI API HELPER ---
 const fetchWithRetry = async (url, options, retries = 5) => {
@@ -499,13 +507,13 @@ const AuthScreen = ({ onComplete }) => {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(auth, provider);
-      onComplete();
+      // Use redirect (works on GitHub Pages + mobile; popups are often blocked)
+      await signInWithRedirect(auth, provider);
+      // onComplete() is called after redirect returns via getRedirectResult in App
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-        setError('Google sign-in failed. Please try again.');
-      }
-    } finally { setIsLoading(null); }
+      setError('Google sign-in failed. Please try again.');
+      setIsLoading(null);
+    }
   };
 
   const handleApple = async () => {
@@ -2199,12 +2207,11 @@ export default function App() {
     if (DEMO_MODE) { setFirebaseUser({ uid: 'demo-user' }); setIsLoggedIn(true); return; }
     const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        }
-        // No signInAnonymously — user must sign in with Google or Apple
-      } catch (error) {
-        console.error("Firebase Auth Error:", error);
+        // Handle returning from Google signInWithRedirect
+        const result = await getRedirectResult(auth);
+        if (result?.user) return; // auth state change will handle the rest
+      } catch (e) {
+        console.warn('Redirect result:', e.code);
       }
     };
     initAuth();
