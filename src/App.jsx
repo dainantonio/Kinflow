@@ -507,11 +507,22 @@ const AuthScreen = ({ onComplete }) => {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      // Use redirect (works on GitHub Pages + mobile; popups are often blocked)
-      await signInWithRedirect(auth, provider);
-      // onComplete() is called after redirect returns via getRedirectResult in App
+      // Try popup first (avoids cross-domain redirect state loss on GitHub Pages)
+      try {
+        const result = await signInWithPopup(auth, provider);
+        if (result?.user) { onComplete(); return; }
+      } catch (popupErr) {
+        // Popup blocked — fall back to redirect
+        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupErr;
+      }
     } catch (err) {
-      setError('Google sign-in failed. Please try again.');
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError('Google sign-in failed. Please try again.');
+      }
       setIsLoading(null);
     }
   };
