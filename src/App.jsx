@@ -488,23 +488,11 @@ const AuthScreen = () => {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      // Try popup first (avoids cross-domain redirect state loss on GitHub Pages)
-      try {
-        await signInWithPopup(auth, provider);
-        // onAuthStateChanged handles the transition automatically
-        return;
-      } catch (popupErr) {
-        // Popup blocked — fall back to redirect
-        if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
-          await signInWithRedirect(auth, provider);
-          return;
-        }
-        throw popupErr;
-      }
+      // Use redirect — most reliable on GitHub Pages (no cross-origin postMessage issues)
+      await signInWithRedirect(auth, provider);
+      // Page will reload; onAuthStateChanged picks up the user on return
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setError('Google sign-in failed. Please try again.');
-      }
+      setError('Google sign-in failed. Please try again.');
       setIsLoading(null);
     }
   };
@@ -2286,6 +2274,8 @@ export default function App() {
 
   useEffect(() => {
     if (DEMO_MODE) { setFirebaseUser({ uid: 'demo-user' }); return; }
+    // Handle redirect result first (Google redirect auth on GitHub Pages)
+    getRedirectResult(auth).catch(() => {}); // result handled by onAuthStateChanged below
     const unsubscribe = onAuthStateChanged(auth, user => {
       setFirebaseUser(user);
       setAuthReady(true);
