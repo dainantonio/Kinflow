@@ -287,12 +287,8 @@ const Confetti = ({ active }) => {
 };
 
 // --- MOCK DATA FOR SEEDING FIREBASE ON FIRST LOAD ---
-const MOCK_USERS = [
-  { id: 'p1', name: "Mom", role: "Parent", initials: "M", color: "from-rose-400 to-pink-600", avatar: "mom" },
-  { id: 'p2', name: "Dad", role: "Parent", initials: "D", color: "from-blue-500 to-indigo-600", avatar: "dad" },
-  { id: 'c1', name: "Jaylen", role: "Child", initials: "J", color: "from-emerald-400 to-teal-500", avatar: "boy" },
-  { id: 'c2', name: "Amara", role: "Child", initials: "A", color: "from-purple-400 to-violet-500", avatar: "girl" },
-];
+// MOCK_USERS removed — family members loaded from Firestore
+const MOCK_USERS = []; // kept as empty fallback only
 const mockTasks = [
   { id: 1, title: "Empty Dishwasher", assignee: "Jaylen", points: 10, status: 'open', requiresPhoto: false },
   { id: 4, title: "Clean Bedroom", assignee: "Jaylen", points: 25, status: 'open', requiresPhoto: true },
@@ -624,42 +620,109 @@ const AuthScreen = ({ onComplete }) => {
     </div>
   );
 };
-const ProfileSelectorScreen = ({ onLogin, users, onLogout }) => (
+const ProfileSelectorScreen = ({ onLogin, users, onLogout, onAddMember, firebaseUser }) => {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newRole, setNewRole] = useState('Child');
+  const [newAvatar, setNewAvatar] = useState('👧🏾');
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    if (!newName.trim()) return;
+    setSaving(true);
+    await onAddMember({ name: newName.trim(), role: newRole, avatar: newAvatar });
+    setNewName('');
+    setNewRole('Child');
+    setNewAvatar('👧🏾');
+    setSaving(false);
+    setShowAddModal(false);
+  };
+
+  return (
   <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
     <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[120px]" />
     <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-violet-500/15 rounded-full blur-[100px]" />
-    <div className="absolute inset-0 opacity-[0.03]" style={{backgroundImage:'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize:'28px 28px'}} />
-
-    <div className="mb-12 text-center animate-bounce-in relative z-10 flex flex-col items-center">
-      <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[1.25rem] flex items-center justify-center shadow-[0_12px_40px_rgba(99,102,241,0.4)] mb-6 ring-1 ring-white/10">
-        <Layers className="w-7 h-7 text-white" strokeWidth={1.5} />
-      </div>
-      <h1 className="text-3xl font-bold tracking-tight mb-2 text-white">Who's using Kinflow?</h1>
-      <p className="text-white/35 text-sm font-medium">Select your profile to continue</p>
-    </div>
-
-    <div className="grid grid-cols-2 gap-x-8 gap-y-10 w-full max-w-xs animate-bounce-in relative z-10" style={{animationDelay: '0.15s'}}>
-      {users.map((u, i) => (
-        <div key={u.id} onClick={() => onLogin(u)} className="spring-press flex flex-col items-center gap-3 cursor-pointer group" style={{animationDelay:`${i*80}ms`}}>
-          <div className="relative">
-            <Avatar user={u} size="xxl" className="group-hover:scale-[1.08] transition-all duration-300 shadow-2xl ring-4 ring-white/10 group-hover:ring-white/25 group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.4)]" />
-            <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full border-2 border-slate-900 flex items-center justify-center text-sm font-bold bg-white/10 backdrop-blur-sm">
-              {u.role === 'Parent' ? '👑' : '⭐'}
-            </div>
-          </div>
-          <div className="text-center">
-            <span className="font-bold text-base tracking-wide text-white/80 group-hover:text-white transition-colors block">{u.name}</span>
-            <span className="text-white/30 text-xs font-semibold">{u.role}</span>
-          </div>
+    <div className="relative z-10 w-full max-w-sm">
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[1.75rem] flex items-center justify-center mx-auto mb-4 shadow-2xl">
+          <span className="text-3xl">🏠</span>
         </div>
-      ))}
+        <h1 className="text-3xl font-bold tracking-tight">Who's home?</h1>
+        <p className="text-slate-400 mt-2 text-sm">Choose your profile to continue</p>
+      </div>
+
+      {users.length === 0 ? (
+        <div className="text-center py-10">
+          <p className="text-slate-400 mb-4">No family members yet.</p>
+          <p className="text-slate-500 text-sm">Add yourself to get started!</p>
+        </div>
+      ) : (
+        <div className="space-y-3 mb-6">
+          {users.map(u => (
+            <button key={u.id} onClick={() => onLogin(u)}
+              className="w-full flex items-center gap-4 p-4 rounded-[1.75rem] bg-white/10 hover:bg-white/20 active:scale-[0.98] transition-all text-left">
+              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${u.color || 'from-indigo-400 to-violet-500'} flex items-center justify-center text-2xl shadow-lg`}>
+                {u.photoURL ? <img src={u.photoURL} className="w-full h-full rounded-2xl object-cover" alt={u.name}/> : (u.avatar?.length > 2 ? u.initials : u.avatar || u.initials)}
+              </div>
+              <div>
+                <div className="font-bold text-lg leading-tight">{u.name}</div>
+                <div className="text-xs text-slate-400 font-medium">{u.role}</div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-slate-400 ml-auto"/>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button onClick={() => setShowAddModal(true)}
+        className="w-full py-3.5 rounded-[1.75rem] border-2 border-dashed border-white/20 text-slate-400 hover:border-white/40 hover:text-white transition-all flex items-center justify-center gap-2 text-sm font-semibold mb-6">
+        <Plus className="w-4 h-4"/>Add Family Member
+      </button>
+
+      <button onClick={onLogout} className="w-full text-center text-slate-500 text-sm hover:text-slate-300 transition-colors py-2">
+        Sign out
+      </button>
     </div>
 
-    <button onClick={onLogout} className="absolute bottom-10 text-white/30 hover:text-white/70 text-xs font-bold uppercase tracking-widest transition-colors z-10">
-      Sign out of Kinflow Account
-    </button>
+    {showAddModal && (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setShowAddModal(false); }}>
+        <div className="bg-slate-800 rounded-[1.75rem] p-6 w-full max-w-sm space-y-4">
+          <h3 className="text-xl font-bold text-white text-center">Add Family Member</h3>
+          
+          <div className="text-center text-4xl py-2">{newAvatar}</div>
+          
+          <div className="grid grid-cols-5 gap-2">
+            {['👩🏾','👨🏾','👧🏾','👦🏾','👩🏿','👨🏿','👧🏿','👦🏿','👩🏽','👨🏽'].map(em => (
+              <button key={em} onClick={() => setNewAvatar(em)}
+                className={`text-2xl p-2 rounded-xl transition-all ${newAvatar === em ? 'bg-indigo-500 scale-110' : 'bg-white/10 hover:bg-white/20'}`}>
+                {em}
+              </button>
+            ))}
+          </div>
+
+          <input value={newName} onChange={e => setNewName(e.target.value)}
+            placeholder="Name (e.g. Marcus)" maxLength={20}
+            className="w-full bg-white/10 rounded-2xl px-4 py-3 text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-indigo-500 text-base"/>
+
+          <div className="flex gap-2">
+            {['Parent','Child'].map(r => (
+              <button key={r} onClick={() => setNewRole(r)}
+                className={`flex-1 py-3 rounded-2xl font-semibold transition-all ${newRole === r ? 'bg-indigo-500 text-white' : 'bg-white/10 text-slate-300 hover:bg-white/20'}`}>
+                {r}
+              </button>
+            ))}
+          </div>
+
+          <button onClick={handleAdd} disabled={!newName.trim() || saving}
+            className="w-full py-3.5 rounded-2xl bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 font-bold text-white transition-all">
+            {saving ? 'Adding...' : 'Add Member'}
+          </button>
+        </div>
+      </div>
+    )}
   </div>
-);
+  );
+};
 
 // --- MAIN FEATURE SUB-VIEWS ---
 
@@ -684,13 +747,13 @@ const ChatView = ({ messages, onSend, onDelete }) => {
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Family Chat</h2>
           <div className="flex items-center gap-1 mt-1">
-            {MOCK_USERS.slice(0,4).map((u,i) => (
+            {(allUsers||[]).slice(0,4).map((u,i) => (
               <div key={u.id} className="relative" style={{marginLeft: i > 0 ? '-6px' : 0, zIndex: 4-i}}>
                 <Avatar user={u} size="sm" className="ring-2 ring-white" />
                 <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-1 ring-white" />
               </div>
             ))}
-            <span className="text-xs font-bold text-slate-400 ml-2">{MOCK_USERS.length} online</span>
+            <span className="text-xs font-bold text-slate-400 ml-2">{(allUsers||[]).length} online</span>
           </div>
         </div>
       </div>
@@ -699,7 +762,7 @@ const ChatView = ({ messages, onSend, onDelete }) => {
         <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
           {messages.map((msg, idx) => {
             const isMe = msg.senderId === user.id;
-            const sender = MOCK_USERS.find(u => u.id === msg.senderId);
+            const sender = (allUsers||[]).find(u => u.id === msg.senderId) || { name: msg.senderName || 'Unknown', initials: '?', color: 'from-slate-400 to-slate-500' };
             return (
               <div key={msg.id} className={`flex gap-2 items-end ${isMe ? 'justify-end' : 'justify-start'}`}>
                 {!isMe && <Avatar user={sender} size="sm" className="shrink-0 mb-4 ring-2 ring-white shadow-sm" />}
@@ -892,7 +955,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
 const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
-  const [assignee, setAssignee] = useState('Jaylen');
+  const [assignee, setAssignee] = useState('');
   const [taskPoints, setTaskPoints] = useState(10);
   const [requiresPhoto, setRequiresPhoto] = useState(false);
 
@@ -1724,10 +1787,22 @@ const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
   );
 };
 
-const SettingsView = ({ user, isParent, onLogout, allUsers = MOCK_USERS, userPoints = {}, tasks = [], onBack }) => {
+const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}, tasks = [], onBack, onUpdateMember, onAddMember, onDeleteMember }) => {
   const [activeModal, setActiveModal] = useState(null);
   const [editName, setEditName] = useState(user?.name || '');
   const handleModalClose = () => setActiveModal(null);
+  const photoInputRef = useRef(null);
+  const handlePhotoClick = () => { if (photoInputRef.current) photoInputRef.current.click(); };
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataURL = ev.target.result;
+      if (onUpdateMember) onUpdateMember(user.id, { photoURL: dataURL });
+    };
+    reader.readAsDataURL(file);
+  };
 
   const myPoints = userPoints[user?.name] || 0;
   const totalPoints = Object.values(userPoints).reduce((a, b) => a + b, 0);
@@ -2194,7 +2269,7 @@ export default function App() {
   const [firebaseUser, setFirebaseUser] = useState(null); 
   const [tasks, setTasks] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [userPoints, setUserPoints] = useState({ 'Jaylen': 0, 'Amara': 0 });
+  const [userPoints, setUserPoints] = useState({});
   const [events, setEvents] = useState([]);
   const [meals, setMeals] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -2204,6 +2279,7 @@ export default function App() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [undoDelete, setUndoDelete] = useState(null); // { message, onUndo }
+  const [users, setUsers] = useState([]);
 
   const prevNotifsLength = useRef(0);
 
@@ -2238,11 +2314,7 @@ export default function App() {
   useEffect(() => {
     if (!firebaseUser) return;
     if (DEMO_MODE) {
-      setTasks(mockTasks.map(t => ({...t, id: t.id.toString(), createdAt: Date.now()})));
-      setMessages(mockChats.map(c => ({...c, id: c.id.toString(), createdAt: Date.now()})));
-      setUserPoints({'Jaylen': 45, 'Amara': 30});
-      setEvents(mockEvents.map(e => ({...e, id: e.id.toString(), createdAt: Date.now()})));
-      setMeals(mockMeals.map(m => ({...m, id: m.id.toString(), createdAt: Date.now()})));
+      // No mock data — start fresh
       return;
     }
     const dataPath = 'public';
@@ -2266,7 +2338,7 @@ export default function App() {
         /* seed removed */;
         /* seed removed */;
       } else {
-        let p = { 'Jaylen': 0, 'Amara': 0 };
+        let p = {};
         snap.docs.forEach(d => { p[d.id] = d.data().points; });
         setUserPoints(p);
       }
@@ -2289,7 +2361,13 @@ export default function App() {
       setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, console.error);
 
-    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubNotifs(); };
+    const usersRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_users');
+    const unsubUsers = onSnapshot(usersRef, (snap) => {
+      const loaded = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
+      setUsers(loaded);
+    }, console.error);
+
+    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubNotifs(); unsubUsers(); };
   }, [firebaseUser]);
 
   useEffect(() => {
@@ -2334,6 +2412,39 @@ export default function App() {
 
   // --- ACTIONS ---
   
+  const handleAddFamilyMember = async (memberData) => {
+    const newId = Date.now().toString();
+    const initials = memberData.name ? memberData.name.charAt(0).toUpperCase() : '?';
+    const colors = ['from-emerald-400 to-teal-500','from-purple-400 to-violet-500','from-rose-400 to-pink-600','from-blue-500 to-indigo-600','from-amber-400 to-orange-500','from-cyan-400 to-blue-500'];
+    const colorIdx = users.length % colors.length;
+    const data = { 
+      id: newId, 
+      name: memberData.name || 'New Member', 
+      role: memberData.role || 'Child', 
+      initials, 
+      color: memberData.color || colors[colorIdx],
+      avatar: memberData.avatar || (memberData.role === 'Parent' ? 'parent' : 'child'),
+      photoURL: memberData.photoURL || null,
+      createdAt: Date.now() 
+    };
+    if (!firebaseUser) return;
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_users', newId), data);
+    return data;
+  };
+
+  const handleUpdateFamilyMember = async (id, updates) => {
+    if (!firebaseUser) return;
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_users', id), updates);
+    setUsers(prev => prev.map(u => u.id === id ? {...u, ...updates} : u));
+    if (activeUser?.id === id) setActiveUser(prev => ({...prev, ...updates}));
+  };
+
+  const handleDeleteFamilyMember = async (id) => {
+    if (!firebaseUser) return;
+    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_users', id));
+    setUsers(prev => prev.filter(u => u.id !== id));
+  };
+
   const handleAddTask = async (newTask) => {
     const newId = Date.now().toString();
     const taskData = { ...newTask, id: newId, status: 'open', createdAt: Date.now() };
@@ -2506,13 +2617,13 @@ export default function App() {
   const renderContent = () => {
     const displayPoints = isParent ? Object.values(userPoints).reduce((a, b) => a + b, 0) : (userPoints[activeUser?.name] || 0);
     switch(activeTab) {
-      case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
+      case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} allUsers={users} />;
       case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
       case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} />;
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
       case 'rewards': return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
       case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} />;
-      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); }} allUsers={MOCK_USERS} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} />;
+      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); }} allUsers={users} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} onUpdateMember={handleUpdateFamilyMember} onAddMember={handleAddFamilyMember} onDeleteMember={handleDeleteFamilyMember} />;
       default: return null;
     }
   };
@@ -2536,7 +2647,7 @@ export default function App() {
 
   if (showSplash) return <SplashScreen />;
   if (!isLoggedIn) return <AuthScreen onComplete={() => setIsLoggedIn(true)} />;
-  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={MOCK_USERS} onLogout={() => setIsLoggedIn(false)} />;
+  if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={users} onLogout={() => setIsLoggedIn(false)} onAddMember={handleAddFamilyMember} firebaseUser={firebaseUser} />;
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
   const navItems = isParent 
@@ -2657,7 +2768,7 @@ export default function App() {
 
         <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title="Switch Profile">
           <div className="space-y-3">
-            {MOCK_USERS.map(user => (
+            {users.map(user => (
               <div key={user.id} onClick={() => { setActiveUser(user); setIsUserSwitcherOpen(false); }} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser?.id === user.id ? 'bg-slate-100 ring-2 ring-slate-400' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}>
                 <Avatar user={user} size="md" />
                 <div><h4 className="font-bold text-slate-800">{user.name}</h4><p className="text-xs font-medium text-slate-500">{user.role}</p></div>
