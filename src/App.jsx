@@ -289,20 +289,9 @@ const Confetti = ({ active }) => {
 // --- MOCK DATA FOR SEEDING FIREBASE ON FIRST LOAD ---
 // MOCK_USERS removed — family members loaded from Firestore
 const MOCK_USERS = []; // kept as empty fallback only
-const mockTasks = [
-  { id: 1, title: "Empty Dishwasher", assignee: "Jaylen", points: 10, status: 'open', requiresPhoto: false },
-  { id: 4, title: "Clean Bedroom", assignee: "Jaylen", points: 25, status: 'open', requiresPhoto: true },
-  { id: 2, title: "Walk the Dog", assignee: "Mom", points: 20, status: 'approved', requiresPhoto: false },
-  { id: 3, title: "Finish Math Homework", assignee: "Amara", points: 15, status: 'pending', requiresPhoto: true, photoUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=400&q=80" },
-];
-const mockChats = [
-  { id: 1, senderId: 'p1', text: "Hey family, what's everyone doing?", time: "3:30 PM" },
-  { id: 2, senderId: 'c1', text: "Just finished my homework! 🙌", time: "3:32 PM" },
-];
-const mockEvents = [
-  { id: 1, title: "Tommy's Soccer Practice", time: "4:00 PM - 5:30 PM", location: "City Park", color: "bg-emerald-500" },
-  { id: 2, title: "Family Dinner", time: "6:30 PM", location: "Home", color: "bg-indigo-500" }
-];
+const mockTasks = [];
+const mockChats = [];
+const mockEvents = [];
 const mockMeals = [
   { id: 1, day: "Today", meal: "Spaghetti Bolognese", prepTime: "30m", tags: ["Pasta"], ingredients: "1 lb Ground Beef\n1 box Spaghetti\n1 jar Marinara Sauce", instructions: "1. Boil water and cook pasta.\n2. Brown ground beef.\n3. Simmer sauce." }
 ];
@@ -726,7 +715,7 @@ const ProfileSelectorScreen = ({ onLogin, users, onLogout, onAddMember, firebase
 
 // --- MAIN FEATURE SUB-VIEWS ---
 
-const ChatView = ({ messages, onSend, onDelete }) => {
+const ChatView = ({ messages, onSend, onDelete, allUsers = [] }) => {
   const { isChild, user } = useContext(ThemeContext);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -952,7 +941,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
   );
 };
 
-const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) => {
+const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent, allUsers = [] }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState('');
@@ -1165,7 +1154,8 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Assignee</label>
               <select value={assignee} onChange={e => setAssignee(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium">
-                <option>Jaylen</option><option>Amara</option><option>Mom</option><option>Dad</option><option>Anyone</option>
+                <option value="">Anyone</option>
+                {(allUsers||[]).map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
               </select>
             </div>
             <div>
