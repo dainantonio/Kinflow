@@ -11,7 +11,7 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION using VITE env vars ---
@@ -295,11 +295,7 @@ const mockEvents = [];
 const mockMeals = [
   { id: 1, day: "Today", meal: "Spaghetti Bolognese", prepTime: "30m", tags: ["Pasta"], ingredients: "1 lb Ground Beef\n1 box Spaghetti\n1 jar Marinara Sauce", instructions: "1. Boil water and cook pasta.\n2. Brown ground beef.\n3. Simmer sauce." }
 ];
-const mockRewards = [
-  { id: 1, title: "30 Min Screen Time", cost: 20, icon: <Smartphone className="w-6 h-6"/>, color: "bg-blue-100 text-blue-600" },
-  { id: 2, title: "Choose Movie Night", cost: 50, icon: <Film className="w-6 h-6"/>, color: "bg-purple-100 text-purple-600" },
-  { id: 3, title: "Special Activity", cost: 100, icon: <Ticket className="w-6 h-6"/>, color: "bg-pink-100 text-pink-600" },
-];
+const mockRewards = [];
 
 // --- AUTH & SETUP SCREENS ---
 
@@ -482,7 +478,7 @@ const OnboardingFlow = ({ onComplete }) => {
 };
 
 
-const AuthScreen = ({ onComplete }) => {
+const AuthScreen = () => {
   const [isLoading, setIsLoading] = useState(null); // 'google' | 'apple' | 'demo' | null
   const [error, setError] = useState('');
 
@@ -494,8 +490,9 @@ const AuthScreen = ({ onComplete }) => {
       provider.setCustomParameters({ prompt: 'select_account' });
       // Try popup first (avoids cross-domain redirect state loss on GitHub Pages)
       try {
-        const result = await signInWithPopup(auth, provider);
-        if (result?.user) { onComplete(); return; }
+        await signInWithPopup(auth, provider);
+        // onAuthStateChanged handles the transition automatically
+        return;
       } catch (popupErr) {
         // Popup blocked — fall back to redirect
         if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
@@ -1834,12 +1831,10 @@ const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}
       <div className="flex flex-col items-center -mt-14 pb-5 px-4">
         <div className="relative mb-4">
           <Avatar user={user} size="xxl" className="ring-[5px] ring-white shadow-2xl shadow-slate-900/20" />
-          <button
-            onClick={() => setActiveModal('editProfile')}
-            className="absolute bottom-1 right-1 w-8 h-8 bg-slate-900 border-[2.5px] border-white rounded-full flex items-center justify-center shadow-lg hover:bg-slate-700 active:scale-90 transition-all"
-          >
+          <label className="absolute bottom-1 right-1 w-8 h-8 bg-slate-900 border-[2.5px] border-white rounded-full flex items-center justify-center shadow-lg hover:bg-slate-700 active:scale-90 transition-all cursor-pointer">
             <Camera className="w-3.5 h-3.5 text-white" />
-          </button>
+            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+          </label>
         </div>
         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{user?.name}</h2>
         <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
@@ -2249,8 +2244,7 @@ export default function App() {
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false); 
-  
+    
   const [confirmActionState, setConfirmActionState] = useState(null);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [latestToast, setLatestToast] = useState(null);
@@ -2262,6 +2256,7 @@ export default function App() {
   const [userPoints, setUserPoints] = useState({});
   const [events, setEvents] = useState([]);
   const [meals, setMeals] = useState([]);
+  const [rewards, setRewards] = useState([]);
   const [notifications, setNotifications] = useState([]);
   
   // Non-Firebase States
@@ -2280,25 +2275,19 @@ export default function App() {
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
 
+  const [authReady, setAuthReady] = useState(DEMO_MODE);
+
   useEffect(() => {
-    if (DEMO_MODE) { setFirebaseUser({ uid: 'demo-user' }); setIsLoggedIn(true); return; }
-    const initAuth = async () => {
-      try {
-        // Handle returning from Google signInWithRedirect
-        const result = await getRedirectResult(auth);
-        if (result?.user) return; // auth state change will handle the rest
-      } catch (e) {
-        console.warn('Redirect result:', e.code);
-      }
-    };
-    initAuth();
+    if (DEMO_MODE) { setFirebaseUser({ uid: 'demo-user' }); return; }
     const unsubscribe = onAuthStateChanged(auth, user => {
       setFirebaseUser(user);
-      // Auto-mark logged in when a real (non-anonymous) Firebase user is detected
-      if (user && !user.isAnonymous) setIsLoggedIn(true);
+      setAuthReady(true);
     });
     return () => unsubscribe();
   }, []);
+
+  // Derived: logged in = Firebase user is real (not anonymous) and auth has initialized
+  const isLoggedIn = authReady && !!firebaseUser && !firebaseUser.isAnonymous;
 
   // Sync DB
   useEffect(() => {
@@ -2357,7 +2346,12 @@ export default function App() {
       setUsers(loaded);
     }, console.error);
 
-    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubNotifs(); unsubUsers(); };
+    const rewardsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_rewards');
+    const unsubRewards = onSnapshot(rewardsRef, (snap) => {
+      setRewards(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+    }, console.error);
+
+    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubNotifs(); unsubUsers(); unsubRewards(); };
   }, [firebaseUser]);
 
   useEffect(() => {
@@ -2420,6 +2414,22 @@ export default function App() {
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_users', newId), data);
     return data;
+  };
+
+  const handleUpdatePhoto = async (base64Photo) => {
+    if (!activeUser || !firebaseUser || !db) return;
+    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_users', activeUser.id);
+    await updateDoc(ref, { photoURL: base64Photo });
+    setActiveUser(prev => ({ ...prev, photoURL: base64Photo }));
+    setUsers(prev => prev.map(u => u.id === activeUser.id ? { ...u, photoURL: base64Photo } : u));
+  };
+
+  const handleUpdateUser = async (userId, updates) => {
+    if (!firebaseUser || !db) return;
+    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_users', userId);
+    await updateDoc(ref, updates);
+    if (activeUser?.id === userId) setActiveUser(prev => ({ ...prev, ...updates }));
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
   };
 
   const handleUpdateFamilyMember = async (id, updates) => {
@@ -2611,9 +2621,9 @@ export default function App() {
       case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
       case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} />;
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
-      case 'rewards': return <RewardsView rewards={mockRewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
-      case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} />;
-      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setIsLoggedIn(false); setActiveUser(null); }} allUsers={users} userPoints={userPoints} tasks={tasks} onBack={() => setActiveTab('home')} onUpdateMember={handleUpdateFamilyMember} onAddMember={handleAddFamilyMember} onDeleteMember={handleDeleteFamilyMember} />;
+      case 'rewards': return <RewardsView rewards={rewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
+      case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} allUsers={users} />;
+      case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setActiveUser(null); setFirebaseUser(null); }} allUsers={users} userPoints={userPoints} tasks={tasks} onUpdatePhoto={handleUpdatePhoto} onUpdateUser={handleUpdateUser} onBack={() => setActiveTab('home')} onUpdateMember={handleUpdateFamilyMember} onAddMember={handleAddFamilyMember} onDeleteMember={handleDeleteFamilyMember} />;
       default: return null;
     }
   };
@@ -2635,8 +2645,8 @@ export default function App() {
     });
   };
 
-  if (showSplash) return <SplashScreen />;
-  if (!isLoggedIn) return <AuthScreen onComplete={() => setIsLoggedIn(true)} />;
+  if (showSplash || !authReady) return <SplashScreen />;
+  if (!isLoggedIn) return <AuthScreen />;
   if (!activeUser) return <ProfileSelectorScreen onLogin={handleLogin} users={users} onLogout={() => setIsLoggedIn(false)} onAddMember={handleAddFamilyMember} firebaseUser={firebaseUser} />;
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
