@@ -11,7 +11,7 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION using VITE env vars ---
@@ -24,9 +24,8 @@ const envConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 const hasEnvConfig = Object.values(envConfig).every(Boolean);
-const DEMO_MODE = !hasEnvConfig;
 let _fbApp = null, auth = null, db = null;
-if (!DEMO_MODE) {
+if (hasEnvConfig) {
   try {
     _fbApp = initializeApp(envConfig);
     auth = getAuth(_fbApp);
@@ -514,16 +513,6 @@ const AuthScreen = () => {
     }
   };
 
-  const handleDemo = async () => {
-    setIsLoading('demo');
-    try {
-      await signInAnonymously(auth);
-      // onAuthStateChanged handles the transition
-    } catch (err) {
-      setError('Demo failed. Please try again.');
-      setIsLoading(null);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
@@ -589,9 +578,6 @@ const AuthScreen = () => {
         )}
 
         <div className="pt-2 text-center">
-          <button onClick={handleDemo} disabled={!!isLoading} className="text-white/35 hover:text-white/55 transition-colors text-xs font-medium underline underline-offset-2">
-            {isLoading === 'demo' ? 'Loading…' : 'Try Demo (no account needed)'}
-          </button>
         </div>
       </div>
 
@@ -2270,10 +2256,9 @@ export default function App() {
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
 
-  const [authReady, setAuthReady] = useState(DEMO_MODE);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    if (DEMO_MODE) { setFirebaseUser({ uid: 'demo-user' }); return; }
     // Handle redirect result first (Google redirect auth on GitHub Pages)
     getRedirectResult(auth).catch(() => {}); // result handled by onAuthStateChanged below
     const unsubscribe = onAuthStateChanged(auth, user => {
@@ -2284,15 +2269,11 @@ export default function App() {
   }, []);
 
   // Derived: logged in = Firebase user is real (not anonymous) and auth has initialized
-  const isLoggedIn = authReady && !!firebaseUser; // anonymous = demo mode, real auth = Google/Apple
+  const isLoggedIn = authReady && !!firebaseUser && !firebaseUser.isAnonymous;
 
   // Sync DB
   useEffect(() => {
     if (!firebaseUser) return;
-    if (DEMO_MODE) {
-      // No mock data — start fresh
-      return;
-    }
     const dataPath = 'public';
     const collPath = 'data';
 
@@ -2386,7 +2367,6 @@ export default function App() {
   const sendNotification = async (title, body, targetUserOrRole) => {
     const newId = Date.now().toString();
     const notifData = { id: newId, title, body, target: targetUserOrRole, createdAt: Date.now(), read: false };
-    if (DEMO_MODE) { setNotifications(prev => [...prev, notifData]); return; }
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_notifications', newId), notifData);
   };
@@ -2445,7 +2425,6 @@ export default function App() {
   const handleAddTask = async (newTask) => {
     const newId = Date.now().toString();
     const taskData = { ...newTask, id: newId, status: 'open', createdAt: Date.now() };
-    if (DEMO_MODE) { setTasks(prev => [...prev, taskData]); return; }
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), taskData);
     if (newTask.assignee && newTask.assignee !== 'Anyone') {
@@ -2456,11 +2435,9 @@ export default function App() {
   const requestDeleteTask = (id) => {
     const item = tasks.find(t => String(t.id) === String(id));
     if (!item) return;
-    if (DEMO_MODE) { setTasks(prev => prev.filter(t => String(t.id) !== String(id))); }
     else deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()));
     setUndoDelete({ message: `"${item.title}" removed`, onUndo: () => {
-      if (DEMO_MODE) { setTasks(prev => [...prev, item]); }
-      else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()), item);
+        else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()), item);
       setUndoDelete(null);
     }});
     setTimeout(() => setUndoDelete(prev => prev && prev.message === `"${item.title}" removed` ? null : prev), 4500);
@@ -2468,7 +2445,7 @@ export default function App() {
 
   const handleTaskAction = async (taskId, action, extra = {}) => {
     const t = tasks.find(x => x.id === taskId || String(x.id) === String(taskId));
-    if (!t || (!DEMO_MODE && !firebaseUser)) return;
+    if (!t || (!firebaseUser)) return;
 
     const assignee = t.assignee;
     let newStatus = t.status;
@@ -2511,13 +2488,6 @@ export default function App() {
       if (t.status !== newStatus && action !== 'reject') triggerConfetti();
     }
 
-    if (DEMO_MODE) {
-      setTasks(prev => prev.map(x => String(x.id) === String(taskId) ? { ...x, status: newStatus, photoUrl: newPhotoUrl } : x));
-      if (pointsChange !== 0 && assignee) {
-        setUserPoints(prev => ({ ...prev, [assignee]: Math.max(0, (prev[assignee] || 0) + pointsChange) }));
-      }
-      return;
-    }
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), { status: newStatus, photoUrl: newPhotoUrl });
 
     if (pointsChange !== 0 && assignee) {
@@ -2534,15 +2504,13 @@ export default function App() {
     if (!activeUser) return;
     const newId = Date.now().toString();
     const msgData = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
-    if (DEMO_MODE) { setMessages(prev => [...prev, msgData]); return; }
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msgData);
   };
 
   const requestDeleteMessage = (id) => {
     setConfirmActionState({ title: 'Delete Message', message: 'Remove this message for everyone in the family?', onConfirm: async () => {
-      if (DEMO_MODE) { setMessages(prev => prev.filter(m => String(m.id) !== String(id))); }
-      else await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', id.toString()));
+        else await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', id.toString()));
       setConfirmActionState(null);
     }});
   };
@@ -2551,7 +2519,7 @@ export default function App() {
     if (!activeUser) return;
     const pointsAvailable = userPoints[activeUser.name] || 0;
     if (!isParent && pointsAvailable >= cost) {
-      if (DEMO_MODE) {
+      if (false) {
         setUserPoints(prev => ({ ...prev, [activeUser.name]: Math.max(0, (prev[activeUser.name] || 0) - cost) }));
       } else {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), { points: pointsAvailable - cost }, { merge: true });
@@ -2564,7 +2532,6 @@ export default function App() {
   const handleAddEvent = async (newEvent) => {
     const newId = Date.now().toString();
     const eventData = { ...newEvent, id: newId, color: 'bg-indigo-500', createdAt: Date.now() };
-    if (DEMO_MODE) { setEvents(prev => [...prev, eventData]); return; }
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', newId), eventData);
   };
@@ -2572,11 +2539,9 @@ export default function App() {
   const requestDeleteEvent = (id) => {
     const item = events.find(e => String(e.id) === String(id));
     if (!item) return;
-    if (DEMO_MODE) { setEvents(prev => prev.filter(e => String(e.id) !== String(id))); }
     else deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()));
     setUndoDelete({ message: `"${item.title}" removed`, onUndo: () => {
-      if (DEMO_MODE) { setEvents(prev => [...prev, item]); }
-      else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()), item);
+        else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()), item);
       setUndoDelete(null);
     }});
     setTimeout(() => setUndoDelete(prev => prev && prev.message === `"${item.title}" removed` ? null : prev), 4500);
@@ -2585,13 +2550,12 @@ export default function App() {
   const handleAddMeal = async (newMeal) => {
     const newId = Date.now().toString();
     const mealData = { ...newMeal, id: newId, tags: ['New Recipe'], createdAt: Date.now() };
-    if (DEMO_MODE) { setMeals(prev => [...prev, mealData]); return; }
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', newId), mealData);
   };
 
   const handleUpdateMeal = async (updatedMeal) => {
-    if (DEMO_MODE) { setMeals(prev => prev.map(m => String(m.id) === String(updatedMeal.id) ? { ...m, ...updatedMeal } : m)); return; }
+    if (false) { setMeals(prev => prev.map(m => String(m.id) === String(updatedMeal.id) ? { ...m, ...updatedMeal } : m)); return; }
     if (!firebaseUser) return;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', updatedMeal.id.toString()), updatedMeal);
   };
@@ -2599,11 +2563,9 @@ export default function App() {
   const requestDeleteMeal = (id) => {
     const item = meals.find(m => String(m.id) === String(id));
     if (!item) return;
-    if (DEMO_MODE) { setMeals(prev => prev.filter(m => String(m.id) !== String(id))); }
     else deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()));
     setUndoDelete({ message: `"${item.meal}" removed`, onUndo: () => {
-      if (DEMO_MODE) { setMeals(prev => [...prev, item]); }
-      else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()), item);
+        else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()), item);
       setUndoDelete(null);
     }});
     setTimeout(() => setUndoDelete(prev => prev && prev.message === `"${item.meal}" removed` ? null : prev), 4500);
@@ -2634,7 +2596,7 @@ export default function App() {
   const unreadNotifsCount = myNotifications.filter(n => !n.read).length;
 
   const markNotifsAsRead = () => {
-    if (DEMO_MODE) { setNotifications(prev => prev.map(n => ({ ...n, read: true }))); return; }
+    if (false) { setNotifications(prev => prev.map(n => ({ ...n, read: true }))); return; }
     myNotifications.forEach(async (n) => {
       if (!n.read && firebaseUser) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_notifications', n.id), { read: true });
