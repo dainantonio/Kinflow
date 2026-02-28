@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { 
-  Settings, Home, CheckSquare, Calendar as CalendarIcon, 
-  ChefHat, Gift, X, Plus, Bell, ChevronRight, Clock, 
-  MapPin, Send, User, Check, Utensils, Star, Flame, 
+  Settings, Home, CheckSquare, Calendar as CalendarIcon, CalendarDays,
+  ChefHat, Gift, Trophy, X, Plus, Bell, ChevronRight, Clock,
+  MapPin, Send, User, Check, Utensils, Star, Flame, Zap,
   MoreVertical, Users, BellRing, CreditCard, LogOut,
   ShoppingCart, Loader2, Hourglass, ArrowRight,
   Layers, Wand2, Smartphone, Film, Ticket,
-  MessageCircle, Smile, Image as ImageIcon, Camera, Trash2, ChevronLeft, UserCircle
+  MessageCircle, Smile, Image as ImageIcon, Camera, Trash2, ChevronLeft, UserCircle, BadgeCheck
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -851,7 +851,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
             <div className="grid grid-cols-4 gap-2">
               {[
                 {icon: CheckSquare, label: 'Tasks', tab: 'tasks', color: 'bg-emerald-100 text-emerald-600'},
-                {icon: CalendarIcon, label: 'Schedule', tab: 'calendar', color: 'bg-blue-100 text-blue-600'},
+                {icon: CalendarDays, label: 'Schedule', tab: 'calendar', color: 'bg-blue-100 text-blue-600'},
                 {icon: ChefHat, label: 'Meals', tab: 'meals', color: 'bg-orange-100 text-orange-500'},
                 {icon: MessageCircle, label: 'Chat', tab: 'chat', color: 'bg-pink-100 text-pink-500'},
               ].map((a, i) => (
@@ -873,7 +873,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
 const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
-  const [assignee, setAssignee] = useState('Tommy');
+  const [assignee, setAssignee] = useState('Jaylen');
   const [taskPoints, setTaskPoints] = useState(10);
   const [requiresPhoto, setRequiresPhoto] = useState(false);
 
@@ -885,6 +885,15 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
   
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Swipe-to-delete (parents only)
+  const [swipedTaskId, setSwipedTaskId] = useState(null);
+  const touchStartXTask = useRef(null);
+
+  const handleSwipeDeleteTask = (task) => {
+    setSwipedTaskId(null);
+    onDelete(task.id);
+  };
 
   const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser?.name || t.assignee === 'Anyone');
 
@@ -996,43 +1005,66 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent }) =
         {visibleTasks.map((task, idx) => {
           const isApproved = task.status === 'approved';
           const isPending = task.status === 'pending';
+          const isSwiped = swipedTaskId === task.id;
 
           return (
             <RevealCard key={task.id} delay={idx * 60}>
-              <div
-                onClick={() => handleTaskClick(task)}
-                className={`spring-press bg-white rounded-3xl p-4 shadow-sm ring-1 flex items-center gap-3 cursor-pointer transition-all
-                  ${isApproved ? 'opacity-55 ring-black/5' : isPending ? 'ring-amber-200 bg-amber-50/30' : 'ring-black/5'}`}
-              >
-                {/* Left accent */}
-                <div className={`w-1 h-12 rounded-full shrink-0 ${isApproved ? 'bg-emerald-400' : isPending ? 'bg-amber-400' : 'bg-slate-200'}`} />
-
-                {/* Status circle */}
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 transition-all
-                  ${isApproved ? 'bg-emerald-500 border-emerald-500' : isPending ? 'bg-amber-400 border-amber-400' : 'border-dashed border-slate-300'}`}>
-                  {isApproved && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
-                  {isPending && <Hourglass className="w-3.5 h-3.5 text-white" style={{animationDuration:'3s'}} />}
-                </div>
-
-                {/* Text */}
-                <div className="flex-1 min-w-0">
-                  <p className={`font-bold text-sm leading-tight ${isApproved ? 'line-through text-slate-400' : 'text-slate-800'}`}>{task.title}</p>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><User className="w-3 h-3"/>{task.assignee}</span>
-                    {task.requiresPhoto && <span className="text-[9px] font-bold bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full flex items-center gap-1"><Camera className="w-3 h-3"/>Photo</span>}
-                    {isPending && isChild && <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Pending...</span>}
+              <div className="relative overflow-hidden rounded-3xl">
+                {/* Swipe-to-delete zone (parent only) */}
+                {isParent && (
+                  <div
+                    className="absolute right-0 top-0 h-full w-20 bg-rose-500 flex items-center justify-center rounded-r-3xl cursor-pointer select-none"
+                    onClick={(e) => { e.stopPropagation(); handleSwipeDeleteTask(task); }}
+                  >
+                    <Trash2 className="w-5 h-5 text-white" />
                   </div>
-                </div>
+                )}
+                {/* Card */}
+                <div
+                  style={{ transform: isSwiped ? 'translateX(-80px)' : 'translateX(0)', transition: 'transform 0.28s cubic-bezier(0.25,1,0.5,1)' }}
+                  onTouchStart={(e) => {
+                    if (swipedTaskId !== null && swipedTaskId !== task.id) setSwipedTaskId(null);
+                    touchStartXTask.current = e.touches[0].clientX;
+                  }}
+                  onTouchMove={(e) => {
+                    if (touchStartXTask.current === null) return;
+                    const dx = touchStartXTask.current - e.touches[0].clientX;
+                    if (isParent && dx > 55) setSwipedTaskId(task.id);
+                    else if (dx < -10) setSwipedTaskId(null);
+                  }}
+                  onTouchEnd={() => { touchStartXTask.current = null; }}
+                  onClick={() => {
+                    if (isSwiped) { setSwipedTaskId(null); return; }
+                    handleTaskClick(task);
+                  }}
+                  className={`bg-white rounded-3xl p-4 shadow-sm ring-1 flex items-center gap-3 cursor-pointer transition-colors
+                    ${isApproved ? 'opacity-55 ring-black/5' : isPending ? 'ring-amber-200 bg-amber-50/30' : 'ring-black/5'}`}
+                >
+                  {/* Left accent */}
+                  <div className={`w-1 h-12 rounded-full shrink-0 ${isApproved ? 'bg-emerald-400' : isPending ? 'bg-amber-400' : 'bg-slate-200'}`} />
 
-                {/* Points + actions */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {isPending && isParent && <span className="text-[9px] font-bold bg-amber-400 text-white px-2.5 py-1 rounded-full animate-pulse">Review</span>}
-                  <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isApproved ? 'bg-slate-100 text-slate-400' : 'bg-indigo-100 text-indigo-600'}`}>+{task.points}</span>
-                  {isParent && (
-                    <button onClick={e=>{e.stopPropagation();onDelete(task.id)}} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-xl transition-colors">
-                      <Trash2 className="w-4 h-4"/>
-                    </button>
-                  )}
+                  {/* Status circle */}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 transition-all
+                    ${isApproved ? 'bg-emerald-500 border-emerald-500' : isPending ? 'bg-amber-400 border-amber-400' : 'border-dashed border-slate-300'}`}>
+                    {isApproved && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
+                    {isPending && <Hourglass className="w-3.5 h-3.5 text-white" style={{animationDuration:'3s'}} />}
+                  </div>
+
+                  {/* Text */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-bold text-sm leading-tight ${isApproved ? 'line-through text-slate-400' : 'text-slate-800'}`}>{task.title}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><User className="w-3 h-3"/>{task.assignee}</span>
+                      {task.requiresPhoto && <span className="text-[9px] font-bold bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full flex items-center gap-1"><Camera className="w-3 h-3"/>Photo</span>}
+                      {isPending && isChild && <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Waiting...</span>}
+                    </div>
+                  </div>
+
+                  {/* Points + pending badge */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isPending && isParent && <span className="text-[9px] font-bold bg-amber-400 text-white px-2.5 py-1 rounded-full animate-pulse">Review</span>}
+                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isApproved ? 'bg-slate-100 text-slate-400' : 'bg-indigo-100 text-indigo-600'}`}>+{task.points}</span>
+                  </div>
                 </div>
               </div>
             </RevealCard>
@@ -2152,6 +2184,7 @@ export default function App() {
   const [groceries, setGroceries] = useState([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [undoDelete, setUndoDelete] = useState(null); // { message, onUndo }
 
   const prevNotifsLength = useRef(0);
 
@@ -2189,7 +2222,7 @@ export default function App() {
     if (DEMO_MODE) {
       setTasks(mockTasks.map(t => ({...t, id: t.id.toString(), createdAt: Date.now()})));
       setMessages(mockChats.map(c => ({...c, id: c.id.toString(), createdAt: Date.now()})));
-      setUserPoints({'Tommy': 45, 'Lily': 30});
+      setUserPoints({'Jaylen': 45, 'Amara': 30});
       setEvents(mockEvents.map(e => ({...e, id: e.id.toString(), createdAt: Date.now()})));
       setMeals(mockMeals.map(m => ({...m, id: m.id.toString(), createdAt: Date.now()})));
       return;
@@ -2295,11 +2328,16 @@ export default function App() {
   };
 
   const requestDeleteTask = (id) => {
-    setConfirmActionState({ title: 'Delete Task', message: 'Are you sure you want to permanently remove this chore?', onConfirm: async () => {
-      if (DEMO_MODE) { setTasks(prev => prev.filter(t => String(t.id) !== String(id))); }
-      else await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()));
-      setConfirmActionState(null);
+    const item = tasks.find(t => String(t.id) === String(id));
+    if (!item) return;
+    if (DEMO_MODE) { setTasks(prev => prev.filter(t => String(t.id) !== String(id))); }
+    else deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()));
+    setUndoDelete({ message: `"${item.title}" removed`, onUndo: () => {
+      if (DEMO_MODE) { setTasks(prev => [...prev, item]); }
+      else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()), item);
+      setUndoDelete(null);
     }});
+    setTimeout(() => setUndoDelete(prev => prev && prev.message === `"${item.title}" removed` ? null : prev), 4500);
   };
 
   const handleTaskAction = async (taskId, action, extra = {}) => {
@@ -2406,11 +2444,16 @@ export default function App() {
   };
 
   const requestDeleteEvent = (id) => {
-    setConfirmActionState({ title: 'Delete Event', message: 'Are you sure you want to remove this event from the calendar?', onConfirm: async () => {
-      if (DEMO_MODE) { setEvents(prev => prev.filter(e => String(e.id) !== String(id))); }
-      else await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()));
-      setConfirmActionState(null);
+    const item = events.find(e => String(e.id) === String(id));
+    if (!item) return;
+    if (DEMO_MODE) { setEvents(prev => prev.filter(e => String(e.id) !== String(id))); }
+    else deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()));
+    setUndoDelete({ message: `"${item.title}" removed`, onUndo: () => {
+      if (DEMO_MODE) { setEvents(prev => [...prev, item]); }
+      else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()), item);
+      setUndoDelete(null);
     }});
+    setTimeout(() => setUndoDelete(prev => prev && prev.message === `"${item.title}" removed` ? null : prev), 4500);
   };
 
   const handleAddMeal = async (newMeal) => {
@@ -2428,17 +2471,22 @@ export default function App() {
   };
 
   const requestDeleteMeal = (id) => {
-    setConfirmActionState({ title: 'Delete Recipe', message: 'Are you sure you want to permanently delete this recipe?', onConfirm: async () => {
-      if (DEMO_MODE) { setMeals(prev => prev.filter(m => String(m.id) !== String(id))); }
-      else await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()));
-      setConfirmActionState(null);
+    const item = meals.find(m => String(m.id) === String(id));
+    if (!item) return;
+    if (DEMO_MODE) { setMeals(prev => prev.filter(m => String(m.id) !== String(id))); }
+    else deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()));
+    setUndoDelete({ message: `"${item.meal}" removed`, onUndo: () => {
+      if (DEMO_MODE) { setMeals(prev => [...prev, item]); }
+      else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()), item);
+      setUndoDelete(null);
     }});
+    setTimeout(() => setUndoDelete(prev => prev && prev.message === `"${item.meal}" removed` ? null : prev), 4500);
   };
 
   const triggerConfetti = () => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 1500); };
 
   const renderContent = () => {
-    const displayPoints = isParent ? (userPoints['Tommy'] + userPoints['Lily']) : (userPoints[activeUser?.name] || 0);
+    const displayPoints = isParent ? Object.values(userPoints).reduce((a, b) => a + b, 0) : (userPoints[activeUser?.name] || 0);
     switch(activeTab) {
       case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} />;
       case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
@@ -2474,8 +2522,8 @@ export default function App() {
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
   const navItems = isParent 
-    ? [{ id: 'home', icon: Home, label: 'Today' }, { id: 'tasks', icon: CheckSquare, label: 'Tasks' }, { id: 'calendar', icon: CalendarIcon, label: 'Plan' }, { id: 'meals', icon: ChefHat, label: 'Meals' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }]
-    : [{ id: 'home', icon: Home, label: 'Home' }, { id: 'tasks', icon: CheckSquare, label: 'Chores' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Gift, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }];
+    ? [{ id: 'home', icon: Home, label: 'Today' }, { id: 'tasks', icon: CheckSquare, label: 'Tasks' }, { id: 'calendar', icon: CalendarDays, label: 'Plan' }, { id: 'meals', icon: ChefHat, label: 'Meals' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Trophy, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }]
+    : [{ id: 'home', icon: Home, label: 'Home' }, { id: 'tasks', icon: CheckSquare, label: 'Chores' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Trophy, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }];
 
   const appBgClass = isChild ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' : 'bg-slate-50 text-slate-800';
 
@@ -2496,6 +2544,17 @@ export default function App() {
                 <p className="font-bold text-sm leading-tight">{latestToast.title}</p>
                 <p className="text-white/50 text-xs font-medium mt-0.5 truncate">{latestToast.body}</p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* UNDO DELETE TOAST */}
+        {undoDelete && (
+          <div className="fixed bottom-28 inset-x-0 z-[98] flex justify-center px-4 pointer-events-none">
+            <div className="bg-slate-900/96 backdrop-blur-xl text-white px-5 py-4 rounded-3xl shadow-2xl ring-1 ring-white/10 flex items-center gap-3 max-w-sm w-full animate-slide-up pointer-events-auto">
+              <Trash2 className="w-4 h-4 text-white/40 shrink-0" />
+              <span className="flex-1 text-sm font-medium text-white/80">{undoDelete.message}</span>
+              <button onClick={() => { undoDelete.onUndo(); }} className="spring-press text-indigo-400 font-bold text-sm hover:text-indigo-300 transition-colors shrink-0 px-2 py-1 bg-indigo-500/20 rounded-xl">Undo</button>
             </div>
           </div>
         )}
