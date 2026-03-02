@@ -2527,7 +2527,7 @@ export default function App() {
 
   const requestDeleteMessage = (id) => {
     setConfirmActionState({ title: 'Delete Message', message: 'Remove this message for everyone in the family?', onConfirm: async () => {
-        else await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', id.toString()));
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', id.toString()));
       setConfirmActionState(null);
     }});
   };
@@ -2556,9 +2556,9 @@ export default function App() {
   const requestDeleteEvent = (id) => {
     const item = events.find(e => String(e.id) === String(id));
     if (!item) return;
-    else deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()));
+    deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()));
     setUndoDelete({ message: `"${item.title}" removed`, onUndo: () => {
-        else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()), item);
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_events', id.toString()), item);
       setUndoDelete(null);
     }});
     setTimeout(() => setUndoDelete(prev => prev && prev.message === `"${item.title}" removed` ? null : prev), 4500);
@@ -2580,9 +2580,9 @@ export default function App() {
   const requestDeleteMeal = (id) => {
     const item = meals.find(m => String(m.id) === String(id));
     if (!item) return;
-    else deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()));
+    deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()));
     setUndoDelete({ message: `"${item.meal}" removed`, onUndo: () => {
-        else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()), item);
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_meals', id.toString()), item);
       setUndoDelete(null);
     }});
     setTimeout(() => setUndoDelete(prev => prev && prev.message === `"${item.meal}" removed` ? null : prev), 4500);
