@@ -487,11 +487,13 @@ const AuthScreen = () => {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      // Use redirect — most reliable on GitHub Pages (no cross-origin postMessage issues)
-      await signInWithRedirect(auth, provider);
-      // Page will reload; onAuthStateChanged picks up the user on return
+      // Use popup — fires onAuthStateChanged instantly when popup closes
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged handles the screen transition automatically
     } catch (err) {
-      setError('Google sign-in failed. Please try again.');
+      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+        setError('Google sign-in failed. Please try again.');
+      }
       setIsLoading(null);
     }
   };
@@ -2259,13 +2261,28 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    // Handle redirect result first (Google redirect auth on GitHub Pages)
-    getRedirectResult(auth).catch(() => {}); // result handled by onAuthStateChanged below
-    const unsubscribe = onAuthStateChanged(auth, user => {
-      setFirebaseUser(user);
-      setAuthReady(true);
-    });
-    return () => unsubscribe();
+    if (!auth) return;
+    let cleanup;
+    const initAuth = async () => {
+      // Drain any pending redirect result before subscribing to auth state.
+      // This ensures getRedirectResult fully resolves (and Firebase processes
+      // the credential) before onAuthStateChanged fires, preventing the race
+      // condition where onAuthStateChanged fires null first and shows AuthScreen.
+      try {
+        await getRedirectResult(auth);
+      } catch (e) {
+        // Ignore errors (e.g. no pending redirect, domain issues) — 
+        // onAuthStateChanged will still correctly reflect current auth state.
+        console.warn('getRedirectResult:', e?.code);
+      }
+      const unsubscribe = onAuthStateChanged(auth, user => {
+        setFirebaseUser(user);
+        setAuthReady(true);
+      });
+      cleanup = unsubscribe;
+    };
+    initAuth();
+    return () => cleanup?.();
   }, []);
 
   // Derived: logged in = Firebase user is real (not anonymous) and auth has initialized
