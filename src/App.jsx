@@ -2452,9 +2452,9 @@ export default function App() {
   const requestDeleteTask = (id) => {
     const item = tasks.find(t => String(t.id) === String(id));
     if (!item) return;
-    else deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()));
+    deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()));
     setUndoDelete({ message: `"${item.title}" removed`, onUndo: () => {
-        else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()), item);
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', id.toString()), item);
       setUndoDelete(null);
     }});
     setTimeout(() => setUndoDelete(prev => prev && prev.message === `"${item.title}" removed` ? null : prev), 4500);
