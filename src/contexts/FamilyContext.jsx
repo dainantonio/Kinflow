@@ -4,6 +4,8 @@ import {
   signInWithCustomToken, signInAnonymously, onAuthStateChanged,
   collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc
 } from '../utils/firebase';
+import { createAgentProcedures } from '../server/trpc/agentProcedures';
+import { createChatSocketClient } from '../realtime/chatSocket';
 
 export const AVATAR_OPTIONS = {
   parent_female: ['👩🏾', '👩🏿', '👩🏽', '👩🏼', '👩🏻', '👩'],
@@ -34,6 +36,8 @@ export const useFamilyContext = () => {
 };
 
 export const FamilyProvider = ({ children }) => {
+  const agentProceduresRef = useRef(createAgentProcedures());
+  const chatSocketRef = useRef(null);
   const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -64,6 +68,7 @@ export const FamilyProvider = ({ children }) => {
   const [events, setEvents] = useState([]);
   const [meals, setMeals] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [agentPreferences, setAgentPreferences] = useState({});
 
   // Family Members State
   const [familyMembers, setFamilyMembers] = useState(() => {
@@ -191,6 +196,30 @@ export const FamilyProvider = ({ children }) => {
     const timer = setTimeout(() => setShowSplash(false), 2200);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!activeUser) return undefined;
+    const socket = createChatSocketClient({
+      userId: activeUser.id,
+      onMessage: (incoming) => {
+        const mapped = {
+          id: incoming.id,
+          senderId: incoming.senderId,
+          text: incoming.text,
+          time: new Date(incoming.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          createdAt: incoming.createdAt,
+          suggestions: incoming.suggestions || [],
+          type: incoming.type || 'chat_message',
+        };
+        if (DEMO_MODE) {
+          setMessages((prev) => [...prev, mapped]);
+        }
+      },
+    });
+
+    chatSocketRef.current = socket;
+    return () => socket.close();
+  }, [activeUser]);
 
   // TOAST PUSH NOTIFICATION LISTENER
   useEffect(() => {
@@ -387,9 +416,56 @@ export const FamilyProvider = ({ children }) => {
     if (!activeUser) return;
     const newId = Date.now().toString();
     const msgData = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
-    if (DEMO_MODE) { setMessages(prev => [...prev, msgData]); return; }
+    if (DEMO_MODE) {
+      setMessages(prev => [...prev, msgData]);
+      chatSocketRef.current?.send(text, {
+        tasks,
+        mealHistory: meals,
+        events,
+        inventory: groceries,
+      });
+      return;
+    }
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msgData);
+
+    const result = await agentProceduresRef.current.executeAgent({
+      agent: 'conversation',
+      payload: {
+        message: text,
+        tasks,
+        mealHistory: meals,
+        events,
+        inventory: groceries,
+      },
+      context: { userId: activeUser.id },
+    });
+
+    const replyId = `${Date.now()}-agent`;
+    const reply = {
+      id: replyId,
+      senderId: 'conversation-agent',
+      text: result.responseText,
+      suggestions: result.suggestions,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: Date.now(),
+      type: 'agent_message',
+    };
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', replyId), reply);
+  };
+
+  const executeAgent = (agent, payload = {}) => agentProceduresRef.current.executeAgent({ agent, payload, context: { userId: activeUser?.id } });
+  const approveAgentSuggestion = (suggestionId, approved = true) => agentProceduresRef.current.approveSuggestion({ suggestionId, approved, userId: activeUser?.id });
+  const provideAgentFeedback = (suggestionId, feedback, rating) => agentProceduresRef.current.provideFeedback({ suggestionId, feedback, rating, userId: activeUser?.id });
+  const getAgentPreferences = async (agent) => {
+    const response = await agentProceduresRef.current.getAgentPreferences({ agent });
+    setAgentPreferences((prev) => ({ ...prev, [agent]: response.preferences }));
+    return response;
+  };
+  const updateAgentPreferences = async (agent, preferences) => {
+    const response = await agentProceduresRef.current.updateAgentPreferences({ agent, preferences });
+    setAgentPreferences((prev) => ({ ...prev, [agent]: response.preferences }));
+    return response;
   };
 
   const requestDeleteMessage = (id) => {
@@ -510,6 +586,7 @@ export const FamilyProvider = ({ children }) => {
     isNotifModalOpen, setIsNotifModalOpen,
     latestToast,
     tasks, messages, userPoints, events, meals, notifications,
+    agentPreferences,
     groceries, setGroceries,
     showConfetti, isCopilotOpen, setIsCopilotOpen,
     lastRedeemed,
@@ -521,6 +598,8 @@ export const FamilyProvider = ({ children }) => {
     handleLogin, completeOnboarding, triggerConfetti,
     handleAddTask, handleUpdateTask, requestDeleteTask, handleTaskAction,
     handleSendMessage, requestDeleteMessage,
+    executeAgent, approveAgentSuggestion, provideAgentFeedback,
+    getAgentPreferences, updateAgentPreferences,
     handleRedeemReward,
     handleAddEvent, handleUpdateEvent, requestDeleteEvent,
     handleAddMeal, handleUpdateMeal, requestDeleteMeal,

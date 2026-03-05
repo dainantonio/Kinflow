@@ -204,6 +204,15 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
                   >
                     {msg.text}
                   </div>
+                  {Array.isArray(msg.suggestions) && msg.suggestions.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {msg.suggestions.slice(0, 3).map((suggestion) => (
+                        <span key={suggestion.id} className="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-indigo-200">
+                          {suggestion.title}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <div className={`flex items-center gap-1.5 mt-1 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
                     {isMe && <span className="text-[9px] font-bold text-slate-400">You · {user?.name}</span>}
                     {isMe && (
