@@ -179,8 +179,10 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
             </div>
           )}
           {messages?.map((msg, idx) => {
-            const isMe = msg.senderId === user.id;
+            const isMe = Boolean(user?.id) && msg.senderId === user.id;
             const sender = familyMembers.find((u) => u.id === msg.senderId);
+            const senderName = isMe ? `${user?.name || 'You'} (You)` : (sender?.name || 'Kinflow');
+            const senderRole = isMe ? (user?.role || 'Member') : (sender?.role || 'Agent');
             return (
               <div key={msg.id} className={`flex gap-2 items-end ${isMe ? 'justify-end' : 'justify-start'}`}>
                 {!isMe && <Avatar user={sender} size="sm" className="shrink-0 mb-4 ring-2 ring-white shadow-sm" />}
@@ -191,7 +193,7 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
                         sender?.color || user?.color || 'from-indigo-400 to-violet-500'
                       }`}
                     />
-                    {isMe ? `${user?.name} (You)` : sender?.name} · {isMe ? user?.role : sender?.role}
+                    {senderName} · {senderRole}
                   </span>
                   <div
                     className={`px-4 py-2.5 text-sm font-medium leading-relaxed shadow-sm ${
