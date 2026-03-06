@@ -93,6 +93,15 @@ export const FamilyProvider = ({ children }) => {
 
   const prevNotifsLength = useRef(0);
 
+  const formatMessageTime = (value) => {
+    const numeric = typeof value === 'number' ? value : (typeof value?.toMillis === 'function' ? value.toMillis() : Date.now());
+    const parsed = new Date(numeric);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   const isParent = activeUser?.role === 'Parent';
   const isChild = activeUser?.role === 'Child';
 
@@ -206,7 +215,7 @@ export const FamilyProvider = ({ children }) => {
           id: incoming.id,
           senderId: incoming.senderId,
           text: incoming.text,
-          time: new Date(incoming.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          time: formatMessageTime(incoming.createdAt),
           createdAt: incoming.createdAt,
           suggestions: incoming.suggestions || [],
           type: incoming.type || 'chat_message',
@@ -429,29 +438,33 @@ export const FamilyProvider = ({ children }) => {
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msgData);
 
-    const result = await agentProceduresRef.current.executeAgent({
-      agent: 'conversation',
-      payload: {
-        message: text,
-        tasks,
-        mealHistory: meals,
-        events,
-        inventory: groceries,
-      },
-      context: { userId: activeUser.id },
-    });
+    try {
+      const result = await agentProceduresRef.current.executeAgent({
+        agent: 'conversation',
+        payload: {
+          message: text,
+          tasks,
+          mealHistory: meals,
+          events,
+          inventory: groceries,
+        },
+        context: { userId: activeUser.id },
+      });
 
-    const replyId = `${Date.now()}-agent`;
-    const reply = {
-      id: replyId,
-      senderId: 'conversation-agent',
-      text: result.responseText,
-      suggestions: result.suggestions,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      createdAt: Date.now(),
-      type: 'agent_message',
-    };
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', replyId), reply);
+      const replyId = `${Date.now()}-agent`;
+      const reply = {
+        id: replyId,
+        senderId: 'conversation-agent',
+        text: result.responseText,
+        suggestions: result.suggestions,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        createdAt: Date.now(),
+        type: 'agent_message',
+      };
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', replyId), reply);
+    } catch (error) {
+      console.error('Conversation agent failed:', error);
+    }
   };
 
   const executeAgent = (agent, payload = {}) => agentProceduresRef.current.executeAgent({ agent, payload, context: { userId: activeUser?.id } });
