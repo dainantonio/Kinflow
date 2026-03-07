@@ -2,6 +2,7 @@ import { taskAgent } from '../../agents/taskAgent';
 import { mealAgent } from '../../agents/mealAgent';
 import { scheduleAgent } from '../../agents/scheduleAgent';
 import { conversationAgent } from '../../agents/conversationAgent';
+import { createAutomationProcedures } from './automationProcedures';
 
 const AGENTS = {
   task: taskAgent,
@@ -21,6 +22,7 @@ export const createAgentProcedures = () => {
   const suggestions = new Map();
   const feedbackStore = [];
   const preferences = { ...defaultPreferences };
+  const automation = createAutomationProcedures();
 
   return {
     async executeAgent(input = {}) {
@@ -85,5 +87,7 @@ export const createAgentProcedures = () => {
         preferences: preferences[agentName],
       };
     },
+
+    ...automation,
   };
 };

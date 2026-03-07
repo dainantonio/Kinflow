@@ -11,7 +11,7 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION using VITE env vars ---
@@ -487,11 +487,21 @@ const AuthScreen = () => {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      // Use popup — fires onAuthStateChanged instantly when popup closes
+      const useRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
+      if (useRedirect) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
       await signInWithPopup(auth, provider);
       // onAuthStateChanged handles the screen transition automatically
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+      const popupIssue = ['auth/popup-blocked', 'auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
+      if (popupIssue.includes(err?.code)) {
+        setError('Google sign-in was interrupted. Please try again.');
+      } else if (String(err?.message || '').toLowerCase().includes('unauthorized-domain')) {
+        setError(`This domain is not authorized in Firebase Auth: ${window.location.hostname}`);
+      } else {
         setError('Google sign-in failed. Please try again.');
       }
       setIsLoading(null);
@@ -505,10 +515,21 @@ const AuthScreen = () => {
       const provider = new OAuthProvider('apple.com');
       provider.addScope('email');
       provider.addScope('name');
+      const useRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
+      if (useRedirect) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
       await signInWithPopup(auth, provider);
       // onAuthStateChanged handles the screen transition automatically
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+      const popupIssue = ['auth/popup-blocked', 'auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
+      if (popupIssue.includes(err?.code)) {
+        setError('Apple sign-in was interrupted. Please try again.');
+      } else if (String(err?.message || '').toLowerCase().includes('unauthorized-domain')) {
+        setError(`This domain is not authorized in Firebase Auth: ${window.location.hostname}`);
+      } else {
         setError('Apple sign-in failed. Please try again.');
       }
       setIsLoading(null);
