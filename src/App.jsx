@@ -731,26 +731,48 @@ const ProfileSelectorScreen = ({ onLogin, users, onLogout, onAddMember, firebase
 
 // --- MAIN FEATURE SUB-VIEWS ---
 
-const AgentSuggestionCard = ({ icon = '🤖', title, subtitle, confidence, onApprove, onDismiss, approveLabel = 'Approve' }) => (
-  <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-indigo-100">
-    <div className="flex items-start gap-3">
-      <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-lg">{icon}</div>
-      <div className="min-w-0 flex-1">
-        <p className="font-bold text-sm text-slate-800 leading-tight">{title}</p>
-        {subtitle && <p className="text-xs text-slate-500 font-medium mt-1">{subtitle}</p>}
-        {typeof confidence === 'number' && (
-          <p className="text-[10px] font-bold text-indigo-600 mt-1 uppercase tracking-wider">
-            Confidence {Math.round(confidence * 100)}%
-          </p>
-        )}
+const AgentSuggestionCard = ({ icon = '🤖', title, subtitle, reasoning, confidence, source, onApprove, onDismiss, approveLabel = 'Approve' }) => {
+  const [expanded, setExpanded] = useState(false);
+  const sourceLabel = source === 'automation' ? '⚙️ Auto' : source === 'task' ? '📋 Tasks' : source === 'meal' ? '🍽️ Meals' : source === 'schedule' ? '📅 Schedule' : '🤖 AI';
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-indigo-100">
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-lg shrink-0">{icon}</div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-bold text-sm text-slate-800 leading-tight">{title}</p>
+            <span className="text-[9px] font-bold bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">{sourceLabel}</span>
+          </div>
+          {subtitle && <p className="text-xs text-slate-500 font-medium mt-1">{subtitle}</p>}
+          <div className="flex items-center gap-3 mt-1.5">
+            {typeof confidence === 'number' && (
+              <div className="flex items-center gap-1.5">
+                <div className="h-1 w-16 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-400 rounded-full" style={{width:`${Math.round(confidence*100)}%`}} />
+                </div>
+                <span className="text-[10px] font-bold text-indigo-500">{Math.round(confidence * 100)}% conf</span>
+              </div>
+            )}
+            {reasoning && (
+              <button onClick={() => setExpanded(e => !e)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors underline underline-offset-2">
+                {expanded ? 'less' : 'why?'}
+              </button>
+            )}
+          </div>
+          {expanded && reasoning && (
+            <div className="mt-2 p-2.5 bg-slate-50 rounded-xl">
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">{reasoning}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="mt-3 flex gap-2">
+        <button onClick={onApprove} className="spring-press px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold">{approveLabel}</button>
+        <button onClick={onDismiss} className="spring-press px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">Dismiss</button>
       </div>
     </div>
-    <div className="mt-3 flex gap-2">
-      <button onClick={onApprove} className="spring-press px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold">{approveLabel}</button>
-      <button onClick={onDismiss} className="spring-press px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">Dismiss</button>
-    </div>
-  </div>
-);
+  );
+};
 
 const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggestion, onDismissSuggestion }) => {
   const { isChild, user } = useContext(ThemeContext);
@@ -808,6 +830,8 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggesti
                           icon={suggestion.icon || '🤖'}
                           title={suggestion.title}
                           subtitle={suggestion.subtitle}
+                          reasoning={suggestion.reasoning}
+                          source={suggestion.source}
                           confidence={suggestion.confidence}
                           onApprove={() => onApproveSuggestion?.(suggestion)}
                           onDismiss={() => onDismissSuggestion?.(suggestion.id)}
@@ -872,11 +896,155 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggesti
   );
 };
 
-const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, suggestions = [], onApproveSuggestion, onDismissSuggestion }) => {
+// CHILD MISSION HOME — game-like quest screen for kids
+const ChildHome = ({ tasks, events, points, activeUser, onNavigate }) => {
+  const myTasks = tasks.filter(t => (t.assignee === activeUser?.name || t.assignee === 'Anyone') && t.status === 'open');
+  const pendingTasks = tasks.filter(t => t.assignee === activeUser?.name && t.status === 'pending');
+  const doneTasks = tasks.filter(t => t.assignee === activeUser?.name && t.status === 'approved');
+  const levelInfo = getLevelInfo(points);
+  const totalMissions = myTasks.length + pendingTasks.length + doneTasks.length;
+  const doneCount = doneTasks.length;
+  const progressPct = totalMissions > 0 ? Math.round((doneCount / totalMissions) * 100) : 0;
+  const currentHour = new Date().getHours();
+  const timeGreeting = currentHour < 12 ? '🌅 Morning' : currentHour < 18 ? '☀️ Afternoon' : '🌙 Evening';
+
+  return (
+    <div className="space-y-4 animate-bounce-in">
+      {/* HERO CARD */}
+      <div className="relative overflow-hidden rounded-[2rem] p-5" style={{background:'linear-gradient(135deg, #0c4a6e 0%, #0369a1 50%, #0ea5e9 100%)'}}>
+        <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/4" />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/5 rounded-full" />
+        <div className="relative z-10 flex items-start justify-between mb-4">
+          <div>
+            <p className="text-sky-300/70 text-[10px] font-bold uppercase tracking-widest">{timeGreeting}</p>
+            <h1 className="text-2xl font-black text-white mt-0.5">{activeUser?.name}! 👋</h1>
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r ${levelInfo.color} shadow-md mt-2`}>
+              <Crown className="w-3 h-3 text-white" />
+              <span className="text-white text-[10px] font-black uppercase tracking-wider">{levelInfo.name}</span>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-4xl font-black text-white">{points}</p>
+            <p className="text-sky-300/60 text-[10px] font-black uppercase">points</p>
+          </div>
+        </div>
+        {/* Daily progress bar */}
+        <div>
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-sky-200/60 text-[10px] font-bold uppercase tracking-wider">Today's Progress</span>
+            <span className="text-sky-200/70 text-[10px] font-black">{doneCount}/{totalMissions} done</span>
+          </div>
+          <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-sky-300 to-cyan-400 rounded-full transition-all duration-700" style={{width:`${progressPct}%`}} />
+          </div>
+        </div>
+      </div>
+
+      {/* MISSIONS SECTION */}
+      <div>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+            {myTasks.length > 0 ? `⚡ ${myTasks.length} Mission${myTasks.length > 1 ? 's' : ''} Active` : '✅ All Clear!'}
+          </p>
+          <button onClick={() => onNavigate('tasks')} className="text-xs font-bold text-sky-500">See all →</button>
+        </div>
+
+        {myTasks.length === 0 && pendingTasks.length === 0 ? (
+          <div className="bg-white rounded-3xl p-6 text-center ring-1 ring-black/5">
+            <div className="text-4xl mb-2">🎉</div>
+            <p className="font-black text-slate-800">All missions complete!</p>
+            <p className="text-slate-400 text-sm mt-1">You're crushing it today</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {pendingTasks.length > 0 && (
+              <div onClick={() => onNavigate('tasks')} className="spring-press bg-amber-50 rounded-3xl p-4 ring-2 ring-amber-200 cursor-pointer flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-400 rounded-2xl flex items-center justify-center shrink-0">
+                  <Hourglass className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-amber-900 text-sm">{pendingTasks.length} waiting for approval</p>
+                  <p className="text-amber-600 text-xs font-semibold">Parent review in progress...</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-amber-400" />
+              </div>
+            )}
+            {myTasks.slice(0, 3).map((task, idx) => (
+              <div key={task.id} onClick={() => onNavigate('tasks')}
+                className="spring-press bg-white rounded-3xl p-4 ring-1 ring-black/5 shadow-sm flex items-center gap-4 cursor-pointer"
+                style={{animationDelay:`${idx*60}ms`}}>
+                <div className="w-10 h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-xl shrink-0">
+                  {['🧹','🍽️','🛏️','🐕','🌿','📚','🗑️'][idx % 7]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-800 text-sm truncate">{task.title}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                    <span className="text-xs font-bold text-amber-600">{task.points || 10} pts</span>
+                  </div>
+                </div>
+                <div className="shrink-0 w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center">
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </div>
+              </div>
+            ))}
+            {myTasks.length > 3 && (
+              <button onClick={() => onNavigate('tasks')} className="spring-press w-full py-3 rounded-3xl bg-slate-100 text-slate-500 font-bold text-sm">
+                +{myTasks.length - 3} more missions →
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* NEXT REWARD TEASER */}
+      <div onClick={() => onNavigate('rewards')} className="spring-press cursor-pointer bg-gradient-to-r from-amber-400 to-orange-400 rounded-3xl p-4 shadow-lg shadow-amber-400/30 flex items-center gap-4">
+        <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl shrink-0">🎁</div>
+        <div className="flex-1">
+          <p className="text-white font-black text-sm">Rewards Shop</p>
+          <p className="text-white/70 text-xs font-semibold">{points} pts available to spend</p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-white/60 shrink-0" />
+      </div>
+
+      {/* UPCOMING EVENTS for kids */}
+      {(() => {
+        const now = new Date();
+        const upcoming = (events || []).filter(ev => {
+          if (!ev.date) return true;
+          return new Date(ev.date + 'T23:59:59') >= now;
+        }).sort((a, b) => new Date(a.date + 'T12:00:00') - new Date(b.date + 'T12:00:00')).slice(0, 2);
+        if (upcoming.length === 0) return null;
+        return (
+          <div>
+            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">📅 Coming Up</p>
+            <div className="space-y-2">
+              {upcoming.map((event, i) => (
+                <div key={event.id} className="bg-white rounded-2xl p-4 ring-1 ring-black/5 flex items-center gap-3">
+                  <div className={`w-1 h-10 rounded-full shrink-0 ${event.color || 'bg-sky-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-800 text-sm truncate">{event.title}</p>
+                    <p className="text-slate-400 text-xs font-medium mt-0.5">{event.time} {event.location ? `· ${event.location}` : ''}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+};
+
+const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, allUsers = [], suggestions = [], onApproveSuggestion, onDismissSuggestion }) => {
   const { isChild } = useContext(ThemeContext);
+
+  // Kids get their own dedicated home screen
+  if (isChild) return <ChildHome tasks={tasks} events={events} points={points} activeUser={activeUser} onNavigate={onNavigate} />;
+
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
-  const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser?.name || t.assignee === 'Anyone');
+  const visibleTasks = tasks;
   const openTasks = visibleTasks.filter(t => t.status === 'open').length;
   const pendingApproval = tasks.filter(t => t.status === 'pending').length;
 
@@ -884,20 +1052,18 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, su
     <div className="space-y-5 animate-bounce-in">
       {/* GREETING HERO */}
       <RevealCard delay={0}>
-        <div className="relative overflow-hidden rounded-3xl p-5" style={{background: isChild ? 'linear-gradient(135deg, #0369a1 0%, #0284c7 50%, #0ea5e9 100%)' : 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)'}}>
+        <div className="relative overflow-hidden rounded-3xl p-5" style={{background:'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)'}}>
           <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4" />
           <div className="relative z-10">
             <p className="text-indigo-200/70 text-[10px] font-bold uppercase tracking-widest mb-1">{greeting}</p>
-            <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">
-              {isChild ? `Hi, ${activeUser?.name}! 👋` : `${activeUser?.name} 👋`}
-            </h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">{activeUser?.name} 👋</h1>
             <p className="text-white/40 text-xs font-medium mt-1 mb-4">
-              {isParent ? `${openTasks} chores open · ${pendingApproval} need review` : `${openTasks} chores waiting for you`}
+              {`${openTasks} chores open · ${pendingApproval} need review`}
             </p>
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-2xl ring-1 ring-white/15">
               <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
-              <span className="text-white font-bold text-sm">{points} pts</span>
+              <span className="text-white font-bold text-sm">{points} family pts</span>
             </div>
           </div>
         </div>
@@ -912,6 +1078,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, su
                 icon={suggestion.icon || '🤖'}
                 title={suggestion.title}
                 subtitle={suggestion.subtitle}
+                reasoning={suggestion.reasoning}
                 confidence={suggestion.confidence}
                 onApprove={() => onApproveSuggestion?.(suggestion)}
                 onDismiss={() => onDismissSuggestion?.(suggestion.id)}
@@ -921,8 +1088,8 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, su
         </RevealCard>
       )}
 
-      {/* PENDING APPROVAL ALERT (parents only) */}
-      {isParent && pendingApproval > 0 && (
+      {/* PENDING APPROVAL ALERT */}
+      {pendingApproval > 0 && (
         <RevealCard delay={60}>
           <div onClick={() => onNavigate('tasks')} className="spring-press flex items-center gap-4 bg-amber-400 rounded-3xl p-4 shadow-lg shadow-amber-400/25 cursor-pointer">
             <div className="w-10 h-10 bg-white/25 rounded-2xl flex items-center justify-center shrink-0">
@@ -939,17 +1106,17 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, su
       {/* QUICK STATS GRID */}
       <RevealCard delay={80}>
         <div className="grid grid-cols-2 gap-3">
-          <div onClick={() => onNavigate('tasks')} className={`spring-press rounded-3xl p-5 cursor-pointer relative overflow-hidden ${isChild ? 'bg-sky-500 shadow-lg shadow-sky-500/25' : 'bg-slate-900 shadow-lg shadow-slate-900/15'}`}>
+          <div onClick={() => onNavigate('tasks')} className="spring-press rounded-3xl p-5 cursor-pointer relative overflow-hidden bg-slate-900 shadow-lg shadow-slate-900/15">
             <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-4 translate-x-4" />
-            <CheckSquare className={`w-5 h-5 mb-3 ${isChild ? 'text-white/60' : 'text-white/50'}`} strokeWidth={2} />
+            <CheckSquare className="w-5 h-5 mb-3 text-white/50" strokeWidth={2} />
             <p className="text-4xl font-bold text-white tracking-tight">{openTasks}</p>
-            <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mt-1">Chores left</p>
+            <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mt-1">Chores open</p>
           </div>
           <div onClick={() => onNavigate('rewards')} className="spring-press bg-white rounded-3xl p-5 cursor-pointer shadow-sm ring-1 ring-black/5 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-20 h-20 bg-amber-50 rounded-full -translate-y-4 translate-x-4" />
             <Gift className="w-5 h-5 text-amber-500 mb-3" strokeWidth={2} />
             <p className="text-4xl font-bold text-slate-900 tracking-tight">{points}</p>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-1">{isParent ? 'Family pts' : 'My points'}</p>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-1">Family pts</p>
           </div>
         </div>
       </RevealCard>
@@ -959,7 +1126,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, su
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Up Next</h3>
-            {isParent && <button onClick={() => onNavigate('calendar')} className="text-xs font-bold text-indigo-500 hover:text-indigo-700 transition-colors">View all</button>}
+            <button onClick={() => onNavigate('calendar')} className="text-xs font-bold text-indigo-500 hover:text-indigo-700 transition-colors">View all</button>
           </div>
           <div className="space-y-2">
             {(() => {
@@ -967,7 +1134,6 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, su
               const upcoming = (events || [])
                 .filter(ev => {
                   if (!ev.date) return true;
-                  // Build a datetime: combine date + parsed time, fall back to end-of-day so today's events stay visible
                   const base = new Date(ev.date + 'T23:59:59');
                   if (ev.time) {
                     const t = ev.time.match(/(\d+):(\d+)\s*(am|pm)?/i);
@@ -1007,8 +1173,6 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, su
           </div>
         </div>
       </RevealCard>
-
-
     </div>
   );
 };
@@ -1146,6 +1310,8 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent, all
               icon={suggestion.icon || '✅'}
               title={suggestion.title}
               subtitle={suggestion.subtitle}
+              reasoning={suggestion.reasoning}
+              source={suggestion.source}
               confidence={suggestion.confidence}
               onApprove={() => onApproveSuggestion?.(suggestion)}
               onDismiss={() => onDismissSuggestion?.(suggestion.id)}
@@ -1503,6 +1669,8 @@ const CalendarView = ({ events, onAdd, onDelete, isParent, suggestions = [], onA
               icon={suggestion.icon || '📅'}
               title={suggestion.title}
               subtitle={suggestion.subtitle}
+              reasoning={suggestion.reasoning}
+              source={suggestion.source}
               confidence={suggestion.confidence}
               onApprove={() => onApproveSuggestion?.(suggestion)}
               onDismiss={() => onDismissSuggestion?.(suggestion.id)}
@@ -1733,6 +1901,8 @@ const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setG
               icon={suggestion.icon || '🍽️'}
               title={suggestion.title}
               subtitle={suggestion.subtitle}
+              reasoning={suggestion.reasoning}
+              source={suggestion.source}
               confidence={suggestion.confidence}
               onApprove={() => onApproveSuggestion?.(suggestion)}
               onDismiss={() => onDismissSuggestion?.(suggestion.id)}
@@ -2563,13 +2733,33 @@ const SettingRow = ({ icon: Icon, label, value, className = '', iconClass = '', 
   );
 };
 
-const AICopilotModal = ({ isOpen, onClose }) => {
-  const [messages, setMessages] = useState([{ role: 'ai', text: "Hi! I'm your Kinflow Copilot. I can help organize chores, plan meals, or resolve scheduling conflicts. What's up?" }]);
+const AICopilotModal = ({ isOpen, onClose, familyContext = {} }) => {
+  const [messages, setMessages] = useState([{ role: 'ai', text: "Hi! I'm your Kinflow Copilot. I know your family's tasks, schedule, and meals. Ask me anything — or try a quick action below." }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isLoading]);
+
+  // Build rich context string from live family data
+  const buildContextSummary = () => {
+    const { tasks = [], events = [], meals = [], users = [], userPoints = {} } = familyContext;
+    const openTasks = tasks.filter(t => t.status === 'open');
+    const pendingTasks = tasks.filter(t => t.status === 'pending');
+    const upcomingEvents = events.filter(e => e.date && new Date(e.date + 'T23:59:59') >= new Date()).slice(0, 5);
+    const children = users.filter(u => u.role === 'Child');
+    const pointsSummary = children.map(c => `${c.name}: ${userPoints[c.name] || 0}pts`).join(', ');
+    return `
+FAMILY STATE (live data):
+- Members: ${users.map(u => `${u.name} (${u.role})`).join(', ')}
+- Open chores: ${openTasks.length} (${openTasks.map(t => `"${t.title}" → ${t.assignee||'unassigned'}`).slice(0,5).join(', ')})
+- Pending review: ${pendingTasks.length} (${pendingTasks.map(t => `"${t.title}"`).join(', ')})
+- Upcoming events: ${upcomingEvents.map(e => `"${e.title}" on ${e.date}${e.time?' at '+e.time:''}`).join(', ') || 'none'}
+- Meals this week: ${meals.slice(0,4).map(m => m.meal).join(', ') || 'none planned'}
+- Kids points: ${pointsSummary || 'no kids'}
+Today is ${new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })}.
+`.trim();
+  };
 
   const handleSend = async (presetText = null) => {
     const textToSend = presetText || input;
@@ -2584,13 +2774,25 @@ const AICopilotModal = ({ isOpen, onClose }) => {
       const apiKey = ""; 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
+      const contextSummary = buildContextSummary();
+      const systemPrompt = `You are Kinflow Copilot, an intelligent family organizer AI. You have access to the family's live data below. Use it to give specific, personalized advice — not generic suggestions.
+
+${contextSummary}
+
+Rules:
+- Always reference actual family members, tasks, and events by name when relevant
+- Be concise (2-4 sentences max unless listing items)  
+- Be warm and practical
+- If asked to create tasks/plans, describe them specifically so the parent can act on them
+- Use occasional emojis`;
+
       const geminiMessages = newMessages.map(m => ({
         role: m.role === 'ai' ? 'model' : 'user',
         parts: [{ text: m.text }]
       }));
 
       const payload = {
-        systemInstruction: { parts: [{ text: "You are Kinflow Copilot, a helpful AI assistant for a family organization app. Help parents plan meals, suggest age-appropriate chores, manage schedules, and give brief, friendly, practical advice. Keep your responses concise (under 3 sentences) and use emojis occasionally." }] },
+        systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: geminiMessages
       };
 
@@ -2603,11 +2805,19 @@ const AICopilotModal = ({ isOpen, onClose }) => {
       const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that right now.";
       setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'ai', text: "Oops, I'm having trouble connecting right now. Please try again later." }]);
+      setMessages(prev => [...prev, { role: 'ai', text: "Oops, I'm having trouble connecting right now. Please try again." }]);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const quickActions = [
+    "Plan chores for this week",
+    "Who hasn't done anything lately?",
+    "Suggest dinner ideas",
+    "Any scheduling conflicts?",
+    "How are the kids doing?"
+  ];
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="AI Copilot" fullHeight>
@@ -2616,10 +2826,11 @@ const AICopilotModal = ({ isOpen, onClose }) => {
           <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center">
             <Wand2 className="w-4 h-4 text-white" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <span className="text-xs font-bold text-indigo-700">Kinflow Copilot</span>
-            <p className="text-[10px] text-indigo-400 font-medium">Powered by Gemini AI</p>
+            <p className="text-[10px] text-indigo-400 font-medium">Knows your family's live data</p>
           </div>
+          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
         </div>
         <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-4">
           {messages.map((msg, idx) => (
@@ -2649,7 +2860,7 @@ const AICopilotModal = ({ isOpen, onClose }) => {
         </div>
         {messages.length < 3 && !isLoading && (
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 pt-1 shrink-0">
-            {["Plan Dinners", "Assign Chores", "Find Free Time"].map(action => (
+            {quickActions.map(action => (
               <button key={action} onClick={() => handleSend(action)} className="spring-press whitespace-nowrap bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-full text-xs font-bold hover:bg-slate-50 transition-colors shadow-sm">
                 {action}
               </button>
@@ -2657,7 +2868,7 @@ const AICopilotModal = ({ isOpen, onClose }) => {
           </div>
         )}
         <div className="relative mt-auto shrink-0 pt-2">
-          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} disabled={isLoading} placeholder={isLoading ? "Copilot is thinking..." : "Ask Copilot anything..."} className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-2xl pl-5 pr-14 py-3.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 focus:bg-white transition-all font-medium disabled:opacity-50" />
+          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} disabled={isLoading} placeholder={isLoading ? "Copilot is thinking..." : "Ask about your family..."} className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-2xl pl-5 pr-14 py-3.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 focus:bg-white transition-all font-medium disabled:opacity-50" />
           <button onClick={() => handleSend()} disabled={!input.trim() || isLoading} className="spring-press absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-xl transition-all disabled:opacity-50 shadow-md shadow-indigo-500/25">
             <Send className="w-4 h-4" />
           </button>
@@ -3200,13 +3411,68 @@ export default function App() {
 
   const normalizeSuggestion = (suggestion, source = 'agent') => ({
     ...suggestion,
-    id: suggestion.id || `${source}-${Date.now()}-${Math.random()}` ,
+    id: suggestion.id || `${source}-${Date.now()}-${Math.random()}`,
     source,
+    icon: suggestion.icon || (source === 'task' ? '📋' : source === 'meal' ? '🍽️' : source === 'schedule' ? '📅' : source === 'proactive' ? '💡' : '🤖'),
     subtitle: suggestion.subtitle || suggestion.payload?.reason || suggestion.payload?.mealName || suggestion.payload?.taskId || '',
+    reasoning: suggestion.reasoning || (
+      source === 'task' ? `The task agent analyzed current assignments and workload distribution across your family.` :
+      source === 'meal' ? `Based on your meal history and family size — variety and prep time were factored in.` :
+      source === 'schedule' ? `The schedule agent scanned all events for conflicts and available time slots.` :
+      source === 'proactive' ? suggestion.proactiveReason || `Proactively suggested based on upcoming week patterns.` :
+      `Suggested by the automation agent based on recent family activity.`
+    ),
   });
+
+  // PROACTIVE PLANNER — Sunday evening: suggest weekly chore planning
+  const proactivePlannerFired = useRef(false);
+  const proactiveSuggestions = React.useMemo(() => {
+    const now = new Date();
+    const isSundayEvening = now.getDay() === 0 && now.getHours() >= 17;
+    const noMealsThisWeek = meals.length < 3;
+    const unassignedTasks = tasks.filter(t => t.status === 'open' && (!t.assignee || t.assignee === 'Anyone'));
+    const suggestions = [];
+
+    if (isSundayEvening && unassignedTasks.length > 0) {
+      suggestions.push({
+        id: 'proactive-sunday-tasks',
+        type: 'proactive',
+        title: `Plan the week: ${unassignedTasks.length} chores unassigned`,
+        proactiveReason: `It's Sunday evening — a great time to assign next week's chores so everyone knows their responsibilities.`,
+        confidence: 0.9,
+        payload: {},
+      });
+    }
+    if (isSundayEvening && noMealsThisWeek) {
+      suggestions.push({
+        id: 'proactive-sunday-meals',
+        type: 'proactive',
+        title: `No dinners planned — set up the week`,
+        proactiveReason: `It's Sunday and the meal plan is mostly empty. Planning ahead reduces weekday stress.`,
+        confidence: 0.85,
+        payload: {},
+      });
+    }
+    // Monday morning: highlight any overdue tasks
+    if (now.getDay() === 1 && now.getHours() < 10) {
+      const overdue = tasks.filter(t => t.dueDate && new Date(t.dueDate) < now && t.status === 'open');
+      if (overdue.length > 0) {
+        suggestions.push({
+          id: 'proactive-monday-overdue',
+          type: 'proactive',
+          title: `${overdue.length} overdue chore${overdue.length > 1 ? 's' : ''} to address`,
+          proactiveReason: `Starting the week with overdue tasks. Worth reassigning or following up with ${overdue.map(t=>t.assignee).filter(Boolean)[0] || 'the kids'}.`,
+          confidence: 0.95,
+          payload: {},
+        });
+      }
+    }
+    return suggestions;
+  }, [tasks, meals]);
 
   const mergedSuggestions = [
     ...agentSuggestions.filter((s) => (s.status || 'proposed') === 'proposed').map((s) => normalizeSuggestion(s, 'automation')),
+    ...proactiveSuggestions.map((s) => normalizeSuggestion(s, 'proactive')),
     ...localTaskSuggestions.map((s) => normalizeSuggestion(s, 'task')),
     ...localMealSuggestions.map((s) => normalizeSuggestion(s, 'meal')),
     ...localScheduleSuggestions.map((s) => normalizeSuggestion(s, 'schedule')),
@@ -3295,8 +3561,19 @@ export default function App() {
   if (showOnboarding) return <OnboardingFlow onComplete={completeOnboarding} />;
 
   const navItems = isParent 
-    ? [{ id: 'home', icon: Home, label: 'Today' }, { id: 'tasks', icon: CheckSquare, label: 'Tasks' }, { id: 'calendar', icon: CalendarDays, label: 'Plan' }, { id: 'meals', icon: ChefHat, label: 'Meals' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Trophy, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }]
-    : [{ id: 'home', icon: Home, label: 'Home' }, { id: 'tasks', icon: CheckSquare, label: 'Chores' }, { id: 'chat', icon: MessageCircle, label: 'Chat' }, { id: 'rewards', icon: Trophy, label: 'Rewards' }, { id: 'settings', icon: UserCircle, label: 'Profile' }];
+    ? [
+        { id: 'home', icon: Home, label: 'Today' },
+        { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
+        { id: 'calendar', icon: CalendarDays, label: 'Plan' },
+        { id: 'meals', icon: ChefHat, label: 'Meals' },
+        { id: 'rewards', icon: Trophy, label: 'Rewards' },
+      ]
+    : [
+        { id: 'home', icon: Home, label: 'Home' },
+        { id: 'tasks', icon: CheckSquare, label: 'Chores' },
+        { id: 'rewards', icon: Trophy, label: 'Rewards' },
+        { id: 'chat', icon: MessageCircle, label: 'Chat' },
+      ];
 
   const appBgClass = isChild ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' : 'bg-slate-50 text-slate-800';
 
@@ -3336,15 +3613,21 @@ export default function App() {
         <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-30 border-b border-slate-200/50" style={{paddingTop:'max(env(safe-area-inset-top, 0px), 10px)', background:'rgba(248,250,252,0.95)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{
-              {home:'Today', tasks:'Tasks', calendar:'Schedule', meals:'Meals', chat:'Family', rewards:'Rewards', settings:'Profile'}[activeTab] || 'Kinflow'
+              {home:'Today', tasks: isParent ? 'Tasks' : 'My Chores', calendar:'Schedule', meals:'Meals', chat:'Family Chat', rewards:'Rewards', settings:'Profile'}[activeTab] || 'Kinflow'
             }</p>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Kinflow</h1>
           </div>
           <div className="flex items-center gap-2">
-            {/* AI Copilot button (parents) */}
+            {/* AI Copilot button (parents only) */}
             {isParent && (
               <button onClick={() => setIsCopilotOpen(true)} className="spring-press w-9 h-9 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
                 <Wand2 className="w-4 h-4 text-white" strokeWidth={2} />
+              </button>
+            )}
+            {/* Family Chat shortcut for parents (not in bottom nav) */}
+            {isParent && (
+              <button onClick={() => setActiveTab('chat')} className={`spring-press relative w-9 h-9 rounded-2xl flex items-center justify-center shadow-sm ring-1 transition-colors ${activeTab === 'chat' ? 'bg-slate-900 ring-slate-900' : 'bg-white ring-black/5'}`}>
+                <MessageCircle className={`w-4 h-4 ${activeTab === 'chat' ? 'text-white' : 'text-slate-700'}`} strokeWidth={2} />
               </button>
             )}
             {/* Notifications bell */}
@@ -3352,8 +3635,8 @@ export default function App() {
               <Bell className="w-4 h-4 text-slate-700" strokeWidth={2} />
               {unreadNotifsCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">{unreadNotifsCount}</span>}
             </button>
-            {/* Avatar → user switcher */}
-            <button onClick={() => setIsUserSwitcherOpen(true)} className="spring-press">
+            {/* Avatar → Settings / profile switcher */}
+            <button onClick={() => setActiveTab('settings')} className="spring-press">
               <Avatar user={activeUser} size="sm" className="ring-2 ring-white shadow-md" />
             </button>
           </div>
@@ -3421,7 +3704,7 @@ export default function App() {
 
         {/* No standalone FAB - AI Copilot is in the top bar */}
 
-        <AICopilotModal isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} />
+        <AICopilotModal isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} familyContext={{ tasks, events, meals, users, userPoints }} />
 
         <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title="Switch Profile">
           <div className="space-y-3">
