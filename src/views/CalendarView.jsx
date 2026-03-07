@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Plus, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, CalendarDays, Rows3 } from 'lucide-react';
-import { Button, Modal, RevealCard, DetailActions } from '../components/shared/Primitives';
+import { useFamilyContext } from '../contexts/FamilyContext';
+import { Button, Modal, RevealCard, DetailActions, AgentSuggestionCard } from '../components/shared/Primitives';
 
 export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) => {
+  const { agentSuggestions, approveAgentSuggestion } = useFamilyContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
@@ -194,6 +196,23 @@ export const CalendarView = ({ events, onAdd, onUpdate, onDelete, isParent }) =>
           </div>
         </div>
       </RevealCard>
+
+      {agentSuggestions?.calendar?.length > 0 && (
+        <div className="space-y-2">
+          {agentSuggestions.calendar.slice(0, 3).map((suggestion) => (
+            <AgentSuggestionCard
+              key={suggestion.id}
+              icon="📅"
+              title={suggestion.title}
+              subtitle={suggestion.subtitle}
+              confidence={suggestion.confidence}
+              approveLabel={suggestion.type === 'timeslot' ? 'Keep' : 'Acknowledge'}
+              onApprove={() => approveAgentSuggestion(suggestion, true)}
+              onDismiss={() => approveAgentSuggestion(suggestion, false)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Calendar Grid */}
       {viewMode === 'calendar' && (

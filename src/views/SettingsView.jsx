@@ -97,12 +97,12 @@ export const PreferencesPanel = ({ onClose }) => {
   );
 };
 
-export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}, tasks = [], onBack, onUpdateProfile, onAddMember, onUpdateMember, onRemoveMember, theme = 'indigo', onThemeChange }) => {
+export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}, tasks = [], onBack, onUpdateProfile, onUpdateNotificationPrefs, onAddMember, onUpdateMember, onRemoveMember, theme = 'indigo', onThemeChange }) => {
   const [activeModal, setActiveModal] = useState(null);
   const [editName, setEditName] = useState(user?.name || '');
   const [profileSaved, setProfileSaved] = useState(false);
   const [notifPrefs, setNotifPrefs] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('kinflow_notifPrefs') || 'null') || { choreReminders: true, approvals: true, chatMessages: false }; }
+    try { return user?.notificationPrefs || JSON.parse(localStorage.getItem('kinflow_notifPrefs') || 'null') || { choreReminders: true, approvals: true, chatMessages: false }; }
     catch(e) { return { choreReminders: true, approvals: true, chatMessages: false }; }
   });
 
@@ -131,6 +131,7 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
     setNotifPrefs(prev => {
       const updated = { ...prev, [key]: !prev[key] };
       try { localStorage.setItem('kinflow_notifPrefs', JSON.stringify(updated)); } catch(e) {}
+      onUpdateNotificationPrefs && onUpdateNotificationPrefs(updated);
       return updated;
     });
   };
