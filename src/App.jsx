@@ -11,8 +11,11 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { taskAgent } from './agents/taskAgent';
+import { mealAgent } from './agents/mealAgent';
+import { scheduleAgent } from './agents/scheduleAgent';
 
 // --- FIREBASE INITIALIZATION using VITE env vars ---
 const envConfig = {
@@ -487,11 +490,21 @@ const AuthScreen = () => {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      // Use popup — fires onAuthStateChanged instantly when popup closes
+      const useRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
+      if (useRedirect) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
       await signInWithPopup(auth, provider);
       // onAuthStateChanged handles the screen transition automatically
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+      const popupIssue = ['auth/popup-blocked', 'auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
+      if (popupIssue.includes(err?.code)) {
+        setError('Google sign-in was interrupted. Please try again.');
+      } else if (String(err?.message || '').toLowerCase().includes('unauthorized-domain')) {
+        setError(`This domain is not authorized in Firebase Auth: ${window.location.hostname}`);
+      } else {
         setError('Google sign-in failed. Please try again.');
       }
       setIsLoading(null);
@@ -505,10 +518,21 @@ const AuthScreen = () => {
       const provider = new OAuthProvider('apple.com');
       provider.addScope('email');
       provider.addScope('name');
+      const useRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
+      if (useRedirect) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
       await signInWithPopup(auth, provider);
       // onAuthStateChanged handles the screen transition automatically
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+      const popupIssue = ['auth/popup-blocked', 'auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
+      if (popupIssue.includes(err?.code)) {
+        setError('Apple sign-in was interrupted. Please try again.');
+      } else if (String(err?.message || '').toLowerCase().includes('unauthorized-domain')) {
+        setError(`This domain is not authorized in Firebase Auth: ${window.location.hostname}`);
+      } else {
         setError('Apple sign-in failed. Please try again.');
       }
       setIsLoading(null);
@@ -695,7 +719,28 @@ const ProfileSelectorScreen = ({ onLogin, users, onLogout, onAddMember, firebase
 
 // --- MAIN FEATURE SUB-VIEWS ---
 
-const ChatView = ({ messages, onSend, onDelete, allUsers = [] }) => {
+const AgentSuggestionCard = ({ icon = '🤖', title, subtitle, confidence, onApprove, onDismiss, approveLabel = 'Approve' }) => (
+  <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-indigo-100">
+    <div className="flex items-start gap-3">
+      <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-lg">{icon}</div>
+      <div className="min-w-0 flex-1">
+        <p className="font-bold text-sm text-slate-800 leading-tight">{title}</p>
+        {subtitle && <p className="text-xs text-slate-500 font-medium mt-1">{subtitle}</p>}
+        {typeof confidence === 'number' && (
+          <p className="text-[10px] font-bold text-indigo-600 mt-1 uppercase tracking-wider">
+            Confidence {Math.round(confidence * 100)}%
+          </p>
+        )}
+      </div>
+    </div>
+    <div className="mt-3 flex gap-2">
+      <button onClick={onApprove} className="spring-press px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold">{approveLabel}</button>
+      <button onClick={onDismiss} className="spring-press px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">Dismiss</button>
+    </div>
+  </div>
+);
+
+const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggestion, onDismissSuggestion }) => {
   const { isChild, user } = useContext(ThemeContext);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -743,6 +788,21 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [] }) => {
                       : 'bg-slate-100 text-slate-800 rounded-3xl rounded-bl-md ring-1 ring-black/5'}`}>
                     {msg.text}
                   </div>
+                  {Array.isArray(msg.suggestions) && msg.suggestions.length > 0 && (
+                    <div className="mt-2 space-y-2 w-full">
+                      {msg.suggestions.slice(0, 2).map((suggestion) => (
+                        <AgentSuggestionCard
+                          key={suggestion.id}
+                          icon={suggestion.icon || '🤖'}
+                          title={suggestion.title}
+                          subtitle={suggestion.subtitle}
+                          confidence={suggestion.confidence}
+                          onApprove={() => onApproveSuggestion?.(suggestion)}
+                          onDismiss={() => onDismissSuggestion?.(suggestion.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
                   <div className={`flex items-center gap-1.5 mt-1 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
                     {isMe && (
                       <button onClick={() => onDelete(msg.id)} className="text-slate-300 hover:text-rose-500 p-0.5 rounded transition-colors">
@@ -800,7 +860,7 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [] }) => {
   );
 };
 
-const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) => {
+const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, suggestions = [], onApproveSuggestion, onDismissSuggestion }) => {
   const { isChild } = useContext(ThemeContext);
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
@@ -830,6 +890,24 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
           </div>
         </div>
       </RevealCard>
+
+      {suggestions.length > 0 && (
+        <RevealCard delay={40}>
+          <div className="space-y-2">
+            {suggestions.slice(0, 3).map((suggestion) => (
+              <AgentSuggestionCard
+                key={suggestion.id}
+                icon={suggestion.icon || '🤖'}
+                title={suggestion.title}
+                subtitle={suggestion.subtitle}
+                confidence={suggestion.confidence}
+                onApprove={() => onApproveSuggestion?.(suggestion)}
+                onDismiss={() => onDismissSuggestion?.(suggestion.id)}
+              />
+            ))}
+          </div>
+        </RevealCard>
+      )}
 
       {/* PENDING APPROVAL ALERT (parents only) */}
       {isParent && pendingApproval > 0 && (
@@ -895,7 +973,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
       </RevealCard>
 
       {/* QUICK ACTIONS (parent only) */}
-      {isParent && (
+      {false && isParent && (
         <RevealCard delay={160}>
           <div>
             <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">Quick Actions</h3>
@@ -921,7 +999,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) 
   );
 };
 
-const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent, allUsers = [] }) => {
+const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent, allUsers = [], suggestions = [], onApproveSuggestion, onDismissSuggestion }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState('');
@@ -1045,6 +1123,22 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent, all
           </div>
         </div>
       </RevealCard>
+
+      {suggestions.length > 0 && (
+        <div className="space-y-2">
+          {suggestions.map((suggestion) => (
+            <AgentSuggestionCard
+              key={suggestion.id}
+              icon={suggestion.icon || '✅'}
+              title={suggestion.title}
+              subtitle={suggestion.subtitle}
+              confidence={suggestion.confidence}
+              onApprove={() => onApproveSuggestion?.(suggestion)}
+              onDismiss={() => onDismissSuggestion?.(suggestion.id)}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="space-y-3">
         {visibleTasks.length === 0 && (
@@ -1217,7 +1311,7 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent, all
   );
 };
 
-const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
+const CalendarView = ({ events, onAdd, onDelete, isParent, suggestions = [], onApproveSuggestion, onDismissSuggestion }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
@@ -1368,6 +1462,23 @@ const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
           </div>
         </div>
       </RevealCard>
+
+      {suggestions.length > 0 && (
+        <div className="space-y-2">
+          {suggestions.map((suggestion) => (
+            <AgentSuggestionCard
+              key={suggestion.id}
+              icon={suggestion.icon || '📅'}
+              title={suggestion.title}
+              subtitle={suggestion.subtitle}
+              confidence={suggestion.confidence}
+              onApprove={() => onApproveSuggestion?.(suggestion)}
+              onDismiss={() => onDismissSuggestion?.(suggestion.id)}
+              approveLabel={suggestion.approveLabel || 'Apply'}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Full Month Calendar */}
       {viewMode === 'calendar' && (
@@ -1522,7 +1633,7 @@ const CalendarView = ({ events, onAdd, onDelete, isParent }) => {
 };
 
 
-const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setGroceries }) => {
+const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setGroceries, suggestions = [], onApproveSuggestion, onDismissSuggestion }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -1575,6 +1686,23 @@ const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setG
           </div>
         </div>
       </RevealCard>
+
+      {suggestions.length > 0 && (
+        <div className="space-y-2">
+          {suggestions.map((suggestion) => (
+            <AgentSuggestionCard
+              key={suggestion.id}
+              icon={suggestion.icon || '🍽️'}
+              title={suggestion.title}
+              subtitle={suggestion.subtitle}
+              confidence={suggestion.confidence}
+              onApprove={() => onApproveSuggestion?.(suggestion)}
+              onDismiss={() => onDismissSuggestion?.(suggestion.id)}
+              approveLabel={suggestion.approveLabel || 'Add meal'}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="space-y-3">
         {meals.length === 0 && (
@@ -2222,10 +2350,10 @@ const NavItem = ({ icon: Icon, label, isActive, isChild, onClick }) => {
 // --- MAIN APP COMPONENT ---
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
-  const [activeTab, setActiveTab] = useState('home');
-  const [activeUser, setActiveUser] = useState(null); 
+  const [activeTab, setActiveTab] = useState(() => { try { return localStorage.getItem('kinflow_activeTab') || 'home'; } catch(e) { return 'home'; } });
+  const [activeUser, setActiveUser] = useState(() => { try { const saved = localStorage.getItem('kinflow_lastProfile'); return saved ? JSON.parse(saved) : null; } catch(e) { return null; } }); 
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
-  const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [hasOnboarded, setHasOnboarded] = useState(() => { try { return localStorage.getItem('kinflow_hasOnboarded') === 'true'; } catch(e) { return false; } });
   const [showOnboarding, setShowOnboarding] = useState(false);
     
   const [confirmActionState, setConfirmActionState] = useState(null);
@@ -2241,6 +2369,8 @@ export default function App() {
   const [meals, setMeals] = useState([]);
   const [rewards, setRewards] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [agentSuggestions, setAgentSuggestions] = useState([]);
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState([]);
   
   // Non-Firebase States
   const [groceries, setGroceries] = useState([]);
@@ -2259,6 +2389,21 @@ export default function App() {
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
 
   const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem('kinflow_activeTab', activeTab); } catch(e) {}
+  }, [activeTab]);
+
+  useEffect(() => {
+    try {
+      if (activeUser) localStorage.setItem('kinflow_lastProfile', JSON.stringify(activeUser));
+      else localStorage.removeItem('kinflow_lastProfile');
+    } catch(e) {}
+  }, [activeUser]);
+
+  useEffect(() => {
+    try { localStorage.setItem('kinflow_hasOnboarded', String(hasOnboarded)); } catch(e) {}
+  }, [hasOnboarded]);
 
   useEffect(() => {
     if (!auth) return;
@@ -2346,7 +2491,12 @@ export default function App() {
       setRewards(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
     }, console.error);
 
-    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubNotifs(); unsubUsers(); unsubRewards(); };
+    const agentSuggestionsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_agent_suggestions');
+    const unsubAgentSuggestions = onSnapshot(agentSuggestionsRef, (snap) => {
+      setAgentSuggestions(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+    }, () => setAgentSuggestions([]));
+
+    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubNotifs(); unsubUsers(); unsubRewards(); unsubAgentSuggestions(); };
   }, [firebaseUser]);
 
   useEffect(() => {
@@ -2370,13 +2520,13 @@ export default function App() {
 
   const handleLogin = (user) => {
     setActiveUser(user);
-    setActiveTab('home'); 
     if (user.role === 'Parent' && !hasOnboarded) setShowOnboarding(true);
   };
 
   const completeOnboarding = () => {
     setShowOnboarding(false);
     setHasOnboarded(true);
+    try { localStorage.setItem('kinflow_hasOnboarded', 'true'); } catch(e) {}
     triggerConfetti();
   };
 
@@ -2500,6 +2650,11 @@ export default function App() {
       newPhotoUrl = null;
       notifToSent = { title: "Needs Work", body: `Your parent asked you to redo "${t.title}".`, target: assignee };
     }
+    else if (action === 'assign') {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), { assignee: extra.assignee || 'Anyone' });
+      sendNotification('Task Assigned', `${extra.assignee || 'A family member'} was assigned "${t.title}".`, 'Parent');
+      return;
+    }
 
     if (newStatus === 'pending' || newStatus === 'approved') {
       if (t.status !== newStatus && action !== 'reject') triggerConfetti();
@@ -2590,15 +2745,79 @@ export default function App() {
 
   const triggerConfetti = () => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 1500); };
 
+  const localTaskSuggestions = taskAgent.execute({ prompt: 'assign review overdue', tasks, familyMembers: users }).suggestions || [];
+  const localMealSuggestions = mealAgent.execute({ prompt: 'healthy family dinners', inventory: groceries, mealHistory: meals, familySize: users.length || 4 }).suggestions || [];
+  const localScheduleSuggestions = scheduleAgent.execute({ events }).suggestions || [];
+
+  const normalizeSuggestion = (suggestion, source = 'agent') => ({
+    ...suggestion,
+    id: suggestion.id || `${source}-${Date.now()}-${Math.random()}` ,
+    source,
+    subtitle: suggestion.subtitle || suggestion.payload?.reason || suggestion.payload?.mealName || suggestion.payload?.taskId || '',
+  });
+
+  const mergedSuggestions = [
+    ...agentSuggestions.filter((s) => (s.status || 'proposed') === 'proposed').map((s) => normalizeSuggestion(s, 'automation')),
+    ...localTaskSuggestions.map((s) => normalizeSuggestion(s, 'task')),
+    ...localMealSuggestions.map((s) => normalizeSuggestion(s, 'meal')),
+    ...localScheduleSuggestions.map((s) => normalizeSuggestion(s, 'schedule')),
+  ].filter((s) => !dismissedSuggestionIds.includes(s.id));
+
+  const taskSuggestions = mergedSuggestions.filter((s) => s.agent === 'task' || s.type === 'assignment' || s.type === 'reminder');
+  const mealSuggestions = mergedSuggestions.filter((s) => s.agent === 'meal' || s.type === 'meal_plan' || s.type === 'grocery_list');
+  const calendarSuggestions = mergedSuggestions.filter((s) => s.agent === 'schedule' || s.type === 'conflict' || s.type === 'timeslot');
+  const dashboardSuggestions = mergedSuggestions.slice(0, 3);
+
+  const dismissSuggestion = async (suggestionId) => {
+    setDismissedSuggestionIds((prev) => [...new Set([...prev, suggestionId])]);
+    const found = agentSuggestions.find((s) => String(s.id) === String(suggestionId));
+    if (found && firebaseUser) {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_agent_suggestions', suggestionId.toString()), { status: 'dismissed' });
+    }
+  };
+
+  const approveSuggestion = async (suggestion) => {
+    if (!suggestion) return;
+    const payload = suggestion.payload || {};
+    if (suggestion.type === 'assignment' && payload.taskId) {
+      await handleTaskAction(payload.taskId, 'assign', { assignee: payload.assignee || 'Anyone' });
+    } else if (suggestion.type === 'meal_plan') {
+      await handleAddMeal({
+        meal: payload.mealName || suggestion.title,
+        day: 'This Week',
+        prepTime: payload.prepMinutes ? `${payload.prepMinutes}m prep` : '30m prep',
+        ingredients: (payload.missingIngredients || []).join('\n'),
+      });
+    } else if (suggestion.type === 'timeslot') {
+      const toTime = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+      await handleAddEvent({
+        title: 'Suggested Focus Block',
+        time: `${toTime(payload.start)}-${toTime(payload.end)}`,
+        location: 'Home',
+        date: new Date().toISOString().split('T')[0],
+      });
+    } else if (payload.taskId) {
+      await handleTaskAction(payload.taskId, 'approve');
+    }
+
+    if (firebaseUser) {
+      const found = agentSuggestions.find((s) => String(s.id) === String(suggestion.id));
+      if (found) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_agent_suggestions', suggestion.id.toString()), { status: 'approved' });
+      }
+    }
+    await dismissSuggestion(suggestion.id);
+  };
+
   const renderContent = () => {
     const displayPoints = isParent ? Object.values(userPoints).reduce((a, b) => a + b, 0) : (userPoints[activeUser?.name] || 0);
     switch(activeTab) {
-      case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} allUsers={users} />;
-      case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} />;
-      case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} />;
-      case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} />;
+      case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} allUsers={users} suggestions={dashboardSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
+      case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} suggestions={taskSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
+      case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} suggestions={calendarSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
+      case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} suggestions={mealSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'rewards': return <RewardsView rewards={rewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
-      case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} allUsers={users} />;
+      case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} allUsers={users} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setActiveUser(null); signOut(auth); }} allUsers={users} userPoints={userPoints} tasks={tasks} onUpdatePhoto={handleUpdatePhoto} onUpdateUser={handleUpdateUser} onBack={() => setActiveTab('home')} onUpdateMember={handleUpdateFamilyMember} onAddMember={handleAddFamilyMember} onDeleteMember={handleDeleteFamilyMember} />;
       default: return null;
     }
@@ -2665,7 +2884,7 @@ export default function App() {
         )}
 
         {/* TOP APP BAR */}
-        <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-30" style={{background:'rgba(248,250,252,0.95)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
+        <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-30" style={{paddingTop:'max(env(safe-area-inset-top, 0px), 10px)', background:'rgba(248,250,252,0.95)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{
               {home:'Today', tasks:'Tasks', calendar:'Schedule', meals:'Meals', chat:'Family', rewards:'Rewards', settings:'Profile'}[activeTab] || 'Kinflow'
@@ -2693,7 +2912,7 @@ export default function App() {
 
         {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto" style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', minHeight:0}}>
-          <div className="px-4 pt-3 pb-36 max-w-lg mx-auto w-full">
+          <div className="px-4 pt-4 pb-36 max-w-lg mx-auto w-full">
             {renderContent()}
           </div>
         </div>

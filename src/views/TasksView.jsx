@@ -1,10 +1,10 @@
 import React, { useState, useContext, useRef } from 'react';
 import { Plus, Check, Clock, Star, Hourglass, Trash2, Camera, ChevronRight, X, MoreVertical, User, CheckSquare, Loader2 } from 'lucide-react';
 import { ThemeContext, useFamilyContext } from '../contexts/FamilyContext';
-import { Card, Button, Badge, Avatar, Modal, RevealCard, DetailActions } from '../components/shared/Primitives';
+import { Card, Button, Badge, Avatar, Modal, RevealCard, DetailActions, AgentSuggestionCard } from '../components/shared/Primitives';
 
 export const TasksView = ({ tasks, onAction, onAdd, onUpdate, onDelete, activeUser, isParent }) => {
-  const { familyMembers } = useFamilyContext();
+  const { familyMembers, agentSuggestions, approveAgentSuggestion } = useFamilyContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState(() => {
@@ -166,6 +166,22 @@ export const TasksView = ({ tasks, onAction, onAdd, onUpdate, onDelete, activeUs
           </div>
         </div>
       </RevealCard>
+
+      {agentSuggestions?.tasks?.length > 0 && (
+        <div className="space-y-2">
+          {agentSuggestions.tasks.slice(0, 3).map((suggestion) => (
+            <AgentSuggestionCard
+              key={suggestion.id}
+              icon="✅"
+              title={suggestion.title}
+              subtitle={suggestion.subtitle}
+              confidence={suggestion.confidence}
+              onApprove={() => approveAgentSuggestion(suggestion, true)}
+              onDismiss={() => approveAgentSuggestion(suggestion, false)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* APPROVAL QUEUE (parents only) */}
       {isParent && visibleTasks.filter(t => t.status === 'pending').length > 0 && (

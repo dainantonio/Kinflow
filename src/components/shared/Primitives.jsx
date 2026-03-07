@@ -134,6 +134,34 @@ export const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) 
   );
 };
 
+
+export const AgentSuggestionCard = ({
+  icon = '🤖',
+  title,
+  subtitle,
+  confidence,
+  onApprove,
+  onDismiss,
+  approveLabel = 'Approve',
+}) => (
+  <div className="bg-white rounded-2xl p-4 shadow-sm ring-1 ring-indigo-100">
+    <div className="flex items-start gap-3">
+      <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-lg">{icon}</div>
+      <div className="min-w-0 flex-1">
+        <p className="font-bold text-sm text-slate-800 leading-tight">{title}</p>
+        {subtitle ? <p className="text-xs text-slate-500 font-medium mt-1">{subtitle}</p> : null}
+        {typeof confidence === 'number' ? (
+          <p className="text-[10px] font-bold text-indigo-600 mt-1 uppercase tracking-wider">Confidence {Math.round(confidence * 100)}%</p>
+        ) : null}
+      </div>
+    </div>
+    <div className="mt-3 flex gap-2">
+      <button type="button" onClick={onApprove} className="spring-press px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold">{approveLabel}</button>
+      <button type="button" onClick={onDismiss} className="spring-press px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">Dismiss</button>
+    </div>
+  </div>
+);
+
 export const Confetti = ({ active }) => {
   if (!active) return null;
   const colors = ['bg-indigo-500', 'bg-purple-500', 'bg-emerald-400', 'bg-amber-400', 'bg-pink-400'];

@@ -4,11 +4,11 @@ import {
   ChevronDown, X, MessageCircle, CheckSquare,
 } from 'lucide-react';
 import { ThemeContext, useFamilyContext } from '../contexts/FamilyContext';
-import { Card, Avatar, Modal } from '../components/shared/Primitives';
+import { Card, Avatar, Modal, AgentSuggestionCard } from '../components/shared/Primitives';
 
 export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
   const { isChild, user } = useContext(ThemeContext);
-  const { familyMembers } = useFamilyContext();
+  const { familyMembers, approveAgentSuggestion } = useFamilyContext();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
   const isParent = user?.role === 'Parent';
@@ -207,11 +207,17 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
                     {msg.text}
                   </div>
                   {Array.isArray(msg.suggestions) && msg.suggestions.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {msg.suggestions.slice(0, 3).map((suggestion) => (
-                        <span key={suggestion.id} className="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold ring-1 ring-indigo-200">
-                          {suggestion.title}
-                        </span>
+                    <div className="mt-2 space-y-2 w-full max-w-sm">
+                      {msg.suggestions.slice(0, 2).map((suggestion) => (
+                        <AgentSuggestionCard
+                          key={suggestion.id}
+                          icon="🤖"
+                          title={suggestion.title}
+                          subtitle={suggestion.subtitle}
+                          confidence={suggestion.confidence}
+                          onApprove={() => approveAgentSuggestion(suggestion, true)}
+                          onDismiss={() => approveAgentSuggestion(suggestion, false)}
+                        />
                       ))}
                     </div>
                   )}
