@@ -124,18 +124,10 @@ export const FamilyProvider = ({ children }) => {
 
   useEffect(() => {
     if (DEMO_MODE) { setFirebaseUser({ uid: 'demo-user' }); return; }
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.error("Firebase Auth Error:", error);
-      }
-    };
-    initAuth();
+    // Observe only — App.jsx owns the sign-in flow.
+    // DO NOT call signInAnonymously here. It overwrites the Google credential
+    // and causes an infinite loop: Google → anonymous → isLoggedIn=false → AuthScreen → repeat.
+    if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, user => setFirebaseUser(user));
     return () => unsubscribe();
   }, []);
