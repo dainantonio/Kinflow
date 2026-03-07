@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { 
   Settings, Home, CheckSquare, Calendar as CalendarIcon, CalendarDays,
   ChefHat, Gift, Trophy, X, Plus, Bell, ChevronRight, Clock,
@@ -16,7 +16,6 @@ import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc
 import { taskAgent } from './agents/taskAgent';
 import { mealAgent } from './agents/mealAgent';
 import { scheduleAgent } from './agents/scheduleAgent';
-import { createAutomationProcedures } from './server/trpc/automationProcedures';
 
 // --- FIREBASE INITIALIZATION using VITE env vars ---
 const envConfig = {
@@ -269,7 +268,7 @@ const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
           </div>
         </div>
 
-        <div className={`px-5 pb-6 overflow-y-auto relative ${fullHeight ? 'flex-1 h-[60vh]' : ''}`}>
+        <div className={`px-5 pb-6 overflow-y-auto relative flex-1 ${fullHeight ? 'min-h-[40vh]' : ''}`}>
           {children}
         </div>
       </div>
@@ -737,9 +736,33 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggesti
   const { isChild, user } = useContext(ThemeContext);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
+  const containerRef = useRef(null);
   const isParent = user?.role === 'Parent';
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  // Dynamically size the chat panel to fill available visible height.
+  // This avoids the clipping that occurs when switching tabs because the
+  // scroll pane may be at an offset — a fixed calc(100dvh - X) would be wrong.
+  useEffect(() => {
+    const recalc = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const scrollPane = el.closest('.overflow-y-auto');
+      if (scrollPane) {
+        // visible height minus content top padding (pt-6=24px) and bottom padding (pb-36=144px)
+        const h = scrollPane.clientHeight - 24 - 144;
+        el.style.height = Math.max(h, 380) + 'px';
+      }
+    };
+    recalc();
+    window.addEventListener('resize', recalc);
+    window.addEventListener('orientationchange', recalc);
+    return () => {
+      window.removeEventListener('resize', recalc);
+      window.removeEventListener('orientationchange', recalc);
+    };
+  }, []);
 
   const handleSend = (text) => {
     if (!text.trim()) return;
@@ -748,11 +771,7 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggesti
   };
 
   return (
-    // Chat layout: the parent scroll container provides the viewport.
-    // We subtract the sticky top bar (~64px), the floating bottom nav (~80px),
-    // the content area top padding (24px) and a small buffer (8px) = 176px total.
-    // Using 100dvh (dynamic viewport height) avoids mobile browser chrome issues.
-    <div className="flex flex-col animate-bounce-in" style={{height:'calc(100dvh - 176px)', minHeight:'380px'}}>
+    <div ref={containerRef} className="flex flex-col animate-bounce-in" style={{minHeight:'380px'}}>
       {/* Chat header */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
@@ -1732,7 +1751,7 @@ const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setG
         </form>
       </Modal>
 
-      <Modal isOpen={!!selectedMeal} onClose={closeMealModal} title={isEditing ? "Edit Recipe" : (selectedMeal?.meal || "Recipe")}>
+      <Modal isOpen={!!selectedMeal} onClose={closeMealModal} title={isEditing ? "Edit Recipe" : (selectedMeal?.meal || "Recipe")} fullHeight>
         {selectedMeal && !isEditing && (
           <div className="space-y-6">
             <div className="flex gap-2"><Badge variant="premium">{selectedMeal.day}</Badge><Badge variant="default">{selectedMeal.prepTime}</Badge></div>
@@ -2573,10 +2592,16 @@ export default function App() {
   const handleAddTask = async (newTask) => {
     const newId = Date.now().toString();
     const taskData = { ...newTask, id: newId, status: 'open', createdAt: Date.now() };
-    if (!firebaseUser) return;
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), taskData);
-    if (newTask.assignee && newTask.assignee !== 'Anyone') {
-      sendNotification("New Chore", `You were assigned a new chore: "${newTask.title}"`, newTask.assignee);
+    // Optimistically update local state so the task appears immediately
+    setTasks(prev => [...prev, taskData].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+    if (!firebaseUser) return; // local-only if not authenticated
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), taskData);
+      if (newTask.assignee && newTask.assignee !== 'Anyone') {
+        sendNotification("New Chore", `You were assigned a new chore: "${newTask.title}"`, newTask.assignee);
+      }
+    } catch (e) {
+      console.warn('Task save failed, keeping local copy', e);
     }
   };
 
@@ -2656,9 +2681,18 @@ export default function App() {
   const handleSendMessage = async (text) => {
     if (!activeUser) return;
     const newId = Date.now().toString();
-    const msgData = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
+    const msgData = { id: newId, senderId: activeUser.id, senderName: activeUser.name, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msgData);
+    // Notify every other family member that a chat message arrived
+    const otherUsers = users.filter(u => u.id !== activeUser.id);
+    otherUsers.forEach(u => {
+      sendNotification(
+        `${activeUser.name} 💬`,
+        text.length > 60 ? text.slice(0, 57) + '…' : text,
+        u.role === 'Parent' ? 'Parent' : u.name
+      );
+    });
   };
 
   const requestDeleteMessage = (id) => {
@@ -2726,73 +2760,28 @@ export default function App() {
 
   const triggerConfetti = () => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 1500); };
 
-  // --- DAILY AUTOMATION TRIGGER ---
-  // Runs once per session (max once per 23h) to generate morning digest,
-  // detect schedule conflicts, and surface meal gaps.
-  useEffect(() => {
-    if (!isParent || !activeUser) return;
-    try {
-      const LAST_RUN_KEY = 'kinflow_lastDigestRun';
-      const lastRun = parseInt(localStorage.getItem(LAST_RUN_KEY) || '0', 10);
-      const TWENTY_THREE_HOURS = 23 * 60 * 60 * 1000;
-      if (Date.now() - lastRun < TWENTY_THREE_HOURS) return;
-
-      const automation = createAutomationProcedures();
-      automation.runTrigger({
-        trigger: 'daily-7am',
-        events,
-        weekMeals: meals.map((m, i) => ({
-          day: m.day || `Day ${i + 1}`,
-          slots: [{ name: 'Dinner', meal: m.meal }],
-        })),
-      }).then((result) => {
-        if (result?.ok && result.dashboard?.length > 0) {
-          // Merge automation suggestions into agentSuggestions state
-          setAgentSuggestions((prev) => {
-            const existingIds = new Set(prev.map((s) => s.id));
-            const fresh = result.dashboard.filter((s) => !existingIds.has(s.id));
-            return [...prev, ...fresh];
-          });
-        }
-        localStorage.setItem(LAST_RUN_KEY, String(Date.now()));
-      }).catch(console.error);
-    } catch (e) { console.error('Automation trigger failed:', e); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isParent, activeUser?.id]);
+  const localTaskSuggestions = taskAgent.execute({ prompt: 'assign review overdue', tasks, familyMembers: users }).suggestions || [];
+  const localMealSuggestions = mealAgent.execute({ prompt: 'healthy family dinners', inventory: groceries, mealHistory: meals, familySize: users.length || 4 }).suggestions || [];
+  const localScheduleSuggestions = scheduleAgent.execute({ events }).suggestions || [];
 
   const normalizeSuggestion = (suggestion, source = 'agent') => ({
     ...suggestion,
-    id: suggestion.id || `${source}-${suggestion.type || 'x'}-${suggestion.title?.slice(0,10) || ''}`,
+    id: suggestion.id || `${source}-${Date.now()}-${Math.random()}` ,
     source,
     subtitle: suggestion.subtitle || suggestion.payload?.reason || suggestion.payload?.mealName || suggestion.payload?.taskId || '',
   });
 
-  // Memoized — only recompute when source data changes, not on every render
-  const localTaskSuggestions = useMemo(
-    () => taskAgent.execute({ prompt: 'assign review overdue', tasks, familyMembers: users }).suggestions || [],
-    [tasks, users]
-  );
-  const localMealSuggestions = useMemo(
-    () => mealAgent.execute({ prompt: 'healthy family dinners', inventory: groceries, mealHistory: meals, familySize: users.length || 4 }).suggestions || [],
-    [groceries, meals, users]
-  );
-  const localScheduleSuggestions = useMemo(
-    () => scheduleAgent.execute({ events }).suggestions || [],
-    [events]
-  );
-
-  const mergedSuggestions = useMemo(() => [
+  const mergedSuggestions = [
     ...agentSuggestions.filter((s) => (s.status || 'proposed') === 'proposed').map((s) => normalizeSuggestion(s, 'automation')),
     ...localTaskSuggestions.map((s) => normalizeSuggestion(s, 'task')),
     ...localMealSuggestions.map((s) => normalizeSuggestion(s, 'meal')),
     ...localScheduleSuggestions.map((s) => normalizeSuggestion(s, 'schedule')),
-  ].filter((s) => !dismissedSuggestionIds.includes(s.id)),
-  [agentSuggestions, localTaskSuggestions, localMealSuggestions, localScheduleSuggestions, dismissedSuggestionIds]);
+  ].filter((s) => !dismissedSuggestionIds.includes(s.id));
 
-  const taskSuggestions = useMemo(() => mergedSuggestions.filter((s) => s.agent === 'task' || s.type === 'assignment' || s.type === 'reminder'), [mergedSuggestions]);
-  const mealSuggestions = useMemo(() => mergedSuggestions.filter((s) => s.agent === 'meal' || s.type === 'meal_plan' || s.type === 'grocery_list'), [mergedSuggestions]);
-  const calendarSuggestions = useMemo(() => mergedSuggestions.filter((s) => s.agent === 'schedule' || s.type === 'conflict' || s.type === 'timeslot'), [mergedSuggestions]);
-  const dashboardSuggestions = useMemo(() => mergedSuggestions.slice(0, 3), [mergedSuggestions]);
+  const taskSuggestions = mergedSuggestions.filter((s) => s.agent === 'task' || s.type === 'assignment' || s.type === 'reminder');
+  const mealSuggestions = mergedSuggestions.filter((s) => s.agent === 'meal' || s.type === 'meal_plan' || s.type === 'grocery_list');
+  const calendarSuggestions = mergedSuggestions.filter((s) => s.agent === 'schedule' || s.type === 'conflict' || s.type === 'timeslot');
+  const dashboardSuggestions = mergedSuggestions.slice(0, 3);
 
   const dismissSuggestion = async (suggestionId) => {
     setDismissedSuggestionIds((prev) => [...new Set([...prev, suggestionId])]);
@@ -2839,7 +2828,7 @@ export default function App() {
     const displayPoints = isParent ? Object.values(userPoints).reduce((a, b) => a + b, 0) : (userPoints[activeUser?.name] || 0);
     switch(activeTab) {
       case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} allUsers={users} suggestions={dashboardSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
-      case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} suggestions={taskSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
+      case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} allUsers={users} suggestions={taskSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} suggestions={calendarSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} suggestions={mealSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'rewards': return <RewardsView rewards={rewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
@@ -2937,7 +2926,18 @@ export default function App() {
         </div>
 
         {/* SCROLLABLE CONTENT */}
-        <div className="flex-1 overflow-y-auto" style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', minHeight:0}}>
+        {/* scrollRef lets us reset scroll position on tab switch so ChatView measures correctly */}
+        <div
+          ref={(el) => {
+            if (el) {
+              // Store on the element so NavItem onClick can reach it
+              el._scrollPane = true;
+              window.__kinflowScrollPane = el;
+            }
+          }}
+          className="flex-1 overflow-y-auto"
+          style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', minHeight:0}}
+        >
           <div className="px-4 pt-6 pb-36 max-w-lg mx-auto w-full">
             {renderContent()}
           </div>
@@ -3013,7 +3013,7 @@ export default function App() {
                     label={item.label}
                     isActive={isActive}
                     isChild={isChild}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => { setActiveTab(item.id); requestAnimationFrame(() => { const p = window.__kinflowScrollPane; if (p) p.scrollTop = 0; }); }}
                   />
                 );
               })}
