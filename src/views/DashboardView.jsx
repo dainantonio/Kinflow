@@ -1,10 +1,11 @@
 import React, { useContext } from 'react';
 import { CheckSquare, Calendar as CalendarIcon, Star, ChefHat, ArrowRight, Clock, MapPin, Bell, Gift, ChevronRight, MessageCircle } from 'lucide-react';
-import { ThemeContext } from '../contexts/FamilyContext';
-import { Card, Badge, Avatar, RevealCard } from '../components/shared/Primitives';
+import { ThemeContext, useFamilyContext } from '../contexts/FamilyContext';
+import { Card, Badge, Avatar, RevealCard, AgentSuggestionCard } from '../components/shared/Primitives';
 
 export const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate }) => {
   const { isChild } = useContext(ThemeContext);
+  const { agentSuggestions, approveAgentSuggestion } = useFamilyContext();
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
   const visibleTasks = isParent ? tasks : tasks.filter(t => t.assignee === activeUser?.name || t.assignee === 'Anyone');
@@ -33,6 +34,24 @@ export const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavig
           </div>
         </div>
       </RevealCard>
+
+      {agentSuggestions?.dashboard?.length > 0 && (
+        <RevealCard delay={40}>
+          <div className="space-y-2">
+            {agentSuggestions.dashboard.map((suggestion) => (
+              <AgentSuggestionCard
+                key={suggestion.id}
+                icon="🤖"
+                title={suggestion.title}
+                subtitle={suggestion.subtitle}
+                confidence={suggestion.confidence}
+                onApprove={() => approveAgentSuggestion(suggestion, true)}
+                onDismiss={() => approveAgentSuggestion(suggestion, false)}
+              />
+            ))}
+          </div>
+        </RevealCard>
+      )}
 
       {/* PENDING APPROVAL ALERT (parents only) */}
       {isParent && pendingApproval > 0 && (

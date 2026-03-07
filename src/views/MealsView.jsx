@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Plus, ChefHat, Clock, Utensils, ShoppingCart, Trash2, Check, X, ChevronRight, Loader2 } from 'lucide-react';
 import { ThemeContext, useFamilyContext } from '../contexts/FamilyContext';
-import { Card, Button, Badge, Modal, RevealCard, DetailActions } from '../components/shared/Primitives';
+import { Card, Button, Badge, Modal, RevealCard, DetailActions, AgentSuggestionCard } from '../components/shared/Primitives';
 
 export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setGroceries }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,7 +20,7 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
   const [newIngredients, setNewIngredients] = useState('');
   const [newInstructions, setNewInstructions] = useState('');
   const [manualGroceryItem, setManualGroceryItem] = useState('');
-  const { familyMembers, handleSendMessage, activeUser } = useFamilyContext();
+  const { familyMembers, handleSendMessage, activeUser, agentSuggestions, approveAgentSuggestion } = useFamilyContext();
 
   const handleAddSubmit = (e) => { e.preventDefault(); if (!meal.trim()) return; onAdd({ meal, day, prepTime: prepTime + ' prep', ingredients: newIngredients.trim(), instructions: newInstructions.trim() }); setMeal(''); setNewIngredients(''); setNewInstructions(''); setIsModalOpen(false); };
   const handleEditClick = () => { setEditForm({ ...selectedMeal }); setIsEditing(true); };
@@ -94,6 +94,23 @@ export const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, grocerie
           </div>
         </div>
       </RevealCard>
+
+      {agentSuggestions?.meals?.length > 0 && (
+        <div className="space-y-2">
+          {agentSuggestions.meals.slice(0, 3).map((suggestion) => (
+            <AgentSuggestionCard
+              key={suggestion.id}
+              icon="🍽️"
+              title={suggestion.title}
+              subtitle={suggestion.subtitle}
+              confidence={suggestion.confidence}
+              approveLabel="Add meal"
+              onApprove={() => approveAgentSuggestion(suggestion, true)}
+              onDismiss={() => approveAgentSuggestion(suggestion, false)}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="space-y-3">
         {meals.length === 0 && (
