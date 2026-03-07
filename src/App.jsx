@@ -213,40 +213,29 @@ const Card = ({ children, className = '', onClick }) => {
 };
 
 const Button = ({ children, variant = 'primary', className = '', ...props }) => {
-  const { isChild } = useContext(ThemeContext);
-  const baseStyle = isChild
-    ? "w-full font-bold rounded-[1.5rem] py-4 px-4 transition-all duration-200 active:scale-[0.96] flex items-center justify-center gap-2 relative shadow-[0_4px_0_rgb(0,0,0,0.12)] active:shadow-[0_0px_0_rgb(0,0,0,0)] active:translate-y-1 disabled:opacity-50"
-    : "w-full font-semibold rounded-[1.25rem] py-3.5 px-4 transition-all duration-300 active:scale-[0.97] flex items-center justify-center gap-2 relative overflow-hidden group disabled:opacity-50 disabled:pointer-events-none";
-
-  const variants = isChild ? {
-    primary: "bg-sky-500 text-white hover:bg-sky-400 border-2 border-sky-600",
-    secondary: "bg-white text-slate-800 border-2 border-slate-200",
-    premium: "bg-amber-400 text-amber-900 hover:bg-amber-300 border-2 border-amber-500",
-    outline: "bg-transparent border-2 border-slate-300 text-slate-700"
-  } : {
+  const baseStyle = "w-full font-semibold rounded-[1.25rem] py-3.5 px-4 transition-all duration-300 active:scale-[0.97] flex items-center justify-center gap-2 relative overflow-hidden group disabled:opacity-50 disabled:pointer-events-none";
+  const variants = {
     primary: "bg-slate-900 text-white shadow-md shadow-slate-900/20 hover:bg-slate-800",
     secondary: "bg-white/80 backdrop-blur-md text-slate-800 hover:bg-white ring-1 ring-slate-900/10 shadow-sm",
     premium: "bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-[1.02]",
     outline: "border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
   };
-
   return (
     <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>
       <div className="relative z-10 flex items-center justify-center gap-2 tracking-wide">{children}</div>
-      {!isChild && <div className="absolute inset-0 bg-white/20 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300 ease-in-out pointer-events-none rounded-[1.25rem]" style={{ mixBlendMode: 'overlay' }}></div>}
+      <div className="absolute inset-0 bg-white/20 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300 ease-in-out pointer-events-none rounded-[1.25rem]" style={{ mixBlendMode: 'overlay' }}></div>
     </button>
   );
 };
 
 const Badge = ({ children, variant = 'default', className = '' }) => {
-  const { isChild } = useContext(ThemeContext);
   const variants = {
     default: "bg-slate-100 text-slate-700 ring-1 ring-slate-900/5",
     success: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-900/5",
     warning: "bg-amber-100 text-amber-800 ring-1 ring-amber-900/10",
     premium: "bg-purple-100 text-purple-700 ring-1 ring-purple-900/5",
   };
-  return <span className={`${isChild ? 'text-xs px-3 py-1.5 rounded-xl' : 'text-[10px] sm:text-xs px-2.5 py-1 rounded-full uppercase tracking-wider backdrop-blur-sm'} font-bold ${variants[variant]} ${className}`}>{children}</span>;
+  return <span className={`text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider font-bold ${variants[variant]} ${className}`}>{children}</span>;
 };
 
 const AVATAR_EMOJIS = { mom: '👩🏾', dad: '👨🏾', boy: '👦🏾', girl: '👧🏾' };
@@ -265,30 +254,30 @@ const Avatar = ({ user, size = 'md', className = '' }) => {
 };
 
 const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
-  const { isChild } = useContext(ThemeContext);
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-900/75" onClick={onClose} style={{backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/75" onClick={onClose} style={{backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
       <div
-        className={`${isChild ? 'bg-white rounded-t-[2rem] sm:rounded-[2rem] border-t-8 border-indigo-100' : 'bg-white rounded-t-[2rem] sm:rounded-[2rem]'} w-full max-w-md flex flex-col shadow-2xl ring-1 ring-black/8 relative animate-slide-up cursor-default overflow-hidden`}
+        className="bg-white rounded-t-[2rem] w-full max-w-md flex flex-col shadow-2xl ring-1 ring-black/8 relative animate-slide-up cursor-default"
         style={{
-          transformOrigin:'bottom center',
-          maxHeight: 'min(90dvh, 90vh)',
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+          transformOrigin: 'bottom center',
+          maxHeight: '92dvh',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-5 pb-3 shrink-0">
-          <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4 sm:hidden" />
-          <div className="flex justify-between items-center shrink-0">
+        {/* Drag handle */}
+        <div className="pt-3 pb-1 shrink-0 flex flex-col items-center">
+          <div className="w-10 h-1 bg-slate-200 rounded-full mb-3" />
+          <div className="w-full px-5 flex justify-between items-center pb-3 border-b border-slate-100">
             <h2 className="text-xl font-bold text-slate-900 tracking-tight truncate pr-4">{title}</h2>
-            <button onClick={onClose} className="spring-press p-2 bg-slate-100 rounded-2xl text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-all shrink-0">
+            <button onClick={onClose} className="spring-press p-2 bg-slate-100 rounded-2xl text-slate-500 hover:bg-slate-200 transition-all shrink-0">
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
-
-        <div className={`px-5 pb-6 overflow-y-auto relative flex-1 ${fullHeight ? 'min-h-[40vh]' : ''}`}>
+        {/* Scrollable content — always starts at top */}
+        <div className="px-5 pt-4 pb-6 overflow-y-auto flex-1" style={{overscrollBehavior:'contain', WebkitOverflowScrolling:'touch'}}>
           {children}
         </div>
       </div>
@@ -818,7 +807,7 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggesti
                   {!isMe && <span className="text-[10px] font-bold text-slate-400 ml-2 mb-1">{sender?.name}</span>}
                   <div className={`px-4 py-2.5 text-sm font-medium leading-relaxed shadow-sm
                     ${isMe
-                      ? (isChild ? 'bg-sky-500 text-white rounded-3xl rounded-br-md' : 'bg-slate-900 text-white rounded-3xl rounded-br-md')
+                      ? 'bg-slate-900 text-white rounded-3xl rounded-br-md'
                       : 'bg-slate-100 text-slate-800 rounded-3xl rounded-bl-md ring-1 ring-black/5'}`}>
                     {msg.text}
                   </div>
@@ -880,13 +869,13 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggesti
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend(input)}
-            placeholder={isChild ? "Type a message..." : "Message family..."}
+            placeholder={"Message family..."}
             className="flex-1 bg-white border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all font-medium rounded-2xl pl-4 pr-4 py-2.5 text-sm"
           />
           <button
             onClick={() => handleSend(input)}
             disabled={!input.trim()}
-            className={`spring-press p-2.5 text-white rounded-2xl transition-all disabled:opacity-50 flex items-center justify-center ${isChild ? 'bg-sky-500' : 'bg-slate-900'}`}
+            className={`spring-press p-2.5 text-white rounded-2xl transition-all disabled:opacity-50 flex items-center justify-center ${'bg-slate-900'}`}
           >
             <Send className="w-4 h-4" />
           </button>
@@ -2879,26 +2868,24 @@ Rules:
 };
 
 // --- PREMIUM NAV ITEM ---
-const NavItem = ({ icon: Icon, label, isActive, isChild, onClick }) => {
+const NavItem = ({ icon: Icon, label, isActive, onClick }) => {
   const [bouncing, setBouncing] = useState(false);
   const handleTap = () => {
     setBouncing(true);
     setTimeout(() => setBouncing(false), 500);
     onClick();
   };
-  const activeColor = isChild ? 'text-sky-500' : 'text-indigo-600';
-  const dotColor = isChild ? 'bg-sky-500' : 'bg-indigo-600';
   return (
     <button
       onClick={handleTap}
-      className={`flex flex-col items-center justify-center flex-1 ${isChild ? 'px-3' : 'px-2'} py-2 gap-0.5 relative spring-press group`}
+      className="flex flex-col items-center justify-center flex-1 px-2 py-2 gap-0.5 relative spring-press"
       style={{WebkitTapHighlightColor:'transparent'}}
     >
-      <div className={`${bouncing ? 'animate-nav-bounce' : ''} ${isActive ? activeColor : 'text-slate-400'} transition-colors duration-200`}>
+      <div className={`${bouncing ? 'animate-nav-bounce' : ''} ${isActive ? 'text-indigo-600' : 'text-slate-400'} transition-colors duration-200`}>
         <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
       </div>
-      <span className={`${isChild ? 'text-[10px]' : 'text-[9px]'} font-bold tracking-wide ${isActive ? activeColor : 'text-slate-400'} transition-colors`}>{label}</span>
-      {isActive && <div className={`absolute bottom-1.5 w-1 h-1 ${dotColor} rounded-full`} />}
+      <span className={`text-[9px] font-bold tracking-wide ${isActive ? 'text-indigo-600' : 'text-slate-400'} transition-colors`}>{label}</span>
+      {isActive && <div className="absolute bottom-1.5 w-1 h-1 bg-indigo-600 rounded-full" />}
     </button>
   );
 };
@@ -3575,11 +3562,11 @@ export default function App() {
         { id: 'chat', icon: MessageCircle, label: 'Chat' },
       ];
 
-  const appBgClass = isChild ? 'bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800' : 'bg-slate-50 text-slate-800';
+  
 
   return (
     <ThemeContext.Provider value={{ isChild, user: activeUser }}>
-      <div className={`min-h-screen font-sans flex flex-col relative transition-colors duration-500 ${appBgClass}`} style={{paddingTop:'env(safe-area-inset-top, 0px)'}}>
+      <div className="min-h-screen font-sans flex flex-col relative bg-slate-50 text-slate-800">
         <CustomStyles />
         <Confetti active={showConfetti} />
 
@@ -3609,44 +3596,61 @@ export default function App() {
           </div>
         )}
 
-        {/* TOP APP BAR */}
-        <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-30 border-b border-slate-200/50" style={{paddingTop:'max(env(safe-area-inset-top, 0px), 10px)', background:'rgba(248,250,252,0.95)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
-          <div>
+        {/* TOP APP BAR — fixed so it never clips or scrolls away */}
+        <div
+          className="fixed top-0 inset-x-0 z-30 flex items-center justify-between px-4 border-b border-slate-200/60"
+          style={{
+            paddingTop: 'env(safe-area-inset-top, 0px)',
+            paddingBottom: '10px',
+            background: 'rgba(248,250,252,0.97)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            minHeight: 'calc(56px + env(safe-area-inset-top, 0px))',
+          }}
+        >
+          <div className="pt-2">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{
               {home:'Today', tasks: isParent ? 'Tasks' : 'My Chores', calendar:'Schedule', meals:'Meals', chat:'Family Chat', rewards:'Rewards', settings:'Profile'}[activeTab] || 'Kinflow'
             }</p>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Kinflow</h1>
           </div>
-          <div className="flex items-center gap-2">
-            {/* AI Copilot button (parents only) */}
+          <div className="flex items-center gap-2 pt-2">
             {isParent && (
-              <button onClick={() => setIsCopilotOpen(true)} className="spring-press w-9 h-9 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
+              <button onClick={() => setIsCopilotOpen(true)} className="spring-press w-9 h-9 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-md shadow-indigo-500/25">
                 <Wand2 className="w-4 h-4 text-white" strokeWidth={2} />
               </button>
             )}
-            {/* Family Chat shortcut for parents (not in bottom nav) */}
             {isParent && (
-              <button onClick={() => setActiveTab('chat')} className={`spring-press relative w-9 h-9 rounded-2xl flex items-center justify-center shadow-sm ring-1 transition-colors ${activeTab === 'chat' ? 'bg-slate-900 ring-slate-900' : 'bg-white ring-black/5'}`}>
-                <MessageCircle className={`w-4 h-4 ${activeTab === 'chat' ? 'text-white' : 'text-slate-700'}`} strokeWidth={2} />
+              <button onClick={() => setActiveTab('chat')} className={`spring-press relative w-9 h-9 rounded-2xl flex items-center justify-center ring-1 transition-colors ${activeTab === 'chat' ? 'bg-slate-900 ring-slate-900' : 'bg-white ring-black/8'}`}>
+                <MessageCircle className={`w-4 h-4 ${activeTab === 'chat' ? 'text-white' : 'text-slate-600'}`} strokeWidth={2} />
               </button>
             )}
-            {/* Notifications bell */}
-            <button onClick={() => { setIsNotifModalOpen(true); markNotifsAsRead(); }} className="spring-press relative w-9 h-9 bg-white rounded-2xl flex items-center justify-center shadow-sm ring-1 ring-black/5">
-              <Bell className="w-4 h-4 text-slate-700" strokeWidth={2} />
+            <button onClick={() => { setIsNotifModalOpen(true); markNotifsAsRead(); }} className="spring-press relative w-9 h-9 bg-white rounded-2xl flex items-center justify-center ring-1 ring-black/8">
+              <Bell className="w-4 h-4 text-slate-600" strokeWidth={2} />
               {unreadNotifsCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">{unreadNotifsCount}</span>}
             </button>
-            {/* Avatar → Settings / profile switcher */}
-            <button onClick={() => setActiveTab('settings')} className="spring-press">
+            {/* Avatar: tap = switch profile, long-press / hold = settings */}
+            <button
+              onClick={() => setIsUserSwitcherOpen(true)}
+              onContextMenu={e => { e.preventDefault(); setActiveTab('settings'); }}
+              className="spring-press"
+              title="Tap to switch profile · Hold for settings"
+            >
               <Avatar user={activeUser} size="sm" className="ring-2 ring-white shadow-md" />
             </button>
           </div>
         </div>
 
-        {/* SCROLLABLE CONTENT */}
-        {/* When on chat tab, overflow must be hidden so ChatView owns its own scroll */}
+        {/* SCROLLABLE CONTENT — offset below fixed header */}
         <div
           className={`flex-1 ${activeTab === 'chat' ? 'overflow-hidden' : 'overflow-y-auto'}`}
-          style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', minHeight:0}}
+          style={{
+            paddingTop: 'calc(56px + env(safe-area-inset-top, 0px))',
+            scrollBehavior: 'smooth',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            minHeight: 0,
+          }}
         >
           {activeTab === 'chat'
             ? (
@@ -3721,7 +3725,7 @@ export default function App() {
         {/* PREMIUM BOTTOM NAV */}
         <div className="fixed bottom-0 inset-x-0 z-40" style={{paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
           <div className="mx-4 mb-4">
-            <nav className={`${isChild ? 'bg-white ring-1 ring-black/5' : 'bg-white/95 backdrop-blur-2xl ring-1 ring-black/5'} rounded-[2rem] shadow-[0_-2px_40px_rgba(0,0,0,0.12)] flex items-center px-2 py-1`}>
+            <nav className={`${'bg-white/95 backdrop-blur-2xl ring-1 ring-black/5'} rounded-[2rem] shadow-[0_-2px_40px_rgba(0,0,0,0.12)] flex items-center px-2 py-1`}>
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -3731,7 +3735,6 @@ export default function App() {
                     icon={Icon}
                     label={item.label}
                     isActive={isActive}
-                    isChild={isChild}
                     onClick={() => setActiveTab(item.id)}
                   />
                 );
