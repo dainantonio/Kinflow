@@ -254,8 +254,12 @@ const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-900/75" onClick={onClose} style={{backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
       <div
-        className={`${isChild ? 'bg-white rounded-t-[2rem] sm:rounded-[2rem] border-t-8 border-indigo-100' : 'bg-white rounded-t-[2rem] sm:rounded-[2rem]'} w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl ring-1 ring-black/8 relative animate-slide-up cursor-default overflow-hidden`}
-        style={{transformOrigin:'bottom center'}}
+        className={`${isChild ? 'bg-white rounded-t-[2rem] sm:rounded-[2rem] border-t-8 border-indigo-100' : 'bg-white rounded-t-[2rem] sm:rounded-[2rem]'} w-full max-w-md flex flex-col shadow-2xl ring-1 ring-black/8 relative animate-slide-up cursor-default overflow-hidden`}
+        style={{
+          transformOrigin:'bottom center',
+          maxHeight: 'min(90dvh, 90vh)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
         onClick={e => e.stopPropagation()}
       >
         <div className="p-5 pb-3 shrink-0">
@@ -736,33 +740,9 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggesti
   const { isChild, user } = useContext(ThemeContext);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
-  const containerRef = useRef(null);
   const isParent = user?.role === 'Parent';
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
-  // Dynamically size the chat panel to fill available visible height.
-  // This avoids the clipping that occurs when switching tabs because the
-  // scroll pane may be at an offset — a fixed calc(100dvh - X) would be wrong.
-  useEffect(() => {
-    const recalc = () => {
-      const el = containerRef.current;
-      if (!el) return;
-      const scrollPane = el.closest('.overflow-y-auto');
-      if (scrollPane) {
-        // visible height minus content top padding (pt-6=24px) and bottom padding (pb-36=144px)
-        const h = scrollPane.clientHeight - 24 - 144;
-        el.style.height = Math.max(h, 380) + 'px';
-      }
-    };
-    recalc();
-    window.addEventListener('resize', recalc);
-    window.addEventListener('orientationchange', recalc);
-    return () => {
-      window.removeEventListener('resize', recalc);
-      window.removeEventListener('orientationchange', recalc);
-    };
-  }, []);
 
   const handleSend = (text) => {
     if (!text.trim()) return;
@@ -771,7 +751,7 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggesti
   };
 
   return (
-    <div ref={containerRef} className="flex flex-col animate-bounce-in" style={{minHeight:'380px'}}>
+    <div className="flex flex-col animate-bounce-in h-full" style={{minHeight:'380px'}}>
       {/* Chat header */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
@@ -1215,7 +1195,7 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent, all
         <form onSubmit={handleSubmitNewTask} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Task Name</label>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 text-slate-800 font-medium transition-all" placeholder="e.g., Clean the garage" autoFocus />
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 text-slate-800 font-medium transition-all" placeholder="e.g., Clean the garage" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1603,7 +1583,7 @@ const CalendarView = ({ events, onAdd, onDelete, isParent, suggestions = [], onA
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Event Name</label>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium transition-all" placeholder="e.g., Dentist Appointment" autoFocus />
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium transition-all" placeholder="e.g., Dentist Appointment" />
           </div>
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Date</label>
@@ -1735,7 +1715,7 @@ const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setG
         <form onSubmit={handleAddSubmit} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Recipe Name</label>
-            <input type="text" value={meal} onChange={e => setMeal(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium" placeholder="e.g., Chicken Parmesan" autoFocus />
+            <input type="text" value={meal} onChange={e => setMeal(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium" placeholder="e.g., Chicken Parmesan" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -2926,21 +2906,23 @@ export default function App() {
         </div>
 
         {/* SCROLLABLE CONTENT */}
-        {/* scrollRef lets us reset scroll position on tab switch so ChatView measures correctly */}
+        {/* When on chat tab, overflow must be hidden so ChatView owns its own scroll */}
         <div
-          ref={(el) => {
-            if (el) {
-              // Store on the element so NavItem onClick can reach it
-              el._scrollPane = true;
-              window.__kinflowScrollPane = el;
-            }
-          }}
-          className="flex-1 overflow-y-auto"
+          className={`flex-1 ${activeTab === 'chat' ? 'overflow-hidden' : 'overflow-y-auto'}`}
           style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', minHeight:0}}
         >
-          <div className="px-4 pt-6 pb-36 max-w-lg mx-auto w-full">
-            {renderContent()}
-          </div>
+          {activeTab === 'chat'
+            ? (
+              <div className="h-full px-4 pt-4 pb-4 max-w-lg mx-auto w-full flex flex-col">
+                {renderContent()}
+              </div>
+            )
+            : (
+              <div className="px-4 pt-6 pb-36 max-w-lg mx-auto w-full">
+                {renderContent()}
+              </div>
+            )
+          }
         </div>
 
         {/* Global Notifications Modal */}
@@ -3013,7 +2995,7 @@ export default function App() {
                     label={item.label}
                     isActive={isActive}
                     isChild={isChild}
-                    onClick={() => { setActiveTab(item.id); requestAnimationFrame(() => { const p = window.__kinflowScrollPane; if (p) p.scrollTop = 0; }); }}
+                    onClick={() => setActiveTab(item.id)}
                   />
                 );
               })}
