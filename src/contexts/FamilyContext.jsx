@@ -42,7 +42,7 @@ export const FamilyProvider = ({ children }) => {
   const agentProceduresRef = useRef(createAgentProcedures());
   const chatSocketRef = useRef(null);
   const [showSplash, setShowSplash] = useState(true);
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => { try { return localStorage.getItem('kinflow_activeTab') || 'home'; } catch(e) { return 'home'; } });
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [activeUser, setActiveUser] = useState(() => {
@@ -53,7 +53,7 @@ export const FamilyProvider = ({ children }) => {
     return null;
   });
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
-  const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [hasOnboarded, setHasOnboarded] = useState(() => { try { return localStorage.getItem('kinflow_hasOnboarded') === 'true'; } catch(e) { return false; } });
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     try { return localStorage.getItem('kinflow_loggedIn') === 'true'; } catch(e) { return false; }
@@ -109,6 +109,14 @@ export const FamilyProvider = ({ children }) => {
 
   const isParent = activeUser?.role === 'Parent';
   const isChild = activeUser?.role === 'Child';
+
+  useEffect(() => {
+    try { localStorage.setItem('kinflow_activeTab', activeTab); } catch(e) {}
+  }, [activeTab]);
+
+  useEffect(() => {
+    try { localStorage.setItem('kinflow_hasOnboarded', String(hasOnboarded)); } catch(e) {}
+  }, [hasOnboarded]);
 
   // Dynamic Greeting
   const currentHour = new Date().getHours();
@@ -270,6 +278,7 @@ export const FamilyProvider = ({ children }) => {
   const completeOnboarding = () => {
     setShowOnboarding(false);
     setHasOnboarded(true);
+    try { localStorage.setItem('kinflow_hasOnboarded', 'true'); } catch(e) {}
     triggerConfetti();
   };
 

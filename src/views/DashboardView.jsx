@@ -121,29 +121,7 @@ export const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavig
         </div>
       </RevealCard>
 
-      {/* QUICK ACTIONS (parent only) */}
-      {isParent && (
-        <RevealCard delay={160}>
-          <div>
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">Quick Actions</h3>
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                {icon: CheckSquare, label: 'Tasks', tab: 'tasks', color: 'bg-emerald-100 text-emerald-600'},
-                {icon: CalendarIcon, label: 'Schedule', tab: 'calendar', color: 'bg-blue-100 text-blue-600'},
-                {icon: ChefHat, label: 'Meals', tab: 'meals', color: 'bg-orange-100 text-orange-500'},
-                {icon: MessageCircle, label: 'Chat', tab: 'chat', color: 'bg-pink-100 text-pink-500'},
-              ].map((a, i) => (
-                <button key={a.tab} onClick={() => onNavigate(a.tab)} className="spring-press flex flex-col items-center gap-2 bg-white rounded-2xl p-3 shadow-sm ring-1 ring-black/5" style={{animationDelay:`${i*60}ms`}}>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${a.color}`}>
-                    <a.icon className="w-4 h-4" strokeWidth={2} />
-                  </div>
-                  <span className="text-[9px] font-bold text-slate-600 tracking-wide leading-tight text-center">{a.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </RevealCard>
-      )}
+
     </div>
   );
 };
