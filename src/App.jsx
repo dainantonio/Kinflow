@@ -2831,7 +2831,7 @@ export default function App() {
 
   return (
     <ThemeContext.Provider value={{ isChild, user: activeUser }}>
-      <div className={`min-h-screen font-sans flex flex-col relative transition-colors duration-500 ${appBgClass}`}>
+      <div className={`min-h-screen font-sans flex flex-col relative transition-colors duration-500 ${appBgClass}`} style={{paddingTop:'env(safe-area-inset-top, 0px)'}}>
         <CustomStyles />
         <Confetti active={showConfetti} />
 
