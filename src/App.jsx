@@ -755,7 +755,11 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggesti
   };
 
   return (
-    <div className="flex flex-col animate-bounce-in" style={{height:'calc(100vh - 200px)'}}>
+    // Chat layout: the parent scroll container provides the viewport.
+    // We subtract the sticky top bar (~64px), the floating bottom nav (~80px),
+    // the content area top padding (24px) and a small buffer (8px) = 176px total.
+    // Using 100dvh (dynamic viewport height) avoids mobile browser chrome issues.
+    <div className="flex flex-col animate-bounce-in" style={{height:'calc(100dvh - 176px)', minHeight:'380px'}}>
       {/* Chat header */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
@@ -1575,9 +1579,9 @@ const CalendarView = ({ events, onAdd, onDelete, isParent, suggestions = [], onA
         </div>
       </div>
 
-      {/* Undo toast */}
+      {/* Undo toast — positioned above the floating bottom nav (nav ≈ 80px + 16px margin = 96px) */}
       {undoEvent && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-up whitespace-nowrap">
+        <div className="fixed left-4 right-4 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-up" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}>
           <span className="text-sm font-medium">Event deleted</span>
           <button onClick={() => { onAdd({...undoEvent}); setUndoEvent(null); }} className="text-indigo-300 font-bold text-sm hover:text-white transition-colors">Undo</button>
         </div>
@@ -1899,9 +1903,12 @@ const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}
       ];
 
   return (
-    <div className="animate-bounce-in -mx-4 sm:-mx-6 -mt-6">
+    // Profile page: break out of the parent px-4 padding with -mx-4 to achieve a
+    // full-bleed hero banner. The -mt-6 compensates for the content area's pt-6.
+    // We do NOT use sm:-mx-6 here because the parent container has no sm:px-6.
+    <div className="animate-bounce-in -mx-4 -mt-6">
 
-      {/* HERO BANNER */}
+      {/* HERO BANNER — full-bleed edge-to-edge */}
       <div className="relative h-44 overflow-hidden" style={{background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)'}}>
         <div className="absolute top-[-20%] right-[-5%] w-72 h-72 bg-indigo-400/20 rounded-full blur-[80px]" />
         <div className="absolute bottom-[-20%] left-[-5%] w-64 h-64 bg-violet-400/15 rounded-full blur-[60px]" />
@@ -1934,7 +1941,9 @@ const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}
         </div>
       </div>
 
-      <div className="px-4 sm:px-6 pb-32 space-y-5">
+      {/* Content area: restore px-4 padding, and use safe-area-aware bottom padding
+           so content is never hidden behind the floating nav on any device. */}
+      <div className="px-4 space-y-5" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 96px, 144px)' }}>
 
         {/* STATS ROW */}
         <div className="grid grid-cols-3 gap-3">
@@ -2856,9 +2865,9 @@ export default function App() {
           </div>
         )}
 
-        {/* UNDO DELETE TOAST */}
+        {/* UNDO DELETE TOAST — positioned above the floating bottom nav (nav ≈ 80px + 16px margin = 96px) */}
         {undoDelete && (
-          <div className="fixed bottom-24 inset-x-0 z-[98] flex justify-center px-4 pointer-events-none" style={{paddingBottom:'max(env(safe-area-inset-bottom, 16px), 16px)'}}>
+          <div className="fixed inset-x-0 z-[98] flex justify-center px-4 pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}>
             <div className="bg-slate-900/96 backdrop-blur-xl text-white px-5 py-4 rounded-3xl shadow-2xl ring-1 ring-white/10 flex items-center gap-3 max-w-sm w-full animate-slide-up pointer-events-auto">
               <Trash2 className="w-4 h-4 text-white/40 shrink-0" />
               <span className="flex-1 text-sm font-medium text-white/80">{undoDelete.message}</span>

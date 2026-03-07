@@ -284,8 +284,9 @@ export const TasksView = ({ tasks, onAction, onAdd, onUpdate, onDelete, activeUs
         })}
       </div>
 
+      {/* Undo toast — positioned above the floating bottom nav (nav ≈ 80px + 16px margin = 96px) */}
       {recentlyDeletedTask && (
-        <div className="fixed left-4 right-4 bottom-28 z-40 bg-slate-900 text-white rounded-2xl px-4 py-3 flex items-center justify-between gap-3 shadow-2xl">
+        <div className="fixed left-4 right-4 z-40 bg-slate-900 text-white rounded-2xl px-4 py-3 flex items-center justify-between gap-3 shadow-2xl" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}>
           <span className="text-sm font-semibold truncate">Task deleted</span>
           <button onClick={handleUndoDelete} className="text-xs font-bold bg-white text-slate-900 px-3 py-1.5 rounded-xl">Undo</button>
         </div>

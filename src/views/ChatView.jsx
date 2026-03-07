@@ -71,7 +71,12 @@ export const ChatView = ({ messages, onSend, onDelete, tasks }) => {
   };
 
   return (
-    <div className="flex flex-col animate-bounce-in" style={{ height: 'calc(100dvh - 200px)' }}>
+    // Chat layout: uses a flex column that fills the available scroll area.
+    // Height is driven by the parent scroll container (flex-1 overflow-y-auto in App.jsx).
+    // We use min-h-0 to allow the flex child to shrink, and a fixed pixel height as a
+    // reliable cross-device fallback that accounts for the top bar (~60px) and
+    // floating bottom nav (~88px) plus safe-area padding.
+    <div className="flex flex-col animate-bounce-in" style={{ height: 'calc(100dvh - 168px)', minHeight: '400px' }}>
 
       {/* Chat header */}
       <div className="mb-4 shrink-0">

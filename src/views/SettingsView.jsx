@@ -184,9 +184,12 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
       ];
 
   return (
-    <div className="animate-bounce-in -mx-4 sm:-mx-6">
+    // Profile page uses a full-bleed hero banner. We use a negative margin trick to break
+    // out of the parent's px-4 padding, then restore padding inside content sections.
+    // The outer wrapper must NOT clip overflow so the banner bleeds edge-to-edge.
+    <div className="animate-bounce-in -mx-4">
 
-      {/* HERO BANNER */}
+      {/* HERO BANNER — full-bleed, no overflow:hidden on the page root */}
       <div className="relative h-44 overflow-hidden" style={{background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)'}}>
         <div className="absolute top-[-20%] right-[-5%] w-72 h-72 bg-indigo-400/20 rounded-full blur-[80px]" />
         <div className="absolute bottom-[-20%] left-[-5%] w-64 h-64 bg-violet-400/15 rounded-full blur-[60px]" />
@@ -221,7 +224,9 @@ export const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoin
         </div>
       </div>
 
-      <div className="px-4 sm:px-6 pb-32 space-y-5">
+      {/* Content area: restore horizontal padding and ensure enough bottom clearance
+           for the floating nav (80px) + margin (16px) + safe-area inset */}
+      <div className="px-4 pb-36 space-y-5" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 96px, 144px)' }}>
 
         {/* STATS ROW */}
         <div className="grid grid-cols-3 gap-3">

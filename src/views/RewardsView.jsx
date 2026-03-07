@@ -45,6 +45,9 @@ export const RewardsView = ({ rewards, setRewards, points, onRedeem, isParent, l
 
       {/* Points balance hero card */}
       <RevealCard delay={0}>
+        {/* Note: overflow-hidden is on the outer RevealCard wrapper via the inner div.
+            We intentionally keep the gradient container as a direct child to avoid
+            double border-radius nesting that clips rounded corners. */}
         <div
           className="relative overflow-hidden rounded-[1.75rem] p-6 text-center"
           style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)' }}
@@ -214,9 +217,9 @@ export const RewardsView = ({ rewards, setRewards, points, onRedeem, isParent, l
         })}
       </div>
 
-      {/* Undo toast */}
+      {/* Undo toast — positioned above the floating bottom nav (nav ≈ 80px + 16px margin = 96px) */}
       {deletedReward && (
-        <div className="fixed left-4 right-4 bottom-28 z-40 bg-slate-900 text-white rounded-2xl px-4 py-3 flex items-center justify-between gap-3 shadow-2xl animate-bounce-in">
+        <div className="fixed left-4 right-4 z-40 bg-slate-900 text-white rounded-2xl px-4 py-3 flex items-center justify-between gap-3 shadow-2xl animate-bounce-in" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}>
           <span className="text-sm font-semibold truncate">"{deletedReward.title}" deleted</span>
           <button
             onClick={undoDelete}
