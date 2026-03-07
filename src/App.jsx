@@ -973,7 +973,7 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, su
       </RevealCard>
 
       {/* QUICK ACTIONS (parent only) */}
-      {isParent && (
+      {false && isParent && (
         <RevealCard delay={160}>
           <div>
             <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">Quick Actions</h3>
@@ -2350,10 +2350,10 @@ const NavItem = ({ icon: Icon, label, isActive, isChild, onClick }) => {
 // --- MAIN APP COMPONENT ---
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
-  const [activeTab, setActiveTab] = useState('home');
-  const [activeUser, setActiveUser] = useState(null); 
+  const [activeTab, setActiveTab] = useState(() => { try { return localStorage.getItem('kinflow_activeTab') || 'home'; } catch(e) { return 'home'; } });
+  const [activeUser, setActiveUser] = useState(() => { try { const saved = localStorage.getItem('kinflow_lastProfile'); return saved ? JSON.parse(saved) : null; } catch(e) { return null; } }); 
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
-  const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [hasOnboarded, setHasOnboarded] = useState(() => { try { return localStorage.getItem('kinflow_hasOnboarded') === 'true'; } catch(e) { return false; } });
   const [showOnboarding, setShowOnboarding] = useState(false);
     
   const [confirmActionState, setConfirmActionState] = useState(null);
@@ -2389,6 +2389,21 @@ export default function App() {
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
 
   const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem('kinflow_activeTab', activeTab); } catch(e) {}
+  }, [activeTab]);
+
+  useEffect(() => {
+    try {
+      if (activeUser) localStorage.setItem('kinflow_lastProfile', JSON.stringify(activeUser));
+      else localStorage.removeItem('kinflow_lastProfile');
+    } catch(e) {}
+  }, [activeUser]);
+
+  useEffect(() => {
+    try { localStorage.setItem('kinflow_hasOnboarded', String(hasOnboarded)); } catch(e) {}
+  }, [hasOnboarded]);
 
   useEffect(() => {
     if (!auth) return;
@@ -2505,13 +2520,13 @@ export default function App() {
 
   const handleLogin = (user) => {
     setActiveUser(user);
-    setActiveTab('home'); 
     if (user.role === 'Parent' && !hasOnboarded) setShowOnboarding(true);
   };
 
   const completeOnboarding = () => {
     setShowOnboarding(false);
     setHasOnboarded(true);
+    try { localStorage.setItem('kinflow_hasOnboarded', 'true'); } catch(e) {}
     triggerConfetti();
   };
 
@@ -2869,7 +2884,7 @@ export default function App() {
         )}
 
         {/* TOP APP BAR */}
-        <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-30" style={{background:'rgba(248,250,252,0.95)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
+        <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-30" style={{paddingTop:'max(env(safe-area-inset-top, 0px), 10px)', background:'rgba(248,250,252,0.95)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{
               {home:'Today', tasks:'Tasks', calendar:'Schedule', meals:'Meals', chat:'Family', rewards:'Rewards', settings:'Profile'}[activeTab] || 'Kinflow'
@@ -2897,7 +2912,7 @@ export default function App() {
 
         {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto" style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', minHeight:0}}>
-          <div className="px-4 pt-3 pb-36 max-w-lg mx-auto w-full">
+          <div className="px-4 pt-4 pb-36 max-w-lg mx-auto w-full">
             {renderContent()}
           </div>
         </div>
