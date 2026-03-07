@@ -6,6 +6,9 @@ import {
 } from '../utils/firebase';
 import { createAgentProcedures } from '../server/trpc/agentProcedures';
 import { createChatSocketClient } from '../realtime/chatSocket';
+import { taskAgent } from '../agents/taskAgent';
+import { mealAgent } from '../agents/mealAgent';
+import { scheduleAgent } from '../agents/scheduleAgent';
 
 export const AVATAR_OPTIONS = {
   parent_female: ['👩🏾', '👩🏿', '👩🏽', '👩🏼', '👩🏻', '👩'],
@@ -39,7 +42,7 @@ export const FamilyProvider = ({ children }) => {
   const agentProceduresRef = useRef(createAgentProcedures());
   const chatSocketRef = useRef(null);
   const [showSplash, setShowSplash] = useState(true);
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => { try { return localStorage.getItem('kinflow_activeTab') || 'home'; } catch(e) { return 'home'; } });
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [activeUser, setActiveUser] = useState(() => {
@@ -50,7 +53,7 @@ export const FamilyProvider = ({ children }) => {
     return null;
   });
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
-  const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [hasOnboarded, setHasOnboarded] = useState(() => { try { return localStorage.getItem('kinflow_hasOnboarded') === 'true'; } catch(e) { return false; } });
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     try { return localStorage.getItem('kinflow_loggedIn') === 'true'; } catch(e) { return false; }
@@ -69,6 +72,8 @@ export const FamilyProvider = ({ children }) => {
   const [meals, setMeals] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [agentPreferences, setAgentPreferences] = useState({});
+  const [agentSuggestions, setAgentSuggestions] = useState([]);
+  const [agentFeedback, setAgentFeedback] = useState([]);
 
   // Family Members State
   const [familyMembers, setFamilyMembers] = useState(() => {
@@ -104,6 +109,14 @@ export const FamilyProvider = ({ children }) => {
 
   const isParent = activeUser?.role === 'Parent';
   const isChild = activeUser?.role === 'Child';
+
+  useEffect(() => {
+    try { localStorage.setItem('kinflow_activeTab', activeTab); } catch(e) {}
+  }, [activeTab]);
+
+  useEffect(() => {
+    try { localStorage.setItem('kinflow_hasOnboarded', String(hasOnboarded)); } catch(e) {}
+  }, [hasOnboarded]);
 
   // Dynamic Greeting
   const currentHour = new Date().getHours();
@@ -198,7 +211,17 @@ export const FamilyProvider = ({ children }) => {
       setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, console.error);
 
-    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubFamily(); unsubNotifs(); };
+    const suggestionsRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_agent_suggestions');
+    const unsubSuggestions = onSnapshot(suggestionsRef, (snap) => {
+      setAgentSuggestions(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+    }, () => setAgentSuggestions([]));
+
+    const feedbackRef = collection(db, 'artifacts', appId, dataPath, collPath, 'kinflow_agent_feedback');
+    const unsubFeedback = onSnapshot(feedbackRef, (snap) => {
+      setAgentFeedback(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+    }, () => setAgentFeedback([]));
+
+    return () => { unsubTasks(); unsubMsgs(); unsubPoints(); unsubEvents(); unsubMeals(); unsubFamily(); unsubNotifs(); unsubSuggestions(); unsubFeedback(); };
   }, [firebaseUser]);
 
   useEffect(() => {
@@ -255,6 +278,7 @@ export const FamilyProvider = ({ children }) => {
   const completeOnboarding = () => {
     setShowOnboarding(false);
     setHasOnboarded(true);
+    try { localStorage.setItem('kinflow_hasOnboarded', 'true'); } catch(e) {}
     triggerConfetti();
   };
 
@@ -394,6 +418,14 @@ export const FamilyProvider = ({ children }) => {
       const fb = extra.feedback ? ` Feedback: "${extra.feedback}"` : '';
       notifToSent = { title: "Needs Work", body: `Your parent asked you to redo "${t.title}".${fb}`, target: assignee };
     }
+    else if (action === 'assign') {
+      if (DEMO_MODE) {
+        setTasks(prev => prev.map(x => String(x.id) === String(taskId) ? { ...x, assignee: extra.assignee || 'Anyone' } : x));
+        return;
+      }
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', taskId.toString()), { assignee: extra.assignee || 'Anyone' });
+      return;
+    }
 
     if (newStatus === 'pending' || newStatus === 'approved') {
       if (t.status !== newStatus && action !== 'reject') triggerConfetti();
@@ -467,9 +499,81 @@ export const FamilyProvider = ({ children }) => {
     }
   };
 
-  const executeAgent = (agent, payload = {}) => agentProceduresRef.current.executeAgent({ agent, payload, context: { userId: activeUser?.id } });
-  const approveAgentSuggestion = (suggestionId, approved = true) => agentProceduresRef.current.approveSuggestion({ suggestionId, approved, userId: activeUser?.id });
+  const executeAgent = async (agent, payload = {}) => {
+    const result = await agentProceduresRef.current.executeAgent({ agent, payload, context: { userId: activeUser?.id } });
+    if (!DEMO_MODE && firebaseUser && Array.isArray(result?.suggestions)) {
+      await Promise.all(result.suggestions.map(async (suggestion) => {
+        const suggestionId = suggestion.id || `${Date.now()}-${Math.round(Math.random() * 1000)}`;
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_agent_suggestions', suggestionId), {
+          ...suggestion,
+          id: suggestionId,
+          agent,
+          status: 'proposed',
+          createdAt: Date.now(),
+        }, { merge: true });
+      }));
+    }
+    return result;
+  };
   const provideAgentFeedback = (suggestionId, feedback, rating) => agentProceduresRef.current.provideFeedback({ suggestionId, feedback, rating, userId: activeUser?.id });
+
+  const persistSuggestionFeedback = async (suggestion, approved) => {
+    const feedbackId = `${Date.now()}-${Math.round(Math.random() * 1000)}`;
+    const record = {
+      id: feedbackId,
+      suggestionId: suggestion.id,
+      suggestionType: suggestion.type || suggestion.agent || 'unknown',
+      assignee: suggestion?.payload?.assignee || null,
+      approved,
+      userId: activeUser?.id || 'unknown',
+      timestamp: Date.now(),
+    };
+    if (DEMO_MODE || !firebaseUser) return record;
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_agent_feedback', feedbackId), record);
+    return record;
+  };
+
+  const executeSuggestionAction = async (suggestion) => {
+    const payload = suggestion.payload || {};
+    switch (suggestion.type) {
+      case 'assignment':
+        if (payload.taskId) await handleTaskAction(payload.taskId, 'assign', { assignee: payload.assignee });
+        break;
+      case 'meal_plan':
+        await handleAddMeal({ meal: payload.mealName || suggestion.title, day: payload.day || 'This Week', prepTime: payload.prepMinutes ? `${payload.prepMinutes}m prep` : '30m prep' });
+        break;
+      case 'timeslot':
+      case 'conflict':
+        break;
+      case 'reminder':
+        await sendNotification('Task Reminder', suggestion.title, 'Parent');
+        break;
+      case 'reward_alert':
+        await sendNotification('Reward Alert', suggestion.title, activeUser?.name || 'Parent');
+        break;
+      case 'chore_rotate':
+        if (payload.taskId && payload.assignee) await handleUpdateTask({ id: payload.taskId, assignee: payload.assignee });
+        break;
+      default:
+        break;
+    }
+  };
+
+  const approveAgentSuggestion = async (suggestion, approved = true) => {
+    const suggestionId = typeof suggestion === 'string' ? suggestion : suggestion?.id;
+    if (!suggestionId) return { ok: false };
+    await agentProceduresRef.current.approveSuggestion({ suggestionId, approved, userId: activeUser?.id });
+    const fullSuggestion = typeof suggestion === 'string' ? agentSuggestions.find((item) => String(item.id) === String(suggestionId)) : suggestion;
+    if (fullSuggestion) {
+      if (approved) await executeSuggestionAction(fullSuggestion);
+      await persistSuggestionFeedback(fullSuggestion, approved);
+      if (!DEMO_MODE && firebaseUser) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_agent_suggestions', suggestionId.toString()), { status: approved ? 'approved' : 'dismissed', reviewedAt: Date.now() });
+      }
+    }
+    return { ok: true };
+  };
+
   const getAgentPreferences = async (agent) => {
     const response = await agentProceduresRef.current.getAgentPreferences({ agent });
     setAgentPreferences((prev) => ({ ...prev, [agent]: response.preferences }));
@@ -566,6 +670,12 @@ export const FamilyProvider = ({ children }) => {
     setTimeout(() => setLatestToast(null), 3500);
   };
 
+  const handleUpdateNotificationPrefs = async (prefs) => {
+    if (!activeUser) return;
+    const updatedUser = { ...activeUser, notificationPrefs: { ...(activeUser.notificationPrefs || {}), ...(prefs || {}) } };
+    handleUpdateProfile(updatedUser);
+  };
+
   // Filter My Notifications
   const myNotifications = notifications
     .filter(n => isParent ? n.target === 'Parent' : n.target === activeUser?.name)
@@ -586,6 +696,37 @@ export const FamilyProvider = ({ children }) => {
     try { localStorage.setItem('orbit_theme', theme); } catch(e) {}
   }, [theme]);
 
+  const generatedTaskSuggestions = taskAgent.execute({ prompt: 'assign review overdue', tasks, familyMembers }).suggestions || [];
+  const generatedMealSuggestions = mealAgent.execute({ prompt: 'healthy family meals', inventory: groceries, mealHistory: meals, familySize: familyMembers.length || 4 }).suggestions || [];
+  const generatedScheduleSuggestions = scheduleAgent.execute({ events }).suggestions || [];
+
+  const activeSuggestions = [
+    ...agentSuggestions.filter((item) => (item.status || 'proposed') === 'proposed'),
+    ...generatedTaskSuggestions.map((item) => ({ ...item, agent: item.agent || 'task' })),
+    ...generatedMealSuggestions.map((item) => ({ ...item, agent: item.agent || 'meal' })),
+    ...generatedScheduleSuggestions.map((item) => ({ ...item, agent: item.agent || 'schedule' })),
+  ];
+
+  const getFeedbackMultiplier = (suggestion) => {
+    const matches = agentFeedback.filter((f) => f.suggestionType === suggestion.type);
+    if (matches.length === 0) return 1;
+    const approvals = matches.filter((f) => f.approved).length;
+    const rate = approvals / matches.length;
+    return rate >= 0.5 ? 1 + (rate - 0.5) * 0.3 : 1 - (0.5 - rate) * 0.3;
+  };
+
+  const weightedSuggestions = activeSuggestions.map((item) => ({
+    ...item,
+    confidence: typeof item.confidence === 'number' ? Math.max(0.1, Math.min(0.99, Number((item.confidence * getFeedbackMultiplier(item)).toFixed(2)))) : item.confidence,
+  }));
+
+  const suggestionBuckets = {
+    dashboard: weightedSuggestions.slice(0, 3),
+    tasks: weightedSuggestions.filter((item) => item.agent === 'task' || item.type === 'assignment' || item.type === 'reminder').slice(0, 3),
+    meals: weightedSuggestions.filter((item) => item.agent === 'meal' || item.type === 'meal_plan').slice(0, 3),
+    calendar: weightedSuggestions.filter((item) => item.agent === 'schedule' || item.type === 'conflict' || item.type === 'timeslot').slice(0, 4),
+  };
+
   const value = {
     // State
     showSplash, activeTab, setActiveTab,
@@ -600,6 +741,7 @@ export const FamilyProvider = ({ children }) => {
     latestToast,
     tasks, messages, userPoints, events, meals, notifications,
     agentPreferences,
+    agentSuggestions: suggestionBuckets,
     groceries, setGroceries,
     showConfetti, isCopilotOpen, setIsCopilotOpen,
     lastRedeemed,
@@ -617,6 +759,7 @@ export const FamilyProvider = ({ children }) => {
     handleAddEvent, handleUpdateEvent, requestDeleteEvent,
     handleAddMeal, handleUpdateMeal, requestDeleteMeal,
     handleUpdateProfile,
+    handleUpdateNotificationPrefs,
     handleAddMember, handleUpdateMember, handleRemoveMember,
     myNotifications, unreadNotifsCount, markNotifsAsRead,
   };
