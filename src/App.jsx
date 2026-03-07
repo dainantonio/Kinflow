@@ -2332,7 +2332,7 @@ export default function App() {
   const [activeUser, setActiveUser] = useState(() => { try { const saved = localStorage.getItem('kinflow_lastProfile'); return saved ? JSON.parse(saved) : null; } catch(e) { return null; } }); 
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(() => { try { return localStorage.getItem('kinflow_hasOnboarded') === 'true'; } catch(e) { return false; } });
-  const [showOnboarding, setShowOnboarding] = useState(() => { try { const saved = localStorage.getItem('kinflow_lastProfile'); return saved ? JSON.parse(saved) : null; } catch(e) { return false; } } ? false : false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
     
   const [confirmActionState, setConfirmActionState] = useState(null);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
@@ -2368,10 +2368,12 @@ export default function App() {
 
   const [authReady, setAuthReady] = useState(false);
 
+  // Persist activeTab to localStorage
   useEffect(() => {
     try { localStorage.setItem('kinflow_activeTab', activeTab); } catch(e) {}
   }, [activeTab]);
 
+  // Persist activeUser to localStorage
   useEffect(() => {
     try {
       if (activeUser) localStorage.setItem('kinflow_lastProfile', JSON.stringify(activeUser));
@@ -2379,6 +2381,7 @@ export default function App() {
     } catch(e) {}
   }, [activeUser]);
 
+  // Persist hasOnboarded to localStorage
   useEffect(() => {
     try { localStorage.setItem('kinflow_hasOnboarded', String(hasOnboarded)); } catch(e) {}
   }, [hasOnboarded]);
@@ -2498,8 +2501,10 @@ export default function App() {
 
   const handleLogin = (user) => {
     setActiveUser(user);
-    try { localStorage.setItem('kinflow_lastProfile', JSON.stringify(user)); } catch(e) {}
-    if (user.role === 'Parent' && !hasOnboarded) setShowOnboarding(true);
+    // Only show onboarding for Parent role if they haven't completed it yet
+    if (user.role === 'Parent' && !hasOnboarded) {
+      setShowOnboarding(true);
+    }
   };
 
   const completeOnboarding = () => {
