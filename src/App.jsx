@@ -490,12 +490,8 @@ const AuthScreen = () => {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      const useRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
-      if (useRedirect) {
-        await signInWithRedirect(auth, provider);
-        return;
-      }
-
+      // Use signInWithPopup on all platforms to avoid redirect-related race conditions.
+      // signInWithPopup is more reliable and doesn't require handling getRedirectResult().
       await signInWithPopup(auth, provider);
       // onAuthStateChanged handles the screen transition automatically
     } catch (err) {
@@ -518,12 +514,8 @@ const AuthScreen = () => {
       const provider = new OAuthProvider('apple.com');
       provider.addScope('email');
       provider.addScope('name');
-      const useRedirect = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
-      if (useRedirect) {
-        await signInWithRedirect(auth, provider);
-        return;
-      }
-
+      // Use signInWithPopup on all platforms to avoid redirect-related race conditions.
+      // signInWithPopup is more reliable and doesn't require handling getRedirectResult().
       await signInWithPopup(auth, provider);
       // onAuthStateChanged handles the screen transition automatically
     } catch (err) {
@@ -2395,42 +2387,26 @@ export default function App() {
     try { localStorage.setItem('kinflow_hasOnboarded', String(hasOnboarded)); } catch(e) {}
   }, [hasOnboarded]);
 
+
   useEffect(() => {
     if (!auth) return;
     let cleanup;
-    const initAuth = async () => {
-      // Drain any pending redirect result BEFORE subscribing to auth state.
-      // This is critical on mobile: after signInWithRedirect() completes,
-      // Firebase needs to process the credential. If onAuthStateChanged fires
-      // before getRedirectResult() completes, it will fire with null, causing
-      // the app to show AuthScreen and loop. By awaiting getRedirectResult first,
-      // we ensure Firebase has fully processed the redirect before we subscribe.
-      try {
-        const result = await getRedirectResult(auth);
-        // Note: if result is non-null, the user is already set in Firebase's
-        // auth state and will be picked up by onAuthStateChanged below.
-        if (result?.user) {
-          console.log('Redirect sign-in successful:', result.user.email);
-        }
-      } catch (e) {
-        // Ignore errors (e.g. no pending redirect, domain issues, user cancelled).
-        // onAuthStateChanged will still correctly reflect current auth state.
-        if (e?.code !== 'auth/no-redirect-operation') {
-          console.warn('getRedirectResult error:', e?.code, e?.message);
-        }
-      }
-      // Now subscribe to auth state changes. The redirect is fully processed,
-      // so onAuthStateChanged will fire with the correct user (or null if not signed in).
-      const unsubscribe = onAuthStateChanged(auth, user => {
-        setFirebaseUser(user);
-        setAuthReady(true);
+    // Subscribe to auth state changes. Since we're using signInWithPopup on all platforms,
+    // we don't need to handle getRedirectResult() separately. The popup flow is synchronous
+    // and onAuthStateChanged will fire immediately with the correct user state.
+    const unsubscribe = onAuthStateChanged(auth, user => {
+      console.log('[AUTH] Auth state changed:', {
+        email: user?.email,
+        uid: user?.uid,
+        isAnonymous: user?.isAnonymous,
+        exists: !!user
       });
-      cleanup = unsubscribe;
-    };
-    initAuth();
+      setFirebaseUser(user);
+      setAuthReady(true);
+    });
+    cleanup = unsubscribe;
     return () => cleanup?.();
   }, []);
-
   // Derived: logged in = Firebase user is real (not anonymous) and auth has initialized
   const isLoggedIn = authReady && !!firebaseUser && !firebaseUser.isAnonymous;
 
