@@ -996,24 +996,43 @@ const ChildHome = ({ tasks, events, points, activeUser, onNavigate }) => {
         <ChevronRight className="w-5 h-5 text-white/60 shrink-0" />
       </div>
 
-      {/* UPCOMING EVENTS for kids */}
+      {/* UPCOMING EVENTS for kids — only genuinely future events */}
       {(() => {
         const now = new Date();
         const upcoming = (events || []).filter(ev => {
-          if (!ev.date) return true;
-          return new Date(ev.date + 'T23:59:59') >= now;
-        }).sort((a, b) => new Date(a.date + 'T12:00:00') - new Date(b.date + 'T12:00:00')).slice(0, 2);
+          if (!ev.date) return false; // no date = don't guess
+          // Parse actual datetime (same logic as parseEventDateTime)
+          if (ev.time) {
+            const t = ev.time.match(/(\d+):?(\d*)\s*(am|pm)?/i);
+            if (t) {
+              let h = parseInt(t[1]), m = parseInt(t[2] || '0');
+              const ampm = (t[3] || '').toLowerCase();
+              if (ampm === 'pm' && h < 12) h += 12;
+              if (ampm === 'am' && h === 12) h = 0;
+              const dt = new Date(ev.date + 'T00:00:00');
+              dt.setHours(h, m, 0, 0);
+              return dt >= now;
+            }
+          }
+          // No parseable time — only show if it's a future date (not today already ended)
+          return new Date(ev.date + 'T23:59:59') > now && new Date(ev.date + 'T00:00:00') >= new Date(now.toDateString());
+        })
+        .sort((a, b) => new Date(a.date + 'T12:00:00') - new Date(b.date + 'T12:00:00'))
+        .slice(0, 2);
+
         if (upcoming.length === 0) return null;
         return (
           <div>
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">📅 Coming Up</p>
             <div className="space-y-2">
-              {upcoming.map((event, i) => (
+              {upcoming.map((event) => (
                 <div key={event.id} className="bg-white rounded-2xl p-4 ring-1 ring-black/5 flex items-center gap-3">
-                  <div className={`w-1 h-10 rounded-full shrink-0 ${event.color || 'bg-sky-400'}`} />
+                  <div className={`w-1 h-10 rounded-full shrink-0 ${event.color || 'bg-indigo-400'}`} />
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-slate-800 text-sm truncate">{event.title}</p>
-                    <p className="text-slate-400 text-xs font-medium mt-0.5">{event.time} {event.location ? `· ${event.location}` : ''}</p>
+                    <p className="text-slate-400 text-xs font-medium mt-0.5">
+                      {event.time}{event.location ? ` · ${event.location}` : ''}
+                    </p>
                   </div>
                 </div>
               ))}
