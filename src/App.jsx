@@ -2442,6 +2442,10 @@ const RewardsView = ({ rewards, points, onRedeem, onAddReward, onDeleteReward, i
 const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}, tasks = [], onBack, onUpdateMember, onAddMember, onDeleteMember }) => {
   const [activeModal, setActiveModal] = useState(null);
   const [editName, setEditName] = useState(user?.name || '');
+  // TODO: Persist selectedTheme to Firestore (kinflow_preferences/{userId}) and apply
+  // gradient via ThemeContext so all views respond to it. For now this is UI-only state
+  // that correctly reflects selection within the modal and updates the Settings row label.
+  const [selectedTheme, setSelectedTheme] = useState('Classic');
   const handleModalClose = () => setActiveModal(null);
   const photoInputRef = useRef(null);
   const handlePhotoClick = () => { if (photoInputRef.current) photoInputRef.current.click(); };
@@ -2591,7 +2595,7 @@ const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}
         <div>
           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Appearance</h3>
           <div className="bg-white rounded-[1.75rem] ring-1 ring-slate-900/5 overflow-hidden shadow-sm divide-y divide-slate-50">
-            <SettingRow onClick={() => setActiveModal('themes')} icon={Settings} label="App Theme" value="Classic" />
+            <SettingRow onClick={() => setActiveModal('themes')} icon={Settings} label="App Theme" value={selectedTheme} />
           </div>
         </div>
 
@@ -2698,20 +2702,23 @@ const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Parent Themes</p>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { name: 'Classic', desc: 'Deep indigo & violet', gradient: 'from-indigo-600 to-violet-700', selected: true },
-                { name: 'Slate', desc: 'Professional dark slate', gradient: 'from-slate-700 to-slate-900', selected: false },
-                { name: 'Ocean', desc: 'Blue & teal tones', gradient: 'from-blue-600 to-teal-600', selected: false },
-                { name: 'Forest', desc: 'Calm greens & earth', gradient: 'from-emerald-600 to-green-800', selected: false },
-              ].map(t => (
-                <div key={t.name} className={`relative rounded-2xl overflow-hidden cursor-pointer ring-2 transition-all ${t.selected ? 'ring-indigo-500 shadow-lg shadow-indigo-200' : 'ring-transparent hover:ring-slate-200'}`}>
-                  <div className={`h-16 bg-gradient-to-br ${t.gradient}`} />
-                  <div className="bg-white p-2.5">
-                    <p className="font-bold text-sm text-slate-800">{t.name}</p>
-                    <p className="text-[10px] font-medium text-slate-400">{t.desc}</p>
+                { name: 'Classic', desc: 'Deep indigo & violet', gradient: 'from-indigo-600 to-violet-700' },
+                { name: 'Slate', desc: 'Professional dark slate', gradient: 'from-slate-700 to-slate-900' },
+                { name: 'Ocean', desc: 'Blue & teal tones', gradient: 'from-blue-600 to-teal-600' },
+                { name: 'Forest', desc: 'Calm greens & earth', gradient: 'from-emerald-600 to-green-800' },
+              ].map(t => {
+                const isSelected = selectedTheme === t.name;
+                return (
+                  <div key={t.name} onClick={() => setSelectedTheme(t.name)} className={`relative rounded-2xl overflow-hidden cursor-pointer ring-2 transition-all ${isSelected ? 'ring-indigo-500 shadow-lg shadow-indigo-200' : 'ring-transparent hover:ring-slate-200'}`}>
+                    <div className={`h-16 bg-gradient-to-br ${t.gradient}`} />
+                    <div className="bg-white p-2.5">
+                      <p className="font-bold text-sm text-slate-800">{t.name}</p>
+                      <p className="text-[10px] font-medium text-slate-400">{t.desc}</p>
+                    </div>
+                    {isSelected && <div className="absolute top-2 right-2 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-sm"><Check className="w-3 h-3 text-indigo-500" strokeWidth={3} /></div>}
                   </div>
-                  {t.selected && <div className="absolute top-2 right-2 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-sm"><Check className="w-3 h-3 text-indigo-500" strokeWidth={3} /></div>}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -2719,24 +2726,29 @@ const SettingsView = ({ user, isParent, onLogout, allUsers = [], userPoints = {}
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Kids Themes (Fun & Bright)</p>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { name: 'Sky Kids', desc: 'Bright sky blue', gradient: 'from-sky-400 to-cyan-500', selected: false },
-                { name: 'Sunshine', desc: 'Warm amber & yellow', gradient: 'from-amber-400 to-yellow-400', selected: false },
-                { name: 'Berry', desc: 'Playful pink & purple', gradient: 'from-pink-500 to-purple-500', selected: false },
-                { name: 'Lime', desc: 'Fresh green & mint', gradient: 'from-lime-400 to-emerald-400', selected: false },
-              ].map(t => (
-                <div key={t.name} className="relative rounded-2xl overflow-hidden cursor-pointer ring-2 ring-transparent hover:ring-slate-200 transition-all">
-                  <div className={`h-16 bg-gradient-to-br ${t.gradient}`} />
-                  <div className="bg-white p-2.5">
-                    <p className="font-bold text-sm text-slate-800">{t.name}</p>
-                    <p className="text-[10px] font-medium text-slate-400">{t.desc}</p>
+                { name: 'Sky Kids', desc: 'Bright sky blue', gradient: 'from-sky-400 to-cyan-500' },
+                { name: 'Sunshine', desc: 'Warm amber & yellow', gradient: 'from-amber-400 to-yellow-400' },
+                { name: 'Berry', desc: 'Playful pink & purple', gradient: 'from-pink-500 to-purple-500' },
+                { name: 'Lime', desc: 'Fresh green & mint', gradient: 'from-lime-400 to-emerald-400' },
+              ].map(t => {
+                const isSelected = selectedTheme === t.name;
+                return (
+                  <div key={t.name} onClick={() => setSelectedTheme(t.name)} className={`relative rounded-2xl overflow-hidden cursor-pointer ring-2 transition-all ${isSelected ? 'ring-indigo-500 shadow-lg shadow-indigo-200' : 'ring-transparent hover:ring-slate-200'}`}>
+                    <div className={`h-16 bg-gradient-to-br ${t.gradient}`} />
+                    <div className="bg-white p-2.5">
+                      <p className="font-bold text-sm text-slate-800">{t.name}</p>
+                      <p className="text-[10px] font-medium text-slate-400">{t.desc}</p>
+                    </div>
+                    {isSelected && <div className="absolute top-2 right-2 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-sm"><Check className="w-3 h-3 text-indigo-500" strokeWidth={3} /></div>}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          <p className="text-[10px] font-medium text-slate-400 text-center">Theme switching coming in the next update ✨</p>
-          <Button onClick={handleModalClose} variant="secondary">Done</Button>
+          {/* TODO: Persist selectedTheme to Firestore and propagate via ThemeContext */}
+          <p className="text-[10px] font-medium text-slate-400 text-center">Full theme application coming in the next update ✨</p>
+          <Button onClick={handleModalClose} variant="secondary">Save Theme</Button>
         </div>
       </Modal>
 
