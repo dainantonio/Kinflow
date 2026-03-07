@@ -254,8 +254,12 @@ const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-900/75" onClick={onClose} style={{backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
       <div
-        className={`${isChild ? 'bg-white rounded-t-[2rem] sm:rounded-[2rem] border-t-8 border-indigo-100' : 'bg-white rounded-t-[2rem] sm:rounded-[2rem]'} w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl ring-1 ring-black/8 relative animate-slide-up cursor-default overflow-hidden`}
-        style={{transformOrigin:'bottom center'}}
+        className={`${isChild ? 'bg-white rounded-t-[2rem] sm:rounded-[2rem] border-t-8 border-indigo-100' : 'bg-white rounded-t-[2rem] sm:rounded-[2rem]'} w-full max-w-md flex flex-col shadow-2xl ring-1 ring-black/8 relative animate-slide-up cursor-default overflow-hidden`}
+        style={{
+          transformOrigin:'bottom center',
+          maxHeight: 'min(90dvh, 90vh)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
         onClick={e => e.stopPropagation()}
       >
         <div className="p-5 pb-3 shrink-0">
@@ -268,7 +272,7 @@ const Modal = ({ isOpen, onClose, title, children, fullHeight = false }) => {
           </div>
         </div>
 
-        <div className={`px-5 pb-6 overflow-y-auto relative ${fullHeight ? 'flex-1 h-[60vh]' : ''}`}>
+        <div className={`px-5 pb-6 overflow-y-auto relative flex-1 ${fullHeight ? 'min-h-[40vh]' : ''}`}>
           {children}
         </div>
       </div>
@@ -747,11 +751,7 @@ const ChatView = ({ messages, onSend, onDelete, allUsers = [], onApproveSuggesti
   };
 
   return (
-    // Chat layout: the parent scroll container provides the viewport.
-    // We subtract the sticky top bar (~64px), the floating bottom nav (~80px),
-    // the content area top padding (24px) and a small buffer (8px) = 176px total.
-    // Using 100dvh (dynamic viewport height) avoids mobile browser chrome issues.
-    <div className="flex flex-col animate-bounce-in" style={{height:'calc(100dvh - 176px)', minHeight:'380px'}}>
+    <div className="flex flex-col animate-bounce-in h-full" style={{minHeight:'380px'}}>
       {/* Chat header */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
@@ -1195,7 +1195,7 @@ const TasksView = ({ tasks, onAction, onAdd, onDelete, activeUser, isParent, all
         <form onSubmit={handleSubmitNewTask} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Task Name</label>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 text-slate-800 font-medium transition-all" placeholder="e.g., Clean the garage" autoFocus />
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 text-slate-800 font-medium transition-all" placeholder="e.g., Clean the garage" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1583,7 +1583,7 @@ const CalendarView = ({ events, onAdd, onDelete, isParent, suggestions = [], onA
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Event Name</label>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium transition-all" placeholder="e.g., Dentist Appointment" autoFocus />
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium transition-all" placeholder="e.g., Dentist Appointment" />
           </div>
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Date</label>
@@ -1715,7 +1715,7 @@ const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setG
         <form onSubmit={handleAddSubmit} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Recipe Name</label>
-            <input type="text" value={meal} onChange={e => setMeal(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium" placeholder="e.g., Chicken Parmesan" autoFocus />
+            <input type="text" value={meal} onChange={e => setMeal(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium" placeholder="e.g., Chicken Parmesan" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -1731,7 +1731,7 @@ const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setG
         </form>
       </Modal>
 
-      <Modal isOpen={!!selectedMeal} onClose={closeMealModal} title={isEditing ? "Edit Recipe" : (selectedMeal?.meal || "Recipe")}>
+      <Modal isOpen={!!selectedMeal} onClose={closeMealModal} title={isEditing ? "Edit Recipe" : (selectedMeal?.meal || "Recipe")} fullHeight>
         {selectedMeal && !isEditing && (
           <div className="space-y-6">
             <div className="flex gap-2"><Badge variant="premium">{selectedMeal.day}</Badge><Badge variant="default">{selectedMeal.prepTime}</Badge></div>
@@ -2483,14 +2483,23 @@ export default function App() {
 
   // TOAST PUSH NOTIFICATION LISTENER
   useEffect(() => {
-    if (activeUser && notifications.length > prevNotifsLength.current && prevNotifsLength.current !== 0) {
-       const newest = [...notifications].sort((a,b) => b.createdAt - a.createdAt)[0];
-       // Check if this new alert is for ME and happened in the last 5 seconds
-       const isForMe = isParent ? newest.target === 'Parent' : newest.target === activeUser.name;
-       if (newest && isForMe && newest.createdAt > Date.now() - 5000) {
-           setLatestToast(newest);
-           setTimeout(() => setLatestToast(null), 4500);
-       }
+    if (!activeUser || notifications.length === 0) {
+      prevNotifsLength.current = notifications.length;
+      return;
+    }
+    if (notifications.length > prevNotifsLength.current) {
+      // Only look at notifications targeted at ME
+      const forMe = notifications.filter(n =>
+        isParent ? n.target === 'Parent' : n.target === activeUser.name
+      );
+      // Find the newest one that arrived within the last 8 seconds
+      const recent = forMe
+        .filter(n => n.createdAt > Date.now() - 8000)
+        .sort((a, b) => b.createdAt - a.createdAt)[0];
+      if (recent) {
+        setLatestToast(recent);
+        setTimeout(() => setLatestToast(null), 4500);
+      }
     }
     prevNotifsLength.current = notifications.length;
   }, [notifications, activeUser, isParent]);
@@ -2512,7 +2521,7 @@ export default function App() {
 
   // --- NOTIFICATION DISPATCHER ---
   const sendNotification = async (title, body, targetUserOrRole) => {
-    const newId = Date.now().toString();
+    const newId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const notifData = { id: newId, title, body, target: targetUserOrRole, createdAt: Date.now(), read: false };
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_notifications', newId), notifData);
@@ -2572,10 +2581,16 @@ export default function App() {
   const handleAddTask = async (newTask) => {
     const newId = Date.now().toString();
     const taskData = { ...newTask, id: newId, status: 'open', createdAt: Date.now() };
-    if (!firebaseUser) return;
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), taskData);
-    if (newTask.assignee && newTask.assignee !== 'Anyone') {
-      sendNotification("New Chore", `You were assigned a new chore: "${newTask.title}"`, newTask.assignee);
+    // Optimistically update local state so the task appears immediately
+    setTasks(prev => [...prev, taskData].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+    if (!firebaseUser) return; // local-only if not authenticated
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_tasks', newId), taskData);
+      if (newTask.assignee && newTask.assignee !== 'Anyone') {
+        sendNotification("New Chore", `You were assigned a new chore: "${newTask.title}"`, newTask.assignee);
+      }
+    } catch (e) {
+      console.warn('Task save failed, keeping local copy', e);
     }
   };
 
@@ -2655,9 +2670,18 @@ export default function App() {
   const handleSendMessage = async (text) => {
     if (!activeUser) return;
     const newId = Date.now().toString();
-    const msgData = { id: newId, senderId: activeUser.id, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
+    const msgData = { id: newId, senderId: activeUser.id, senderName: activeUser.name, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: Date.now() };
     if (!firebaseUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_messages', newId), msgData);
+    // Notify every other family member that a chat message arrived
+    const otherUsers = users.filter(u => u.id !== activeUser.id);
+    otherUsers.forEach(u => {
+      sendNotification(
+        `${activeUser.name} 💬`,
+        text.length > 60 ? text.slice(0, 57) + '…' : text,
+        u.role === 'Parent' ? 'Parent' : u.name
+      );
+    });
   };
 
   const requestDeleteMessage = (id) => {
@@ -2793,7 +2817,7 @@ export default function App() {
     const displayPoints = isParent ? Object.values(userPoints).reduce((a, b) => a + b, 0) : (userPoints[activeUser?.name] || 0);
     switch(activeTab) {
       case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} allUsers={users} suggestions={dashboardSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
-      case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} suggestions={taskSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
+      case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} allUsers={users} suggestions={taskSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} suggestions={calendarSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} suggestions={mealSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'rewards': return <RewardsView rewards={rewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
@@ -2891,10 +2915,23 @@ export default function App() {
         </div>
 
         {/* SCROLLABLE CONTENT */}
-        <div className="flex-1 overflow-y-auto" style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', minHeight:0}}>
-          <div className="px-4 pt-6 pb-36 max-w-lg mx-auto w-full">
-            {renderContent()}
-          </div>
+        {/* When on chat tab, overflow must be hidden so ChatView owns its own scroll */}
+        <div
+          className={`flex-1 ${activeTab === 'chat' ? 'overflow-hidden' : 'overflow-y-auto'}`}
+          style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', minHeight:0}}
+        >
+          {activeTab === 'chat'
+            ? (
+              <div className="h-full px-4 pt-4 pb-4 max-w-lg mx-auto w-full flex flex-col">
+                {renderContent()}
+              </div>
+            )
+            : (
+              <div className="px-4 pt-6 pb-36 max-w-lg mx-auto w-full">
+                {renderContent()}
+              </div>
+            )
+          }
         </div>
 
         {/* Global Notifications Modal */}
