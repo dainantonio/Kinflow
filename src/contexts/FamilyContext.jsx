@@ -4,8 +4,23 @@ import {
   signInWithCustomToken, signInAnonymously, onAuthStateChanged,
   collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc
 } from '../utils/firebase';
-import { createAgentProcedures } from '../server/trpc/agentProcedures';
-import { createChatSocketClient } from '../realtime/chatSocket';
+// NOTE: agentProcedures and chatSocket are future server-side infrastructure.
+// They are intentionally not wired to the client runtime yet.
+// When a backend is added, re-import createAgentProcedures from '../server/trpc/agentProcedures'
+// and createChatSocketClient from '../realtime/chatSocket' and wire them here.
+
+// Safe no-op stubs so existing FamilyContext method signatures compile without errors
+const createAgentProcedures = () => ({
+  executeAgent: async () => ({ suggestions: [], responseText: '' }),
+  approveSuggestion: async () => ({ ok: true }),
+  provideFeedback: async () => ({ ok: true }),
+  getAgentPreferences: async (input) => ({ agent: input?.agent, preferences: {} }),
+  updateAgentPreferences: async (input) => ({ agent: input?.agent, preferences: input?.preferences || {} }),
+});
+const createChatSocketClient = ({ onMessage } = {}) => ({
+  send: () => {},
+  close: () => {},
+});
 import { taskAgent } from '../agents/taskAgent';
 import { mealAgent } from '../agents/mealAgent';
 import { scheduleAgent } from '../agents/scheduleAgent';
