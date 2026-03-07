@@ -6,7 +6,8 @@ import {
   MoreVertical, Users, BellRing, CreditCard, LogOut,
   ShoppingCart, Loader2, Hourglass, ArrowRight,
   Layers, Wand2, Smartphone, Film, Ticket,
-  MessageCircle, Smile, Image as ImageIcon, Camera, Trash2, ChevronLeft, UserCircle, BadgeCheck
+  MessageCircle, Smile, Image as ImageIcon, Camera, Trash2, ChevronLeft, UserCircle, BadgeCheck,
+  Crown, Lock, Sparkles, PartyPopper, Medal, TrendingUp
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -120,6 +121,21 @@ const CustomStyles = () => (
         0% { transform: scale(0.8); opacity: 1; }
         100% { transform: scale(2.4); opacity: 0; }
       }
+      @keyframes rewardPop {
+        0% { transform: scale(0.5) rotate(-10deg); opacity: 0; }
+        60% { transform: scale(1.15) rotate(4deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      @keyframes streakFlame {
+        0%, 100% { transform: scaleY(1) rotate(-2deg); }
+        50% { transform: scaleY(1.15) rotate(2deg); }
+      }
+      @keyframes xpBar {
+        from { width: 0%; }
+      }
+      .animate-reward-pop { animation: rewardPop 0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
+      .animate-streak-flame { animation: streakFlame 0.8s ease-in-out infinite; }
+      .animate-xp-bar { animation: xpBar 1s cubic-bezier(0.16,1,0.3,1) forwards; }
       @keyframes countUp {
         from { transform: translateY(8px); opacity: 0; }
         to { transform: translateY(0); opacity: 1; }
@@ -1787,74 +1803,376 @@ const MealsView = ({ meals, onAdd, onUpdate, onDelete, isParent, groceries, setG
   );
 };
 
-const RewardsView = ({ rewards, points, onRedeem, isParent }) => {
+const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 5000];
+const LEVEL_NAMES = ['Rookie', 'Helper', 'Star', 'Champion', 'Legend', 'Hero', 'GOAT'];
+const LEVEL_COLORS = [
+  'from-slate-400 to-slate-500',
+  'from-emerald-400 to-teal-500',
+  'from-blue-400 to-indigo-500',
+  'from-violet-400 to-purple-600',
+  'from-amber-400 to-orange-500',
+  'from-rose-400 to-pink-600',
+  'from-yellow-300 to-amber-500',
+];
+
+const getLevelInfo = (pts) => {
+  let level = 0;
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (pts >= LEVEL_THRESHOLDS[i]) { level = i; break; }
+  }
+  const nextLevel = Math.min(level + 1, LEVEL_THRESHOLDS.length - 1);
+  const current = LEVEL_THRESHOLDS[level];
+  const next = LEVEL_THRESHOLDS[nextLevel];
+  const progress = level === nextLevel ? 100 : Math.round(((pts - current) / (next - current)) * 100);
+  return { level, name: LEVEL_NAMES[level], color: LEVEL_COLORS[level], progress, ptsToNext: Math.max(0, next - pts), nextName: LEVEL_NAMES[nextLevel] };
+};
+
+const RewardsView = ({ rewards, points, onRedeem, onAddReward, onDeleteReward, isParent, allUsers = [], userPoints = {}, tasks = [] }) => {
   const { isChild } = useContext(ThemeContext);
-  const nextReward = rewards.filter(r => r.cost > points).sort((a,b) => a.cost - b.cost)[0];
-  const progress = nextReward ? Math.min(100, (points / nextReward.cost) * 100) : 100;
+  const [activeTab, setActiveTab] = useState('rewards'); // 'rewards' | 'leaderboard' | 'history'
+  const [redeemingId, setRedeemingId] = useState(null);
+  const [justRedeemed, setJustRedeemed] = useState(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newRewardTitle, setNewRewardTitle] = useState('');
+  const [newRewardCost, setNewRewardCost] = useState(50);
+  const [newRewardEmoji, setNewRewardEmoji] = useState('🎁');
+
+  const levelInfo = getLevelInfo(points);
+  const nextReward = rewards.filter(r => r.cost > points).sort((a, b) => a.cost - b.cost)[0];
+
+  const completedTasks = tasks.filter(t => t.status === 'approved');
+  const streak = Math.min(completedTasks.length, 7); // simplified streak
+
+  // Leaderboard data
+  const leaderboard = Object.entries(userPoints)
+    .map(([name, pts]) => ({ name, pts, user: allUsers.find(u => u.name === name) }))
+    .sort((a, b) => b.pts - a.pts);
+
+  const handleRedeem = async (reward) => {
+    if (points < reward.cost) return;
+    setRedeemingId(reward.id);
+    await new Promise(r => setTimeout(r, 600));
+    onRedeem(reward.cost, reward);
+    setJustRedeemed(reward);
+    setRedeemingId(null);
+    setTimeout(() => setJustRedeemed(null), 3000);
+  };
+
+  const handleAddReward = () => {
+    if (!newRewardTitle.trim()) return;
+    onAddReward({ title: newRewardTitle, cost: newRewardCost, emoji: newRewardEmoji });
+    setNewRewardTitle('');
+    setNewRewardCost(50);
+    setNewRewardEmoji('🎁');
+    setIsAddModalOpen(false);
+  };
+
+  const EMOJI_OPTIONS = ['🎁','🎮','🍕','🍦','🎬','🏆','⭐','🎨','🎯','🚀','💎','🦄','🎪','🏖️','🎠'];
 
   return (
-    <div className="space-y-5 animate-bounce-in">
-      {/* HERO BALANCE */}
-      <RevealCard delay={0}>
-        <div className="relative overflow-hidden rounded-3xl p-6 text-center" style={{background:'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)'}}>
-          <div className="absolute inset-0 opacity-10" style={{backgroundImage:'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize:'20px 20px'}} />
-          <div className="relative z-10">
-            <Star className="w-8 h-8 text-amber-900/30 fill-amber-900/20 mx-auto mb-3" />
-            <p className="text-amber-900/60 text-[10px] font-bold uppercase tracking-widest">Your Balance</p>
-            <p className="text-5xl font-black text-amber-900 tracking-tight mt-1 animate-count-up">{points}</p>
-            <p className="text-amber-900/50 text-sm font-bold mt-1">points earned</p>
+    <div className="space-y-4 animate-bounce-in">
+
+      {/* JUST REDEEMED CELEBRATION */}
+      {justRedeemed && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+          <div className="animate-reward-pop flex flex-col items-center gap-3 bg-white rounded-[2rem] shadow-2xl p-8 ring-2 ring-amber-300 max-w-[280px] w-full mx-4 pointer-events-none">
+            <div className="text-6xl">{justRedeemed.emoji || '🎉'}</div>
+            <p className="text-xl font-black text-slate-900 text-center leading-tight">Reward Unlocked!</p>
+            <p className="text-sm font-bold text-slate-500 text-center">{justRedeemed.title}</p>
+            <div className="flex gap-1">
+              {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 text-amber-400 fill-amber-400" style={{animationDelay:`${i*80}ms`}} />)}
+            </div>
           </div>
-          {nextReward && !isParent && (
-            <div className="relative z-10 mt-4">
-              <div className="flex justify-between mb-1.5">
-                <span className="text-amber-900/50 text-[10px] font-bold uppercase tracking-wider">Next: {nextReward.title}</span>
-                <span className="text-amber-900/60 text-[10px] font-bold">{nextReward.cost - points} pts to go</span>
+        </div>
+      )}
+
+      {/* HERO — Level + Points */}
+      <RevealCard delay={0}>
+        <div className="relative overflow-hidden rounded-3xl p-5" style={{background:`linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4c1d95 100%)`}}>
+          <div className="absolute top-0 right-0 w-56 h-56 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/3" />
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4" />
+
+          <div className="relative z-10 flex items-start justify-between mb-4">
+            <div>
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r ${levelInfo.color} shadow-lg mb-2`}>
+                <Crown className="w-3 h-3 text-white" />
+                <span className="text-white text-[10px] font-black uppercase tracking-widest">{levelInfo.name}</span>
               </div>
-              <div className="h-2 bg-amber-800/20 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-900/40 rounded-full transition-all duration-700" style={{width:`${progress}%`}} />
+              <p className="text-5xl font-black text-white tracking-tight">{points.toLocaleString()}</p>
+              <p className="text-white/40 text-xs font-bold mt-1">total points</p>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20">
+                <span className="text-3xl animate-streak-flame">🔥</span>
               </div>
+              <p className="text-white/60 text-[9px] font-black uppercase tracking-wider">{streak} streak</p>
+            </div>
+          </div>
+
+          {/* XP Progress bar */}
+          {levelInfo.ptsToNext > 0 && (
+            <div className="relative z-10">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-white/50 text-[10px] font-bold">Level up → {levelInfo.nextName}</span>
+                <span className="text-white/60 text-[10px] font-black">{levelInfo.ptsToNext} pts to go</span>
+              </div>
+              <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className={`h-full bg-gradient-to-r ${levelInfo.color} rounded-full animate-xp-bar`}
+                  style={{width:`${levelInfo.progress}%`}}
+                />
+              </div>
+            </div>
+          )}
+          {levelInfo.ptsToNext === 0 && (
+            <div className="relative z-10 flex items-center gap-2 bg-white/10 px-4 py-2 rounded-2xl">
+              <span className="text-yellow-300 text-lg">👑</span>
+              <span className="text-white font-bold text-sm">Max Level Achieved!</span>
             </div>
           )}
         </div>
       </RevealCard>
 
-      <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest px-1">Available Rewards</h3>
+      {/* TAB BAR */}
+      <div className="flex bg-slate-100 rounded-2xl p-1 gap-1">
+        {[
+          { id: 'rewards', label: '🎁 Rewards' },
+          { id: 'leaderboard', label: '🏆 Board' },
+          ...(isParent ? [{ id: 'manage', label: '⚙️ Manage' }] : []),
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      <div className="grid grid-cols-1 gap-3">
-        {rewards.map((reward, idx) => {
-          const canAfford = points >= reward.cost;
-          return (
-            <RevealCard key={reward.id} delay={idx * 60}>
-              <div className={`bg-white rounded-3xl p-5 shadow-sm ring-1 transition-all ${canAfford && !isParent ? 'ring-amber-300 shadow-amber-100' : 'ring-black/5'}`}>
-                <div className="flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${reward.color} ${canAfford ? 'shadow-lg' : ''}`}>
-                    {reward.icon}
+      {/* REWARDS TAB */}
+      {activeTab === 'rewards' && (
+        <div className="space-y-3">
+          {/* Next reward teaser */}
+          {nextReward && !isParent && (
+            <div className="bg-indigo-50 rounded-3xl p-4 ring-1 ring-indigo-100 flex items-center gap-3">
+              <div className="text-3xl">{nextReward.emoji || '🎯'}</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-indigo-600 uppercase tracking-wider mb-1">Almost there!</p>
+                <p className="font-bold text-slate-800 text-sm truncate">{nextReward.title}</p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <div className="flex-1 h-1.5 bg-indigo-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500 rounded-full" style={{width:`${Math.round((points/nextReward.cost)*100)}%`}} />
                   </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-slate-800 text-base">{reward.title}</h4>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <Flame className="w-3 h-3 text-amber-500" />
-                      <span className="text-sm font-bold text-amber-600">{reward.cost} pts</span>
-                      {canAfford && !isParent && <span className="text-[9px] font-bold bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full uppercase tracking-wider">Affordable!</span>}
-                    </div>
-                  </div>
-                  <button
-                    disabled={points < reward.cost || isParent}
-                    onClick={() => onRedeem(reward.cost)}
-                    className={`spring-press shrink-0 px-4 py-2.5 rounded-2xl font-bold text-sm transition-all ${
-                      isParent ? 'bg-slate-100 text-slate-400 cursor-not-allowed' :
-                      canAfford ? 'bg-amber-400 text-amber-900 shadow-md shadow-amber-400/30 hover:bg-amber-300' :
-                      'bg-slate-100 text-slate-400'
-                    }`}
-                  >
-                    {isParent ? 'Kids only' : canAfford ? 'Unlock' : `−${reward.cost - points}`}
-                  </button>
+                  <span className="text-[10px] font-black text-indigo-500 shrink-0">{nextReward.cost - points} pts</span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {rewards.length === 0 && (
+            <div className="text-center py-12 bg-white rounded-3xl ring-1 ring-black/5">
+              <div className="text-5xl mb-3">🎁</div>
+              <p className="text-slate-500 font-bold">No rewards yet</p>
+              {isParent && <p className="text-slate-400 text-sm mt-1">Add rewards for your kids to unlock!</p>}
+            </div>
+          )}
+
+          {rewards.map((reward, idx) => {
+            const canAfford = points >= reward.cost;
+            const isRedeeming = redeemingId === reward.id;
+            const ptsNeeded = reward.cost - points;
+            return (
+              <RevealCard key={reward.id} delay={idx * 50}>
+                <div className={`relative overflow-hidden rounded-3xl transition-all ${canAfford && !isParent ? 'ring-2 ring-amber-300 shadow-lg shadow-amber-100' : 'ring-1 ring-black/5'}`}>
+                  {/* Locked overlay */}
+                  {!canAfford && !isParent && (
+                    <div className="absolute inset-0 bg-white/60 z-10 rounded-3xl flex items-center justify-end pr-5">
+                      <div className="flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-full">
+                        <Lock className="w-3 h-3 text-slate-400" />
+                        <span className="text-xs font-black text-slate-500">{ptsNeeded} more pts</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className={`bg-white p-4 flex items-center gap-4 ${!canAfford && !isParent ? 'opacity-60' : ''}`}>
+                    {/* Emoji badge */}
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shrink-0 ${canAfford && !isParent ? 'bg-amber-50 shadow-inner' : 'bg-slate-50'}`}>
+                      {reward.emoji || '🎁'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-slate-800 text-base leading-tight">{reward.title}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <Star className="w-3 h-3 text-amber-500 fill-amber-400" />
+                        <span className="text-sm font-black text-amber-600">{reward.cost.toLocaleString()} pts</span>
+                      </div>
+                      {/* Mini progress bar for kids */}
+                      {!isParent && (
+                        <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden w-full">
+                          <div className={`h-full rounded-full transition-all ${canAfford ? 'bg-amber-400' : 'bg-slate-300'}`} style={{width:`${Math.min(100, Math.round((points/reward.cost)*100))}%`}} />
+                        </div>
+                      )}
+                    </div>
+                    {/* Action button */}
+                    {!isParent ? (
+                      <button
+                        disabled={!canAfford || isRedeeming}
+                        onClick={() => handleRedeem(reward)}
+                        className={`spring-press shrink-0 w-14 h-14 rounded-2xl font-black text-xs flex flex-col items-center justify-center gap-0.5 transition-all ${
+                          isRedeeming ? 'bg-amber-300 scale-90' :
+                          canAfford ? 'bg-amber-400 text-amber-900 shadow-lg shadow-amber-400/40 hover:bg-amber-300 active:scale-95' :
+                          'bg-slate-100 text-slate-300'
+                        }`}
+                      >
+                        {isRedeeming ? <Loader2 className="w-5 h-5 animate-spin" /> : canAfford ? <><span className="text-lg">🎉</span><span>Claim!</span></> : <Lock className="w-4 h-4" />}
+                      </button>
+                    ) : (
+                      <button onClick={() => onDeleteReward?.(reward.id)} className="spring-press shrink-0 w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-400 hover:bg-rose-100 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </RevealCard>
+            );
+          })}
+        </div>
+      )}
+
+      {/* LEADERBOARD TAB */}
+      {activeTab === 'leaderboard' && (
+        <div className="space-y-3">
+          <RevealCard delay={0}>
+            <div className="space-y-2">
+              {leaderboard.length === 0 && (
+                <div className="text-center py-10 text-slate-400 font-medium">No family members yet</div>
+              )}
+              {leaderboard.map((entry, idx) => {
+                const li = getLevelInfo(entry.pts);
+                const medals = ['🥇','🥈','🥉'];
+                const isMe = entry.name === (allUsers.find(u => u)?.name);
+                return (
+                  <div key={entry.name} className={`flex items-center gap-3 p-4 rounded-2xl transition-all ${idx === 0 ? 'bg-amber-50 ring-2 ring-amber-200' : 'bg-slate-50 ring-1 ring-slate-100'}`}>
+                    <span className="text-2xl w-8 text-center shrink-0">{medals[idx] || `#${idx+1}`}</span>
+                    {entry.user ? (
+                      <Avatar user={entry.user} size="sm" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">{entry.name?.[0]}</div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-slate-800 text-sm truncate">{entry.name}</p>
+                      <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r ${li.color} mt-0.5`}>
+                        <span className="text-white text-[9px] font-black">{li.name}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-black text-slate-900 text-base">{entry.pts.toLocaleString()}</p>
+                      <p className="text-slate-400 text-[10px] font-bold">pts</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </RevealCard>
+
+          {/* Level guide */}
+          <RevealCard delay={100}>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Level Guide</p>
+              <div className="grid grid-cols-2 gap-2">
+                {LEVEL_NAMES.map((name, i) => (
+                  <div key={name} className={`flex items-center gap-2 p-2.5 rounded-2xl ${getLevelInfo(points).level === i ? 'ring-2 ring-indigo-300 bg-indigo-50' : 'bg-slate-50'}`}>
+                    <div className={`w-6 h-6 rounded-lg bg-gradient-to-br ${LEVEL_COLORS[i]} shrink-0`} />
+                    <div>
+                      <p className="text-xs font-black text-slate-700">{name}</p>
+                      <p className="text-[9px] text-slate-400 font-bold">{LEVEL_THRESHOLDS[i].toLocaleString()}+ pts</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </RevealCard>
+        </div>
+      )}
+
+      {/* MANAGE TAB (parents only) */}
+      {activeTab === 'manage' && isParent && (
+        <div className="space-y-3">
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="spring-press w-full py-4 rounded-3xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 shadow-md"
+          >
+            <Plus className="w-4 h-4" strokeWidth={2.5} /> Add New Reward
+          </button>
+
+          {rewards.length === 0 && (
+            <div className="text-center py-10 bg-white rounded-3xl ring-1 ring-black/5">
+              <div className="text-4xl mb-3">🎁</div>
+              <p className="text-slate-500 font-bold text-sm">No rewards yet</p>
+              <p className="text-slate-400 text-xs mt-1">Add some to motivate your kids!</p>
+            </div>
+          )}
+
+          {rewards.map((reward, idx) => (
+            <RevealCard key={reward.id} delay={idx * 40}>
+              <div className="bg-white rounded-3xl p-4 ring-1 ring-black/5 flex items-center gap-4">
+                <div className="text-3xl w-12 text-center">{reward.emoji || '🎁'}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-800">{reward.title}</p>
+                  <p className="text-xs font-bold text-amber-600 mt-0.5">⭐ {reward.cost} pts</p>
+                </div>
+                <button onClick={() => onDeleteReward?.(reward.id)} className="spring-press w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-400 hover:bg-rose-100">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </RevealCard>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* ADD REWARD MODAL */}
+      <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="New Reward">
+        <div className="space-y-4">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Pick an emoji</p>
+            <div className="grid grid-cols-5 gap-2">
+              {EMOJI_OPTIONS.map(em => (
+                <button key={em} onClick={() => setNewRewardEmoji(em)}
+                  className={`text-2xl p-2.5 rounded-2xl transition-all ${newRewardEmoji === em ? 'bg-indigo-100 ring-2 ring-indigo-400 scale-110' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                  {em}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Reward Name</label>
+            <input
+              value={newRewardTitle}
+              onChange={e => setNewRewardTitle(e.target.value)}
+              placeholder="e.g., Extra screen time"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 font-medium"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Cost: {newRewardCost} pts</label>
+            <input
+              type="range" min="10" max="500" step="10"
+              value={newRewardCost}
+              onChange={e => setNewRewardCost(Number(e.target.value))}
+              className="w-full accent-indigo-500"
+            />
+            <div className="flex justify-between text-[10px] font-bold text-slate-400 mt-1">
+              <span>10 pts</span><span>Easy</span><span>Hard</span><span>500 pts</span>
+            </div>
+          </div>
+          <button
+            onClick={handleAddReward}
+            disabled={!newRewardTitle.trim()}
+            className="spring-press w-full py-4 rounded-2xl font-bold bg-slate-900 text-white disabled:opacity-40"
+          >
+            Add Reward 🎁
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 };
@@ -2697,18 +3015,26 @@ export default function App() {
     }});
   };
 
-  const handleRedeemReward = async (cost) => {
+  const handleRedeemReward = async (cost, reward) => {
     if (!activeUser) return;
     const pointsAvailable = userPoints[activeUser.name] || 0;
     if (!isParent && pointsAvailable >= cost) {
-      if (false) {
-        setUserPoints(prev => ({ ...prev, [activeUser.name]: Math.max(0, (prev[activeUser.name] || 0) - cost) }));
-      } else {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), { points: pointsAvailable - cost }, { merge: true });
-        sendNotification('Reward Redeemed', `${activeUser.name} just redeemed a reward for ${cost} pts!`, 'Parent');
-      }
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_points', activeUser.name), { points: pointsAvailable - cost }, { merge: true });
+      sendNotification('🎉 Reward Redeemed!', `${activeUser.name} unlocked "${reward?.title || 'a reward'}" for ${cost} pts!`, 'Parent');
       triggerConfetti();
     } else if (isParent) triggerConfetti();
+  };
+
+  const handleAddReward = async (newReward) => {
+    const newId = Date.now().toString();
+    const rewardData = { ...newReward, id: newId, createdAt: Date.now() };
+    if (!firebaseUser) return;
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_rewards', newId), rewardData);
+  };
+
+  const handleDeleteReward = async (id) => {
+    if (!firebaseUser) return;
+    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_rewards', id.toString()));
   };
 
   const handleAddEvent = async (newEvent) => {
@@ -2826,7 +3152,7 @@ export default function App() {
       case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} allUsers={users} suggestions={taskSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} suggestions={calendarSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} suggestions={mealSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
-      case 'rewards': return <RewardsView rewards={rewards} points={displayPoints} onRedeem={handleRedeemReward} isParent={isParent} />;
+      case 'rewards': return <RewardsView rewards={rewards} points={displayPoints} onRedeem={handleRedeemReward} onAddReward={handleAddReward} onDeleteReward={handleDeleteReward} isParent={isParent} allUsers={users} userPoints={userPoints} tasks={tasks} />;
       case 'chat': return <ChatView messages={messages} onSend={handleSendMessage} onDelete={requestDeleteMessage} allUsers={users} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'settings': return <SettingsView user={activeUser} isParent={isParent} onLogout={() => { setActiveUser(null); signOut(auth); }} allUsers={users} userPoints={userPoints} tasks={tasks} onUpdatePhoto={handleUpdatePhoto} onUpdateUser={handleUpdateUser} onBack={() => setActiveTab('home')} onUpdateMember={handleUpdateFamilyMember} onAddMember={handleAddFamilyMember} onDeleteMember={handleDeleteFamilyMember} />;
       default: return null;
