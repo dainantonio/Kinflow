@@ -2332,7 +2332,7 @@ export default function App() {
   const [activeUser, setActiveUser] = useState(() => { try { const saved = localStorage.getItem('kinflow_lastProfile'); return saved ? JSON.parse(saved) : null; } catch(e) { return null; } }); 
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [hasOnboarded, setHasOnboarded] = useState(() => { try { return localStorage.getItem('kinflow_hasOnboarded') === 'true'; } catch(e) { return false; } });
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => { try { const saved = localStorage.getItem('kinflow_lastProfile'); return saved ? JSON.parse(saved) : null; } catch(e) { return false; } } ? false : false);
     
   const [confirmActionState, setConfirmActionState] = useState(null);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
@@ -2498,6 +2498,7 @@ export default function App() {
 
   const handleLogin = (user) => {
     setActiveUser(user);
+    try { localStorage.setItem('kinflow_lastProfile', JSON.stringify(user)); } catch(e) {}
     if (user.role === 'Parent' && !hasOnboarded) setShowOnboarding(true);
   };
 
@@ -2852,7 +2853,7 @@ export default function App() {
 
         {/* UNDO DELETE TOAST */}
         {undoDelete && (
-          <div className="fixed bottom-28 inset-x-0 z-[98] flex justify-center px-4 pointer-events-none">
+          <div className="fixed bottom-24 inset-x-0 z-[98] flex justify-center px-4 pointer-events-none" style={{paddingBottom:'max(env(safe-area-inset-bottom, 16px), 16px)'}}>
             <div className="bg-slate-900/96 backdrop-blur-xl text-white px-5 py-4 rounded-3xl shadow-2xl ring-1 ring-white/10 flex items-center gap-3 max-w-sm w-full animate-slide-up pointer-events-auto">
               <Trash2 className="w-4 h-4 text-white/40 shrink-0" />
               <span className="flex-1 text-sm font-medium text-white/80">{undoDelete.message}</span>
@@ -2862,7 +2863,7 @@ export default function App() {
         )}
 
         {/* TOP APP BAR */}
-        <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-30" style={{paddingTop:'max(env(safe-area-inset-top, 0px), 10px)', background:'rgba(248,250,252,0.95)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
+        <div className="flex items-center justify-between px-4 py-3 sticky top-0 z-30 border-b border-slate-200/50" style={{paddingTop:'max(env(safe-area-inset-top, 0px), 10px)', background:'rgba(248,250,252,0.95)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)'}}>
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{
               {home:'Today', tasks:'Tasks', calendar:'Schedule', meals:'Meals', chat:'Family', rewards:'Rewards', settings:'Profile'}[activeTab] || 'Kinflow'
@@ -2890,7 +2891,7 @@ export default function App() {
 
         {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto" style={{scrollBehavior:'smooth', WebkitOverflowScrolling:'touch', overscrollBehavior:'contain', minHeight:0}}>
-          <div className="px-4 pt-4 pb-36 max-w-lg mx-auto w-full">
+          <div className="px-4 pt-6 pb-36 max-w-lg mx-auto w-full">
             {renderContent()}
           </div>
         </div>
@@ -2952,7 +2953,7 @@ export default function App() {
         </Modal>
 
         {/* PREMIUM BOTTOM NAV */}
-        <div className="fixed bottom-0 inset-x-0 z-40">
+        <div className="fixed bottom-0 inset-x-0 z-40" style={{paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
           <div className="mx-4 mb-4">
             <nav className={`${isChild ? 'bg-white ring-1 ring-black/5' : 'bg-white/95 backdrop-blur-2xl ring-1 ring-black/5'} rounded-[2rem] shadow-[0_-2px_40px_rgba(0,0,0,0.12)] flex items-center px-2 py-1`}>
               {navItems.map((item) => {
