@@ -1044,7 +1044,7 @@ const ChildHome = ({ tasks, events, points, activeUser, onNavigate }) => {
   );
 };
 
-const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, allUsers = [], suggestions = [], onApproveSuggestion, onDismissSuggestion }) => {
+const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, onOpenCopilot, allUsers = [], suggestions = [], onApproveSuggestion, onDismissSuggestion }) => {
   const { isChild } = useContext(ThemeContext);
 
   // Kids get their own dedicated home screen
@@ -1055,6 +1055,11 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, al
   const visibleTasks = tasks;
   const openTasks = visibleTasks.filter(t => t.status === 'open').length;
   const pendingApproval = tasks.filter(t => t.status === 'pending').length;
+  const copilotPrompt = pendingApproval > 0
+    ? `${pendingApproval} task${pendingApproval > 1 ? 's' : ''} pending approval — what should I focus on today?`
+    : openTasks > 0
+    ? `There are ${openTasks} open chores — what should I focus on today?`
+    : `What should I focus on today?`;
 
   return (
     <div className="space-y-5 animate-bounce-in">
@@ -1069,13 +1074,44 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, al
             <p className="text-white/40 text-xs font-medium mt-1 mb-4">
               {`${openTasks} chores open · ${pendingApproval} need review`}
             </p>
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-2xl ring-1 ring-white/15">
-              <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
-              <span className="text-white font-bold text-sm">{points} family pts</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-2xl ring-1 ring-white/15">
+                <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
+                <span className="text-white font-bold text-sm">{points} family pts</span>
+              </div>
+              {/* Copilot quick-fire button inside hero */}
+              {onOpenCopilot && (
+                <button
+                  onClick={() => onOpenCopilot(copilotPrompt)}
+                  className="spring-press inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-2xl ring-1 ring-white/15 hover:bg-white/20 transition-colors"
+                >
+                  <Wand2 className="w-4 h-4 text-violet-300" />
+                  <span className="text-white/80 font-bold text-sm">Ask Copilot</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
       </RevealCard>
+
+      {/* COPILOT FOCUS CARD — persistent entry point */}
+      {onOpenCopilot && (
+        <RevealCard delay={20}>
+          <button
+            onClick={() => onOpenCopilot(copilotPrompt)}
+            className="spring-press w-full text-left bg-gradient-to-r from-indigo-50 to-violet-50 rounded-3xl p-4 ring-1 ring-indigo-100 flex items-center gap-4 hover:ring-indigo-300 transition-all"
+          >
+            <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/25">
+              <Wand2 className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-slate-800 text-sm">What should I focus on today?</p>
+              <p className="text-indigo-500 text-xs font-semibold mt-0.5">Tap to ask your family AI →</p>
+            </div>
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shrink-0" />
+          </button>
+        </RevealCard>
+      )}
 
       {suggestions.length > 0 && (
         <RevealCard delay={40}>
@@ -2741,13 +2777,30 @@ const SettingRow = ({ icon: Icon, label, value, className = '', iconClass = '', 
   );
 };
 
-const AICopilotModal = ({ isOpen, onClose, familyContext = {} }) => {
+const AICopilotModal = ({ isOpen, onClose, familyContext = {}, initialMessage = null }) => {
   const [messages, setMessages] = useState([{ role: 'ai', text: "Hi! I'm your Kinflow Copilot. I know your family's tasks, schedule, and meals. Ask me anything — or try a quick action below." }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const firedInitial = useRef(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isLoading]);
+
+  // Reset conversation and fire initialMessage each time modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setMessages([{ role: 'ai', text: "Hi! I'm your Kinflow Copilot. I know your family's tasks, schedule, and meals. Ask me anything — or try a quick action below." }]);
+      firedInitial.current = false;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && initialMessage && !firedInitial.current) {
+      firedInitial.current = true;
+      // Small delay so the reset above settles first
+      setTimeout(() => handleSend(initialMessage), 120);
+    }
+  }, [isOpen, initialMessage]);
 
   // Build rich context string from live family data
   const buildContextSummary = () => {
@@ -2932,12 +2985,20 @@ export default function App() {
   const [rewards, setRewards] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [agentSuggestions, setAgentSuggestions] = useState([]);
-  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState([]);
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kinflow_dismissed_suggestions') || '[]'); } catch { return []; }
+  });
   
   // Non-Firebase States
   const [groceries, setGroceries] = useState([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [copilotInitialMessage, setCopilotInitialMessage] = useState(null);
+
+  const openCopilot = (prefill = null) => {
+    setCopilotInitialMessage(prefill);
+    setIsCopilotOpen(true);
+  };
   const [undoDelete, setUndoDelete] = useState(null); // { message, onUndo }
   const [users, setUsers] = useState([]);
 
@@ -3415,20 +3476,31 @@ export default function App() {
   const localMealSuggestions = mealAgent.execute({ prompt: 'healthy family dinners', inventory: groceries, mealHistory: meals, familySize: users.length || 4 }).suggestions || [];
   const localScheduleSuggestions = scheduleAgent.execute({ events }).suggestions || [];
 
-  const normalizeSuggestion = (suggestion, source = 'agent') => ({
-    ...suggestion,
-    id: suggestion.id || `${source}-${Date.now()}-${Math.random()}`,
-    source,
-    icon: suggestion.icon || (source === 'task' ? '📋' : source === 'meal' ? '🍽️' : source === 'schedule' ? '📅' : source === 'proactive' ? '💡' : '🤖'),
-    subtitle: suggestion.subtitle || suggestion.payload?.reason || suggestion.payload?.mealName || suggestion.payload?.taskId || '',
-    reasoning: suggestion.reasoning || (
-      source === 'task' ? `The task agent analyzed current assignments and workload distribution across your family.` :
-      source === 'meal' ? `Based on your meal history and family size — variety and prep time were factored in.` :
-      source === 'schedule' ? `The schedule agent scanned all events for conflicts and available time slots.` :
-      source === 'proactive' ? suggestion.proactiveReason || `Proactively suggested based on upcoming week patterns.` :
-      `Suggested by the automation agent based on recent family activity.`
-    ),
-  });
+  // Stable content hash — same logical suggestion always gets the same ID across renders/sessions
+  const suggestionHash = (suggestion, source) => {
+    const key = `${source}::${suggestion.title || ''}::${suggestion.subtitle || ''}::${suggestion.payload?.taskId || suggestion.payload?.assignee || suggestion.payload?.mealName || ''}`;
+    let h = 0;
+    for (let i = 0; i < key.length; i++) { h = Math.imul(31, h) + key.charCodeAt(i) | 0; }
+    return `hash-${(h >>> 0).toString(16)}`;
+  };
+
+  const normalizeSuggestion = (suggestion, source = 'agent') => {
+    const stableId = suggestion.id && !suggestion.id.includes('Date') ? suggestion.id : suggestionHash(suggestion, source);
+    return {
+      ...suggestion,
+      id: stableId,
+      source,
+      icon: suggestion.icon || (source === 'task' ? '📋' : source === 'meal' ? '🍽️' : source === 'schedule' ? '📅' : source === 'proactive' ? '💡' : '🤖'),
+      subtitle: suggestion.subtitle || suggestion.payload?.reason || suggestion.payload?.mealName || suggestion.payload?.taskId || '',
+      reasoning: suggestion.reasoning || (
+        source === 'task' ? `The task agent analyzed current assignments and workload distribution across your family.` :
+        source === 'meal' ? `Based on your meal history and family size — variety and prep time were factored in.` :
+        source === 'schedule' ? `The schedule agent scanned all events for conflicts and available time slots.` :
+        source === 'proactive' ? suggestion.proactiveReason || `Proactively suggested based on upcoming week patterns.` :
+        `Suggested by the automation agent based on recent family activity.`
+      ),
+    };
+  };
 
   // PROACTIVE PLANNER — Sunday evening: suggest weekly chore planning
   const proactivePlannerFired = useRef(false);
@@ -3476,13 +3548,22 @@ export default function App() {
     return suggestions;
   }, [tasks, meals]);
 
-  const mergedSuggestions = [
-    ...agentSuggestions.filter((s) => (s.status || 'proposed') === 'proposed').map((s) => normalizeSuggestion(s, 'automation')),
-    ...proactiveSuggestions.map((s) => normalizeSuggestion(s, 'proactive')),
-    ...localTaskSuggestions.map((s) => normalizeSuggestion(s, 'task')),
-    ...localMealSuggestions.map((s) => normalizeSuggestion(s, 'meal')),
-    ...localScheduleSuggestions.map((s) => normalizeSuggestion(s, 'schedule')),
-  ].filter((s) => !dismissedSuggestionIds.includes(s.id));
+  const mergedSuggestions = (() => {
+    const all = [
+      ...agentSuggestions.filter((s) => (s.status || 'proposed') === 'proposed').map((s) => normalizeSuggestion(s, 'automation')),
+      ...proactiveSuggestions.map((s) => normalizeSuggestion(s, 'proactive')),
+      ...localTaskSuggestions.map((s) => normalizeSuggestion(s, 'task')),
+      ...localMealSuggestions.map((s) => normalizeSuggestion(s, 'meal')),
+      ...localScheduleSuggestions.map((s) => normalizeSuggestion(s, 'schedule')),
+    ];
+    // Deduplicate by stable hash ID — first occurrence wins
+    const seen = new Set();
+    return all.filter(s => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return !dismissedSuggestionIds.includes(s.id);
+    });
+  })();
 
   const taskSuggestions = mergedSuggestions.filter((s) => s.agent === 'task' || s.type === 'assignment' || s.type === 'reminder');
   const mealSuggestions = mergedSuggestions.filter((s) => s.agent === 'meal' || s.type === 'meal_plan' || s.type === 'grocery_list');
@@ -3490,7 +3571,11 @@ export default function App() {
   const dashboardSuggestions = mergedSuggestions.slice(0, 3);
 
   const dismissSuggestion = async (suggestionId) => {
-    setDismissedSuggestionIds((prev) => [...new Set([...prev, suggestionId])]);
+    setDismissedSuggestionIds((prev) => {
+      const next = [...new Set([...prev, suggestionId])];
+      try { localStorage.setItem('kinflow_dismissed_suggestions', JSON.stringify(next)); } catch {}
+      return next;
+    });
     const found = agentSuggestions.find((s) => String(s.id) === String(suggestionId));
     if (found && firebaseUser) {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'kinflow_agent_suggestions', suggestionId.toString()), { status: 'dismissed' });
@@ -3533,7 +3618,7 @@ export default function App() {
   const renderContent = () => {
     const displayPoints = isParent ? Object.values(userPoints).reduce((a, b) => a + b, 0) : (userPoints[activeUser?.name] || 0);
     switch(activeTab) {
-      case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} allUsers={users} suggestions={dashboardSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
+      case 'home': return <Dashboard tasks={tasks} events={events} points={displayPoints} activeUser={activeUser} isParent={isParent} onNavigate={setActiveTab} onOpenCopilot={isParent ? openCopilot : null} allUsers={users} suggestions={dashboardSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'tasks': return <TasksView tasks={tasks} onAction={handleTaskAction} onAdd={handleAddTask} onDelete={requestDeleteTask} activeUser={activeUser} isParent={isParent} allUsers={users} suggestions={taskSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'calendar': return <CalendarView events={events} onAdd={handleAddEvent} onDelete={requestDeleteEvent} isParent={isParent} suggestions={calendarSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
       case 'meals': return <MealsView meals={meals} onAdd={handleAddMeal} onUpdate={handleUpdateMeal} onDelete={requestDeleteMeal} isParent={isParent} groceries={groceries} setGroceries={setGroceries} suggestions={mealSuggestions} onApproveSuggestion={approveSuggestion} onDismissSuggestion={dismissSuggestion} />;
@@ -3635,7 +3720,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-2 pt-2">
             {isParent && (
-              <button onClick={() => setIsCopilotOpen(true)} className="spring-press w-9 h-9 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-md shadow-indigo-500/25">
+              <button onClick={() => openCopilot()} className="spring-press w-9 h-9 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-md shadow-indigo-500/25">
                 <Wand2 className="w-4 h-4 text-white" strokeWidth={2} />
               </button>
             )}
@@ -3735,7 +3820,7 @@ export default function App() {
 
         {/* No standalone FAB - AI Copilot is in the top bar */}
 
-        <AICopilotModal isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} familyContext={{ tasks, events, meals, users, userPoints }} />
+        <AICopilotModal isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} familyContext={{ tasks, events, meals, users, userPoints }} initialMessage={copilotInitialMessage} />
 
         <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title="Switch Profile">
           <div className="space-y-3">
@@ -3746,6 +3831,37 @@ export default function App() {
                 {activeUser?.id === user.id && <Check className="w-5 h-5 text-slate-800 ml-auto" />}
               </div>
             ))}
+            {/* Divider */}
+            <div className="border-t border-slate-100 pt-2 space-y-2">
+              {isParent && (
+                <button
+                  onClick={() => { setIsUserSwitcherOpen(false); setActiveTab('settings'); }}
+                  className="spring-press w-full flex items-center gap-3 p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5 transition-all"
+                >
+                  <div className="w-9 h-9 bg-slate-200 rounded-xl flex items-center justify-center shrink-0">
+                    <Users className="w-4 h-4 text-slate-600" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold text-slate-800 text-sm">Manage Members</p>
+                    <p className="text-xs text-slate-400 font-medium">Add, edit or remove family</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 ml-auto" />
+                </button>
+              )}
+              <button
+                onClick={() => { setIsUserSwitcherOpen(false); setActiveTab('settings'); }}
+                className="spring-press w-full flex items-center gap-3 p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5 transition-all"
+              >
+                <div className="w-9 h-9 bg-slate-200 rounded-xl flex items-center justify-center shrink-0">
+                  <Settings className="w-4 h-4 text-slate-600" />
+                </div>
+                <div className="text-left">
+                  <p className="font-bold text-slate-800 text-sm">Settings & Profile</p>
+                  <p className="text-xs text-slate-400 font-medium">Account, photo, preferences</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 ml-auto" />
+              </button>
+            </div>
           </div>
         </Modal>
 
