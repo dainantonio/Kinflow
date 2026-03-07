@@ -962,24 +962,48 @@ const Dashboard = ({ tasks, events, points, activeUser, isParent, onNavigate, su
             {isParent && <button onClick={() => onNavigate('calendar')} className="text-xs font-bold text-indigo-500 hover:text-indigo-700 transition-colors">View all</button>}
           </div>
           <div className="space-y-2">
-            {events.slice(0,2).map((event, i) => (
-              <div key={event.id} className="spring-press bg-white rounded-2xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4" style={{animationDelay:`${i*80}ms`}}>
-                <div className={`w-1 h-10 rounded-full shrink-0 ${event.color}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="font-bold text-slate-800 text-sm truncate">{event.title}</p>
-                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                    <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/>{event.time}</span>
-                    <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3"/>{event.location}</span>
-                  </div>
+            {(() => {
+              const now = new Date();
+              const upcoming = (events || [])
+                .filter(ev => {
+                  if (!ev.date) return true;
+                  // Build a datetime: combine date + parsed time, fall back to end-of-day so today's events stay visible
+                  const base = new Date(ev.date + 'T23:59:59');
+                  if (ev.time) {
+                    const t = ev.time.match(/(\d+):(\d+)\s*(am|pm)?/i);
+                    if (t) {
+                      let h = parseInt(t[1]), m = parseInt(t[2]);
+                      const ampm = (t[3] || '').toLowerCase();
+                      if (ampm === 'pm' && h < 12) h += 12;
+                      if (ampm === 'am' && h === 12) h = 0;
+                      const dt = new Date(ev.date + 'T00:00:00');
+                      dt.setHours(h, m, 0, 0);
+                      return dt >= now;
+                    }
+                  }
+                  return base >= now;
+                })
+                .sort((a, b) => new Date(a.date + 'T12:00:00') - new Date(b.date + 'T12:00:00'))
+                .slice(0, 2);
+              if (upcoming.length === 0) return (
+                <div className="bg-slate-50 rounded-2xl p-5 text-center">
+                  <p className="text-slate-400 text-sm font-medium">No upcoming events 🎉</p>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-              </div>
-            ))}
-            {events.length === 0 && (
-              <div className="bg-slate-50 rounded-2xl p-5 text-center">
-                <p className="text-slate-400 text-sm font-medium">No events today 🎉</p>
-              </div>
-            )}
+              );
+              return upcoming.map((event, i) => (
+                <div key={event.id} className="spring-press bg-white rounded-2xl p-4 shadow-sm ring-1 ring-black/5 flex items-center gap-4" style={{animationDelay:`${i*80}ms`}}>
+                  <div className={`w-1 h-10 rounded-full shrink-0 ${event.color}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-slate-800 text-sm truncate">{event.title}</p>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/>{event.time}</span>
+                      <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3"/>{event.location}</span>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                </div>
+              ));
+            })()}
           </div>
         </div>
       </RevealCard>
@@ -1336,6 +1360,25 @@ const CalendarView = ({ events, onAdd, onDelete, isParent, suggestions = [], onA
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate();
 
+  const parseEventDateTime = (event) => {
+    if (!event.date) return new Date();
+    // Try to parse the free-text time field (e.g. "2:00 PM", "14:30", "9am")
+    if (event.time) {
+      const t = event.time.match(/(\d+):?(\d*)\s*(am|pm)?/i);
+      if (t) {
+        let h = parseInt(t[1]), m = parseInt(t[2] || '0');
+        const ampm = (t[3] || '').toLowerCase();
+        if (ampm === 'pm' && h < 12) h += 12;
+        if (ampm === 'am' && h === 12) h = 0;
+        const dt = new Date(event.date + 'T00:00:00');
+        dt.setHours(h, m, 0, 0);
+        return dt;
+      }
+    }
+    // No parseable time — treat as end of day so the event stays visible all day
+    return new Date(event.date + 'T23:59:59');
+  };
+
   const parseEventDate = (event) => {
     if (event.date) return new Date(event.date + 'T12:00:00');
     return new Date();
@@ -1362,13 +1405,12 @@ const CalendarView = ({ events, onAdd, onDelete, isParent, suggestions = [], onA
     [events, selectedDay]
   );
 
-  const allSortedEvents = React.useMemo(() =>
-    [...(events || [])].sort((a, b) => {
-      const da = parseEventDate(a), db = parseEventDate(b);
-      return da - db || (a.createdAt || 0) - (b.createdAt || 0);
-    }),
-    [events]
-  );
+  const allSortedEvents = React.useMemo(() => {
+    const now = new Date();
+    const upcoming = [...(events || [])].filter(e => parseEventDateTime(e) >= now).sort((a, b) => parseEventDateTime(a) - parseEventDateTime(b));
+    const past = [...(events || [])].filter(e => parseEventDateTime(e) < now).sort((a, b) => parseEventDateTime(b) - parseEventDateTime(a));
+    return [...upcoming, ...past];
+  }, [events]);
 
   const listEvents = selectedDayEvents.length > 0 ? selectedDayEvents : allSortedEvents;
 
@@ -1552,16 +1594,21 @@ const CalendarView = ({ events, onAdd, onDelete, isParent, suggestions = [], onA
               )}
             </div>
           )}
-          {listEvents.map((event, idx) => (
+          {listEvents.map((event, idx) => {
+            const isPast = parseEventDateTime(event) < new Date();
+            return (
             <RevealCard key={event.id} delay={idx * 50}>
               <div className="relative overflow-hidden rounded-3xl">
                 <div
                   onClick={() => { if (isParent) setSwipedEventId(swipedEventId === event.id ? null : event.id); }}
-                  className={`bg-white rounded-3xl shadow-sm ring-1 ring-black/5 flex items-center gap-4 p-4 transition-all duration-300 cursor-pointer ${isParent && swipedEventId === event.id ? '-translate-x-16' : 'translate-x-0'}`}
+                  className={`bg-white rounded-3xl shadow-sm ring-1 ring-black/5 flex items-center gap-4 p-4 transition-all duration-300 cursor-pointer ${isParent && swipedEventId === event.id ? '-translate-x-16' : 'translate-x-0'} ${isPast ? 'opacity-50' : ''}`}
                 >
                   <div className={`w-1 h-14 rounded-full shrink-0 ${event.color || 'bg-indigo-500'}`} />
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-800 text-sm">{event.title}</p>
+                    <div className="flex items-center gap-2">
+                      <p className={`font-bold text-sm ${isPast ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{event.title}</p>
+                      {isPast && <span className="text-[9px] font-black bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">Past</span>}
+                    </div>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
                       {event.time && <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/>{event.time}</span>}
                       {event.location && <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><MapPin className="w-3 h-3"/>{event.location}</span>}
@@ -1583,7 +1630,8 @@ const CalendarView = ({ events, onAdd, onDelete, isParent, suggestions = [], onA
                 )}
               </div>
             </RevealCard>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -2825,6 +2873,71 @@ export default function App() {
       setTimeout(() => setLatestToast(null), 4500);
     }
   }, [notifications, activeUser, isParent]);
+
+  // EVENT REMINDER SYSTEM
+  // Tracks which event IDs have already fired a reminder so we don't double-notify
+  const firedReminders = useRef(new Set());
+
+  useEffect(() => {
+    if (!activeUser || !isParent) return; // Only parent fires reminders (they're the scheduler)
+
+    const checkUpcoming = () => {
+      const now = Date.now();
+      (events || []).forEach(ev => {
+        if (!ev.date) return;
+
+        // Parse the event's full datetime
+        let eventMs;
+        if (ev.time) {
+          const t = ev.time.match(/(\d+):?(\d*)\s*(am|pm)?/i);
+          if (t) {
+            let h = parseInt(t[1]), m = parseInt(t[2] || '0');
+            const ampm = (t[3] || '').toLowerCase();
+            if (ampm === 'pm' && h < 12) h += 12;
+            if (ampm === 'am' && h === 12) h = 0;
+            const dt = new Date(ev.date + 'T00:00:00');
+            dt.setHours(h, m, 0, 0);
+            eventMs = dt.getTime();
+          }
+        }
+        if (!eventMs) return; // Can't calculate without a parseable time — skip
+
+        const msUntil = eventMs - now;
+        const thirtyMinKey = `${ev.id}-30min`;
+        const startKey = `${ev.id}-start`;
+
+        // 30-minute warning: fire when between 29–31 minutes away
+        if (msUntil > 29 * 60000 && msUntil <= 31 * 60000 && !firedReminders.current.has(thirtyMinKey)) {
+          firedReminders.current.add(thirtyMinKey);
+          const target = ev.assignee || 'Parent'; // notify assignee if set, else parent
+          users.forEach(u => {
+            sendNotification(
+              `⏰ Starting in 30 min`,
+              `"${ev.title}"${ev.location ? ` at ${ev.location}` : ''} starts at ${ev.time}`,
+              u.role === 'Parent' ? 'Parent' : u.name
+            );
+          });
+        }
+
+        // At-start alert: fire when between -1 and +1 minute of start
+        if (msUntil >= -60000 && msUntil <= 60000 && !firedReminders.current.has(startKey)) {
+          firedReminders.current.add(startKey);
+          users.forEach(u => {
+            sendNotification(
+              `🚨 Starting now!`,
+              `"${ev.title}"${ev.location ? ` at ${ev.location}` : ''} is starting now`,
+              u.role === 'Parent' ? 'Parent' : u.name
+            );
+          });
+        }
+      });
+    };
+
+    // Check immediately, then every 60 seconds
+    checkUpcoming();
+    const interval = setInterval(checkUpcoming, 60000);
+    return () => clearInterval(interval);
+  }, [events, activeUser, isParent, users]);
 
   const handleLogin = (user) => {
     setActiveUser(user);
