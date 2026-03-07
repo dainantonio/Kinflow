@@ -2358,7 +2358,7 @@ export default function App() {
   const [undoDelete, setUndoDelete] = useState(null); // { message, onUndo }
   const [users, setUsers] = useState([]);
 
-  const prevNotifsLength = useRef(0);
+
 
   const isParent = activeUser?.role === 'Parent';
   const isChild = activeUser?.role === 'Child';
@@ -2482,30 +2482,36 @@ export default function App() {
   }, []);
 
   // TOAST PUSH NOTIFICATION LISTENER
+  // Track which notif IDs we've already toasted so we never miss or double-fire
+  const seenNotifIds = useRef(new Set());
+
   useEffect(() => {
-    if (!activeUser || notifications.length === 0) {
-      prevNotifsLength.current = notifications.length;
-      return;
+    if (!activeUser || notifications.length === 0) return;
+
+    // Find notifications targeted at the current user that we haven't shown yet
+    const mine = notifications.filter(n => {
+      const targeted = isParent ? n.target === 'Parent' : n.target === activeUser.name;
+      const unseen = !seenNotifIds.current.has(n.id);
+      // Only show notifications from the last 30 seconds (handles tab switches, profile switches)
+      const fresh = n.createdAt > Date.now() - 30000;
+      return targeted && unseen && fresh;
+    });
+
+    // Mark all current notifications as seen regardless (so old ones never pop up)
+    notifications.forEach(n => seenNotifIds.current.add(n.id));
+
+    if (mine.length > 0) {
+      // Show the most recent one
+      const newest = mine.sort((a, b) => b.createdAt - a.createdAt)[0];
+      setLatestToast(newest);
+      setTimeout(() => setLatestToast(null), 4500);
     }
-    if (notifications.length > prevNotifsLength.current) {
-      // Only look at notifications targeted at ME
-      const forMe = notifications.filter(n =>
-        isParent ? n.target === 'Parent' : n.target === activeUser.name
-      );
-      // Find the newest one that arrived within the last 8 seconds
-      const recent = forMe
-        .filter(n => n.createdAt > Date.now() - 8000)
-        .sort((a, b) => b.createdAt - a.createdAt)[0];
-      if (recent) {
-        setLatestToast(recent);
-        setTimeout(() => setLatestToast(null), 4500);
-      }
-    }
-    prevNotifsLength.current = notifications.length;
   }, [notifications, activeUser, isParent]);
 
   const handleLogin = (user) => {
     setActiveUser(user);
+    // Reset seen notification IDs so this profile sees its own fresh notifications
+    seenNotifIds.current = new Set();
     // Only show onboarding for Parent role if they haven't completed it yet
     if (user.role === 'Parent' && !hasOnboarded) {
       setShowOnboarding(true);
@@ -2981,7 +2987,7 @@ export default function App() {
         <Modal isOpen={isUserSwitcherOpen} onClose={() => setIsUserSwitcherOpen(false)} title="Switch Profile">
           <div className="space-y-3">
             {users.map(user => (
-              <div key={user.id} onClick={() => { setActiveUser(user); setIsUserSwitcherOpen(false); }} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser?.id === user.id ? 'bg-slate-100 ring-2 ring-slate-400' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}>
+              <div key={user.id} onClick={() => { setActiveUser(user); seenNotifIds.current = new Set(); setIsUserSwitcherOpen(false); }} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all ${activeUser?.id === user.id ? 'bg-slate-100 ring-2 ring-slate-400' : 'bg-slate-50 hover:bg-slate-100 ring-1 ring-slate-900/5'}`}>
                 <Avatar user={user} size="md" />
                 <div><h4 className="font-bold text-slate-800">{user.name}</h4><p className="text-xs font-medium text-slate-500">{user.role}</p></div>
                 {activeUser?.id === user.id && <Check className="w-5 h-5 text-slate-800 ml-auto" />}
