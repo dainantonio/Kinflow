@@ -3660,30 +3660,38 @@ export default function App() {
           </div>
         </div>
 
-        {/* SCROLLABLE CONTENT — offset below fixed header */}
+        {/* SCROLLABLE CONTENT — non-chat tabs only */}
         <div
-          className={`flex-1 ${activeTab === 'chat' ? 'overflow-hidden' : 'overflow-y-auto'}`}
+          className="flex-1 overflow-y-auto"
           style={{
             paddingTop: 'calc(56px + env(safe-area-inset-top, 0px))',
             scrollBehavior: 'smooth',
             WebkitOverflowScrolling: 'touch',
             overscrollBehavior: 'contain',
             minHeight: 0,
+            display: activeTab === 'chat' ? 'none' : 'block',
           }}
         >
-          {activeTab === 'chat'
-            ? (
-              <div className="h-full px-4 pt-4 pb-4 max-w-lg mx-auto w-full flex flex-col">
-                {renderContent()}
-              </div>
-            )
-            : (
-              <div className="px-4 pt-6 pb-36 max-w-lg mx-auto w-full">
-                {renderContent()}
-              </div>
-            )
-          }
+          <div className="px-4 pt-6 pb-36 max-w-lg mx-auto w-full">
+            {activeTab !== 'chat' && renderContent()}
+          </div>
         </div>
+
+        {/* CHAT — completely independent fixed layer, never affects scroll state of other tabs */}
+        {activeTab === 'chat' && (
+          <div
+            className="fixed inset-0 flex flex-col"
+            style={{
+              paddingTop: 'calc(56px + env(safe-area-inset-top, 0px))',
+              paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
+              zIndex: 10,
+            }}
+          >
+            <div className="flex-1 px-4 max-w-lg mx-auto w-full flex flex-col min-h-0">
+              {renderContent()}
+            </div>
+          </div>
+        )}
 
         {/* Global Notifications Modal */}
         <Modal isOpen={isNotifModalOpen} onClose={() => setIsNotifModalOpen(false)} title="Notifications" fullHeight>
