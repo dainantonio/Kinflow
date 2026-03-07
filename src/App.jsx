@@ -2399,17 +2399,28 @@ export default function App() {
     if (!auth) return;
     let cleanup;
     const initAuth = async () => {
-      // Drain any pending redirect result before subscribing to auth state.
-      // This ensures getRedirectResult fully resolves (and Firebase processes
-      // the credential) before onAuthStateChanged fires, preventing the race
-      // condition where onAuthStateChanged fires null first and shows AuthScreen.
+      // Drain any pending redirect result BEFORE subscribing to auth state.
+      // This is critical on mobile: after signInWithRedirect() completes,
+      // Firebase needs to process the credential. If onAuthStateChanged fires
+      // before getRedirectResult() completes, it will fire with null, causing
+      // the app to show AuthScreen and loop. By awaiting getRedirectResult first,
+      // we ensure Firebase has fully processed the redirect before we subscribe.
       try {
-        await getRedirectResult(auth);
+        const result = await getRedirectResult(auth);
+        // Note: if result is non-null, the user is already set in Firebase's
+        // auth state and will be picked up by onAuthStateChanged below.
+        if (result?.user) {
+          console.log('Redirect sign-in successful:', result.user.email);
+        }
       } catch (e) {
-        // Ignore errors (e.g. no pending redirect, domain issues) — 
+        // Ignore errors (e.g. no pending redirect, domain issues, user cancelled).
         // onAuthStateChanged will still correctly reflect current auth state.
-        console.warn('getRedirectResult:', e?.code);
+        if (e?.code !== 'auth/no-redirect-operation') {
+          console.warn('getRedirectResult error:', e?.code, e?.message);
+        }
       }
+      // Now subscribe to auth state changes. The redirect is fully processed,
+      // so onAuthStateChanged will fire with the correct user (or null if not signed in).
       const unsubscribe = onAuthStateChanged(auth, user => {
         setFirebaseUser(user);
         setAuthReady(true);
